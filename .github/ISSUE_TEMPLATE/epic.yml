@@ -1,0 +1,15 @@
+name: Epic
+description: Un obiettivo ampio del prodotto, scomposto in feature
+title: "E · "
+labels: ["type:epic"]
+body:
+  - type: textarea
+    id: obiettivo
+    attributes:
+      label: Obiettivo
+    validations:
+      required: true
+  - type: textarea
+    id: successo
+    attributes:
+      label: Come capiamo che è raggiunto

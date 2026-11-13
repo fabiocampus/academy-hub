@@ -1,0 +1,24 @@
+name: Bug
+description: Un comportamento diverso da quello atteso
+labels: ["type:bug", "needs-triage"]
+body:
+  - type: textarea
+    id: passi
+    attributes:
+      label: Passi per riprodurre
+    validations:
+      required: true
+  - type: textarea
+    id: atteso
+    attributes:
+      label: Comportamento atteso e osservato
+    validations:
+      required: true
+  - type: input
+    id: ambiente
+    attributes:
+      label: Ambiente
+      placeholder: locale / collaudo / prod, versione
+  - type: markdown
+    attributes:
+      value: "⚠️ Repository pubblico: non incollare segreti, token o dati reali."

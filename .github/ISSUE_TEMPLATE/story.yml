@@ -1,0 +1,40 @@
+name: User story
+description: Una funzione vista da un utente, con criteri di accettazione verificabili
+title: "US-XX · "
+labels: ["type:story", "needs-triage"]
+body:
+  - type: textarea
+    id: storia
+    attributes:
+      label: Storia
+      value: |
+        **Come** <ruolo> **voglio** <azione> **per** <beneficio>.
+    validations:
+      required: true
+  - type: textarea
+    id: criteri
+    attributes:
+      label: Criteri di accettazione
+      description: Forma Dato / Quando / Allora. Includi i casi di errore e i casi vietati.
+      value: |
+        - [ ] Dato ..., quando ..., allora ...
+    validations:
+      required: true
+  - type: input
+    id: regole
+    attributes:
+      label: Regole di business toccate
+      placeholder: "R1, R3 (vedi CONTEXT.md)"
+  - type: textarea
+    id: impatti
+    attributes:
+      label: Impatti
+      description: Schema del database, contratto dell'API, permessi, configurazione.
+  - type: checkboxes
+    id: dor
+    attributes:
+      label: Definition of Ready
+      options:
+        - label: Criteri di accettazione verificabili, compresi i casi di errore
+        - label: Nessuna domanda aperta (o decisione annotata)
+        - label: Chiudibile con una sola pull request

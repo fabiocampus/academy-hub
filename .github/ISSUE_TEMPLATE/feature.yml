@@ -1,0 +1,16 @@
+name: Feature
+description: Un insieme coerente di user story
+title: "F · "
+labels: ["type:feature"]
+body:
+  - type: textarea
+    id: descrizione
+    attributes:
+      label: Descrizione
+    validations:
+      required: true
+  - type: textarea
+    id: storie
+    attributes:
+      label: Storie
+      description: Collega le storie come sub-issue di questa issue.
