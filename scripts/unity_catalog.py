@@ -27,7 +27,8 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.sql import StatementState
 
 CATALOGHI = {"collaudo": "academy_collaudo", "prod": "academy_prod"}
-WAREHOUSE = "9f8eb48fc8353aa1"
+# Cercato per nome, come nel bundle: l'id è del workspace e non sta nel repository.
+WAREHOUSE = "Serverless Starter Warehouse"
 
 # Gli stessi corsi dei dati demo (academy_hub.db.demo); i numeri sono inventati.
 SQL = """
@@ -64,18 +65,22 @@ def main() -> int:
     argomenti.add_argument("comando", choices=["catalogo", "dati-gold"])
     argomenti.add_argument("-t", "--target", choices=sorted(CATALOGHI), required=True)
     argomenti.add_argument("-p", "--profilo", default="academy")
-    argomenti.add_argument("--warehouse", default=WAREHOUSE)
+    argomenti.add_argument("--warehouse", default=WAREHOUSE, help="nome del SQL warehouse")
     a = argomenti.parse_args()
 
     w = WorkspaceClient(profile=a.profilo)
+    warehouse = next((x.id for x in w.warehouses.list() if x.name == a.warehouse), None)
+    if warehouse is None:
+        print(f"Nessun SQL warehouse di nome {a.warehouse!r}", file=sys.stderr)
+        return 1
     catalogo = CATALOGHI[a.target]
     if a.comando == "catalogo":
         # Il nome viene da CATALOGHI, non da chi lancia lo script.
-        if not esegui(w, a.warehouse, f"CREATE CATALOG IF NOT EXISTS {catalogo}"):
+        if not esegui(w, warehouse, f"CREATE CATALOG IF NOT EXISTS {catalogo}"):
             return 1
         print(f"{catalogo} pronto: ora `bundle deployment bind academy {catalogo}`")
         return 0
-    if not esegui(w, a.warehouse, SQL, catalog=catalogo, schema="gold"):
+    if not esegui(w, warehouse, SQL, catalog=catalogo, schema="gold"):
         return 1
     print(f"{catalogo}.gold.iscrizioni_per_corso pronta")
     return 0

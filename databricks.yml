@@ -47,8 +47,11 @@ variables:
   catalogo:
     description: Catalogo Unity Catalog del target (ADR-0011).
   warehouse_id:
-    description: SQL warehouse con cui l'App legge i report, con l'identità dell'utente.
-    default: 9f8eb48fc8353aa1
+    description: >-
+      SQL warehouse con cui l'App legge i report, con l'identità dell'utente. Cercato per
+      nome: l'id è del workspace e non sta nel repository.
+    lookup:
+      warehouse: Serverless Starter Warehouse
 
 resources:
   # Parte analitica (ADR-0011): un catalogo per ambiente con i livelli medallion. Leggere
@@ -158,8 +161,19 @@ targets:
       branch_lakebase: production
       catalogo: academy_prod
     resources:
+      # In prod né il catalogo né i suoi schemi (con le tabelle) si cancellano dal bundle.
       catalogs:
         academy:
+          lifecycle:
+            prevent_destroy: true
+      schemas:
+        bronze:
+          lifecycle:
+            prevent_destroy: true
+        silver:
+          lifecycle:
+            prevent_destroy: true
+        gold:
           lifecycle:
             prevent_destroy: true
       postgres_projects:

@@ -29,6 +29,20 @@ class PersonaNonRegistrata(AzioneNonConsentita):
     titolo = "Persona non registrata nell'Academy"
 
 
+class ReportNonAutorizzato(AzioneNonConsentita):
+    """Unity Catalog (o il warehouse) nega la lettura all'utente collegato (ADR-0011)."""
+
+    tipo = "report-non-autorizzato"
+    titolo = "Non hai i permessi per leggere questo report"
+
+
+class ReportNonDisponibile(ErroreDominio):
+    """Il report non si può leggere ora: configurazione, warehouse o tabella mancanti."""
+
+    tipo = "report-non-disponibile"
+    titolo = "Report non disponibile"
+
+
 class NonTrovato(ErroreDominio, LookupError):
     tipo = "non-trovato"
     titolo = "Risorsa inesistente"

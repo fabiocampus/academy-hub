@@ -10,15 +10,19 @@ from typing import Any
 import pytest
 
 from academy_hub.config import Impostazioni
-from academy_hub.dominio.errori import AzioneNonConsentita, NonAutenticato
+from academy_hub.dominio.errori import (
+    AzioneNonConsentita,
+    ReportNonAutorizzato,
+    ReportNonDisponibile,
+)
 from academy_hub.report import (
     NessunReport,
     ReportDatabricks,
     ReportIscrizioniPerCorso,
-    ReportNonAutorizzato,
-    ReportNonDisponibile,
     RigaIscrizioniPerCorso,
+    invio_http,
     lettore_report,
+    sessione_senza_cookie,
 )
 
 COLONNE = ("letto_come", "corso_id", "titolo", "edizioni", "confermate", "in_attesa")
@@ -62,7 +66,7 @@ class Trasporto:
 
 def _lettore(trasporto: Trasporto) -> ReportDatabricks:
     return ReportDatabricks(
-        warehouse_id="9f8eb48fc8353aa1", catalogo="academy_collaudo", invia=trasporto
+        warehouse_id="0123456789abcdef", catalogo="academy_collaudo", invia=trasporto
     )
 
 
@@ -89,7 +93,7 @@ def test_legge_il_report_con_il_token_dell_utente() -> None:
     [(token, richiesta)] = trasporto.chiamate
     assert token == "token-di-anna"  # noqa: S105 (finto)
     # Catalogo e schema come parametri della richiesta, non dentro il testo SQL.
-    assert richiesta["warehouse_id"] == "9f8eb48fc8353aa1"
+    assert richiesta["warehouse_id"] == "0123456789abcdef"
     assert richiesta["catalog"] == "academy_collaudo"
     assert richiesta["schema"] == "gold"
     assert "academy_collaudo" not in richiesta["statement"]
@@ -147,10 +151,11 @@ def test_warehouse_che_non_finisce_in_tempo(stato: str) -> None:
         _lettore(Trasporto(200, corpo)).iscrizioni_per_corso("t")
 
 
-def test_token_rifiutato_da_databricks_e_non_autenticato() -> None:
+def test_token_rifiutato_a_valle_non_e_un_401_dell_app() -> None:
+    """L'utente è autenticato presso l'App: un 401 farebbe rifare il login per niente."""
     corpo = {"error_code": "UNAUTHENTICATED", "message": "Invalid access token."}
 
-    with pytest.raises(NonAutenticato):
+    with pytest.raises(ReportNonDisponibile):
         _lettore(Trasporto(401, corpo)).iscrizioni_per_corso("t")
 
 
@@ -176,14 +181,148 @@ def test_colonne_inattese_non_disponibile() -> None:
         _lettore(Trasporto(200, corpo)).iscrizioni_per_corso("t")
 
 
-def test_il_token_non_finisce_nei_log(caplog: pytest.LogCaptureFixture) -> None:
+@pytest.mark.parametrize(
+    ("stato", "corpo"),
+    [
+        (200, _fallita("BAD_REQUEST", "[TABLE_OR_VIEW_NOT_FOUND] manca")),
+        (200, _fallita("PERMISSION_DENIED", "no")),
+        (200, {"status": {"state": "RUNNING"}}),
+        (200, _riuscita([["a", "x", "t", "1", "1", "1"]])),
+        (200, _riuscita([["a", "1"]], COLONNE[:2])),
+        (401, {"error_code": "UNAUTHENTICATED"}),
+        (403, {"error_code": "PERMISSION_DENIED"}),
+        (500, {}),
+    ],
+)
+def test_il_token_non_finisce_nei_log_ne_nei_messaggi(
+    caplog: pytest.LogCaptureFixture, stato: int, corpo: dict[str, Any]
+) -> None:
     caplog.set_level("DEBUG")
-    corpo = _fallita("BAD_REQUEST", "[TABLE_OR_VIEW_NOT_FOUND] manca")
 
-    with pytest.raises(ReportNonDisponibile):
-        _lettore(Trasporto(200, corpo)).iscrizioni_per_corso("segreto-123")
+    with pytest.raises(Exception) as errore:
+        _lettore(Trasporto(stato, corpo)).iscrizioni_per_corso("segreto-123")
 
     assert "segreto-123" not in caplog.text
+    assert "segreto-123" not in str(errore.value)
+
+
+@pytest.mark.parametrize(
+    "riga",
+    [
+        ["a", "abc", "t", "1", "1", "1"],
+        ["a", "1", "t", "1.5", "1", "1"],
+        ["a", "1", "t"],
+    ],
+)
+def test_valori_non_validi_non_disponibile(riga: list[str | None]) -> None:
+    with pytest.raises(ReportNonDisponibile):
+        _lettore(Trasporto(200, _riuscita([riga]))).iscrizioni_per_corso("t")
+
+
+def test_i_messaggi_non_riportano_dettagli_interni() -> None:
+    """D10: classi d'errore di Spark e stati HTTP del warehouse solo nel log."""
+    corpo = _fallita("BAD_REQUEST", "[TABLE_OR_VIEW_NOT_FOUND] `academy_collaudo`.`gold`.`x`")
+
+    with pytest.raises(ReportNonDisponibile) as errore:
+        _lettore(Trasporto(200, corpo)).iscrizioni_per_corso("t")
+
+    assert "TABLE_OR_VIEW_NOT_FOUND" not in str(errore.value)
+    assert "academy_collaudo" not in str(errore.value)
+
+
+class RispostaFinta:
+    def __init__(self, stato: int, corpo: object = None, json_valido: bool = True) -> None:
+        self.status_code = stato
+        self._corpo = corpo
+        self._json_valido = json_valido
+
+    def json(self) -> object:
+        if not self._json_valido:
+            raise ValueError("non JSON")
+        return self._corpo
+
+
+class SessioneFinta:
+    def __init__(self, esito: RispostaFinta | Exception) -> None:
+        self.esito = esito
+        self.chiamate: list[dict[str, Any]] = []
+
+    def post(
+        self, url: str, *, json: dict[str, Any], headers: dict[str, str], timeout: float
+    ) -> RispostaFinta:
+        self.chiamate.append({"url": url, "json": json, "headers": headers, "timeout": timeout})
+        if isinstance(self.esito, Exception):
+            raise self.esito
+        return self.esito
+
+
+@pytest.mark.parametrize(
+    "host", ["dbc-esempio.cloud.databricks.com", "https://dbc-esempio.cloud.databricks.com/"]
+)
+def test_invio_http_manda_il_token_come_bearer(host: str) -> None:
+    sessione = SessioneFinta(RispostaFinta(200, {"status": {"state": "SUCCEEDED"}}))
+
+    stato, corpo = invio_http(host, sessione)("token-di-anna", {"statement": "SELECT 1"})
+
+    assert (stato, corpo) == (200, {"status": {"state": "SUCCEEDED"}})
+    [chiamata] = sessione.chiamate
+    assert chiamata["url"] == "https://dbc-esempio.cloud.databricks.com/api/2.0/sql/statements"
+    assert chiamata["headers"] == {"Authorization": "Bearer token-di-anna"}
+    assert chiamata["json"] == {"statement": "SELECT 1"}
+
+
+@pytest.mark.parametrize(
+    "risposta", [RispostaFinta(502, json_valido=False), RispostaFinta(200, ["non", "oggetto"])]
+)
+def test_invio_http_corpo_non_oggetto(risposta: RispostaFinta) -> None:
+    stato, corpo = invio_http("h", SessioneFinta(risposta))("t", {})
+
+    assert (stato, corpo) == (risposta.status_code, {})
+
+
+def test_invio_http_warehouse_irraggiungibile(caplog: pytest.LogCaptureFixture) -> None:
+    import requests
+
+    caplog.set_level("DEBUG")
+    guasto = requests.ConnectionError("Authorization: Bearer segreto-123")
+
+    with pytest.raises(ReportNonDisponibile):
+        invio_http("h", SessioneFinta(guasto))("segreto-123", {})
+
+    assert "segreto-123" not in caplog.text
+
+
+def test_la_sessione_condivisa_non_tiene_cookie() -> None:
+    """Condivisa fra gli utenti: un cookie della risposta per uno non va all'altro."""
+    from http.cookiejar import Cookie
+
+    import requests
+
+    sessione = sessione_senza_cookie()
+    assert isinstance(sessione, requests.Session)
+    richiesta = requests.Request("POST", "https://dbc-esempio.cloud.databricks.com/api").prepare()
+    cookie = Cookie(
+        0,
+        "sessione",
+        "di-anna",
+        None,
+        False,
+        "dbc-esempio.cloud.databricks.com",
+        True,
+        False,
+        "/",
+        True,
+        True,
+        None,
+        False,
+        None,
+        None,
+        {},
+    )
+
+    sessione.cookies.set_cookie_if_ok(cookie, requests.cookies.MockRequest(richiesta))  # type: ignore[attr-defined]
+
+    assert len(sessione.cookies) == 0
 
 
 def test_senza_configurazione_nessun_report() -> None:
@@ -196,7 +335,7 @@ def test_lettore_dalla_configurazione() -> None:
     configurato = Impostazioni(
         ambiente="collaudo",
         identita="databricks",
-        report_warehouse_id="9f8eb48fc8353aa1",
+        report_warehouse_id="0123456789abcdef",
         report_catalogo="academy_collaudo",
         databricks_host="dbc-esempio.cloud.databricks.com",
     )
@@ -205,4 +344,4 @@ def test_lettore_dalla_configurazione() -> None:
 
 def test_report_configurato_a_meta_e_un_errore() -> None:
     with pytest.raises(ValueError, match="report"):
-        Impostazioni(ambiente="locale", report_warehouse_id="9f8eb48fc8353aa1")
+        Impostazioni(ambiente="locale", report_warehouse_id="0123456789abcdef")

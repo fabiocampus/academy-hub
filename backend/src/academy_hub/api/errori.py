@@ -24,9 +24,9 @@ from academy_hub.dominio.errori import (
     ErroreDominio,
     NonAutenticato,
     NonTrovato,
+    ReportNonDisponibile,
     VersioneNonCorrispondente,
 )
-from academy_hub.report import ReportNonDisponibile
 
 TIPO_MEDIA = "application/problem+json"
 
