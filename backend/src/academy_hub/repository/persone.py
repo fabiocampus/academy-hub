@@ -98,3 +98,14 @@ def catena_responsabili(sessione: Session, persona_id: int) -> list[int | None]:
             .order_by(albero.c.livello)
         )
     )
+
+
+def docenti(sessione: Session) -> list[Persona]:
+    """Persone con il ruolo docente, per nome."""
+    return list(
+        sessione.scalars(
+            select(Persona)
+            .where(Persona.ruoli.contains([Ruolo.DOCENTE.value]))
+            .order_by(Persona.nome, Persona.id)
+        )
+    )

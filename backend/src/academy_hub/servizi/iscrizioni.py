@@ -29,7 +29,11 @@ from academy_hub.dominio.stati import (
 from academy_hub.dominio.tempo import oggi
 from academy_hub.repository import catalogo, persone
 from academy_hub.repository import iscrizioni as repository
-from academy_hub.repository.iscrizioni import RichiestaDaDecidere, VoceMiaIscrizione
+from academy_hub.repository.iscrizioni import (
+    IscrizioneDellEdizione,
+    RichiestaDaDecidere,
+    VoceMiaIscrizione,
+)
 
 S = StatoIscrizione
 
@@ -318,3 +322,17 @@ def annulla(
     _cambia_stato(sessione, iscrizione, S.ANNULLATA, attore.persona_id, edizione=edizione)
     promuovi_dalla_lista(sessione, edizione)
     return iscrizione
+
+
+def iscrizioni_dell_edizione(
+    sessione: Session,
+    attore: Attore,
+    edizione_id: int,
+    stato: StatoIscrizione | None = None,
+    limite: int = 20,
+    offset: int = 0,
+) -> tuple[list[IscrizioneDellEdizione], int]:
+    """Chi è iscritto a un'edizione: l'amministrazione ne conferma le Approvate (US-08)."""
+    attore.richiedi(Ruolo.ADMIN_ACADEMY)
+    catalogo.edizione(sessione, edizione_id)
+    return repository.iscrizioni_dell_edizione(sessione, edizione_id, stato, limite, offset)

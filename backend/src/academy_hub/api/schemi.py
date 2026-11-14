@@ -219,6 +219,41 @@ class PaginaRichieste(BaseModel):
     offset: int
 
 
+# --- Gestione Academy (issue #64) --------------------------------------------------
+
+
+class PaginaCorsi(BaseModel):
+    elementi: list[CorsoLetto]
+    totale: int
+    limite: int
+    offset: int
+
+
+class VoceEdizione(EdizioneLetta):
+    lista_attesa: int = Field(description="Iscrizioni InAttesa dell'edizione")
+
+
+class PaginaEdizioni(BaseModel):
+    elementi: list[VoceEdizione]
+    totale: int
+    limite: int
+    offset: int
+
+
+class VoceIscrizioneEdizione(IscrizioneLetta):
+    persona: PersonaInBreve
+    posizione_lista_attesa: int | None = Field(
+        description="Posizione in lista d'attesa (1 = la prossima), solo se InAttesa"
+    )
+
+
+class PaginaIscrizioniEdizione(BaseModel):
+    elementi: list[VoceIscrizioneEdizione]
+    totale: int
+    limite: int
+    offset: int
+
+
 class Profilo(BaseModel):
     """La persona collegata: il frontend sceglie che cosa mostrare, l'API decide comunque."""
 

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import cast
 
-from sqlalchemy import case, func, select, tuple_
+from sqlalchemy import Case, case, func, select, tuple_
 from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.orm import Session, aliased
 
@@ -229,21 +229,9 @@ def eventi_audit(sessione: Session, iscrizione_id: int) -> list[EventoAudit]:
     )
 
 
-@dataclass(frozen=True)
-class VoceMiaIscrizione:
-    iscrizione: Iscrizione
-    edizione: Edizione
-    corso: Corso
-    posizione_lista_attesa: int | None
-
-
-def mie_iscrizioni(
-    sessione: Session, persona_id: int, limite: int, offset: int
-) -> tuple[list[VoceMiaIscrizione], int]:
-    """Iscrizioni della persona, dall'ultimo cambio (US-05). Usa `ix_iscrizioni_persona_id`.
-
-    La posizione in lista d'attesa segue R4: ordine di approvazione, `id` come spareggio.
-    """
+def _posizione_lista_attesa() -> Case[int]:
+    """Posizione in lista d'attesa dell'iscrizione della riga esterna (1 = la prossima),
+    `NULL` se non è InAttesa. Ordine di R4: approvazione, poi `id` come spareggio."""
     altra = aliased(Iscrizione)
     davanti = (
         select(func.count())
@@ -255,7 +243,22 @@ def mie_iscrizioni(
         .correlate(Iscrizione)
         .scalar_subquery()
     )
-    posizione = case((Iscrizione.stato == StatoIscrizione.IN_ATTESA, davanti), else_=None)
+    return case((Iscrizione.stato == StatoIscrizione.IN_ATTESA, davanti), else_=None)
+
+
+@dataclass(frozen=True)
+class VoceMiaIscrizione:
+    iscrizione: Iscrizione
+    edizione: Edizione
+    corso: Corso
+    posizione_lista_attesa: int | None
+
+
+def mie_iscrizioni(
+    sessione: Session, persona_id: int, limite: int, offset: int
+) -> tuple[list[VoceMiaIscrizione], int]:
+    """Iscrizioni della persona, dall'ultimo cambio (US-05). Usa `ix_iscrizioni_persona_id`."""
+    posizione = _posizione_lista_attesa()
     filtro = Iscrizione.persona_id == persona_id
 
     totale = sessione.scalar(select(func.count()).select_from(Iscrizione).where(filtro))
@@ -334,4 +337,37 @@ def richieste_da_decidere(
         .offset(offset)
     ).all()
     voci = [RichiestaDaDecidere(i, p, e, c) for i, p, e, c in righe]
+    return voci, totale or 0
+
+
+@dataclass(frozen=True)
+class IscrizioneDellEdizione:
+    iscrizione: Iscrizione
+    persona: Persona
+    posizione_lista_attesa: int | None
+
+
+def iscrizioni_dell_edizione(
+    sessione: Session,
+    edizione_id: int,
+    stato: StatoIscrizione | None,
+    limite: int,
+    offset: int,
+) -> tuple[list[IscrizioneDellEdizione], int]:
+    """Iscrizioni dell'edizione, dalla richiesta più vecchia (gestione, US-08).
+
+    Usa `ix_iscrizioni_edizione_stato`."""
+    filtri = [Iscrizione.edizione_id == edizione_id]
+    if stato is not None:
+        filtri.append(Iscrizione.stato == stato)
+    totale = sessione.scalar(select(func.count()).select_from(Iscrizione).where(*filtri))
+    righe = sessione.execute(
+        select(Iscrizione, Persona, _posizione_lista_attesa())
+        .join(Persona, Persona.id == Iscrizione.persona_id)
+        .where(*filtri)
+        .order_by(Iscrizione.richiesta_il, Iscrizione.id)
+        .limit(limite)
+        .offset(offset)
+    ).all()
+    voci = [IscrizioneDellEdizione(i, p, cast("int | None", n)) for i, p, n in righe]
     return voci, totale or 0
