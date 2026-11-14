@@ -2,6 +2,10 @@
 
 PostgreSQL 17: in Docker in locale, Lakebase su Databricks (ADR-0001). Lo schema cambia solo con le migrazioni Alembic in `backend/src/academy_hub/db/schema/versions/`; i modelli SQLAlchemy sono in `backend/src/academy_hub/db/modelli.py`.
 
+## Lakebase
+
+Su Databricks il database è Lakebase (ADR-0010): un progetto, un branch per ambiente. `db/motore.py` (`crea_motore`) è l'unico punto che crea un motore SQLAlchemy: con `ACADEMY_LAKEBASE_ENDPOINT` la password di ogni nuova connessione è un token OAuth del service principal dell'App, e host, utente e TLS arrivano dalle variabili `PG*` della risorsa dell'App. Le tabelle stanno in uno schema per ambiente (`ACADEMY_DATABASE_SCHEMA`: `academy` in prod, `academy_collaudo` in collaudo), di proprietà del service principal: le migrazioni lo creano se manca e il motore imposta `search_path` a ogni connessione, quindi migrazioni e query non nominano mai lo schema. Le migrazioni girano all'avvio dell'App (`python -m academy_hub.avvio`).
+
 ## Migrazioni
 
 ```bash

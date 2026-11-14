@@ -8,21 +8,31 @@ invece di stare nella configurazione.
 """
 
 from collections.abc import Callable
-from typing import Any
+from functools import cache
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import Engine, create_engine, event
 
 from academy_hub.config import Impostazioni
 
+if TYPE_CHECKING:
+    from databricks.sdk import WorkspaceClient
+
 GeneraToken = Callable[[str], str]
 """Dall'endpoint Lakebase al token da usare come password."""
 
 
-def token_databricks(endpoint: str) -> str:
-    """Token dell'identità corrente (service principal dell'App, o l'utente della CLI)."""
+@cache
+def _client() -> "WorkspaceClient":
+    """Un client per processo: risolvere l'autenticazione a ogni connessione costa."""
     from databricks.sdk import WorkspaceClient  # import pigro: in locale non serve
 
-    credenziale = WorkspaceClient().postgres.generate_database_credential(endpoint=endpoint)
+    return WorkspaceClient()
+
+
+def token_databricks(endpoint: str) -> str:
+    """Token dell'identità corrente (service principal dell'App, o l'utente della CLI)."""
+    credenziale = _client().postgres.generate_database_credential(endpoint=endpoint)
     if not credenziale.token:
         raise RuntimeError(f"Lakebase non ha restituito un token per {endpoint}")
     return credenziale.token

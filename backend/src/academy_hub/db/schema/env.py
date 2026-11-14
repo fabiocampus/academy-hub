@@ -2,7 +2,8 @@
 
 Il motore è quello dell'app (`crea_motore`): su Lakebase la password è un token OAuth.
 Con `ACADEMY_DATABASE_SCHEMA` le migrazioni creano lo schema se manca; il `search_path`
-impostato dal motore manda lì le tabelle e anche `alembic_version`.
+impostato dal motore manda lì le tabelle e anche `alembic_version`. In modalità offline
+(`--sql`) lo script comincia con le stesse due istruzioni.
 """
 
 from alembic import context
@@ -24,6 +25,9 @@ if context.is_offline_mode():
         compare_type=True,
     )
     with context.begin_transaction():
+        if schema is not None:
+            context.execute(f'CREATE SCHEMA IF NOT EXISTS "{schema}"')
+            context.execute(f'SET search_path TO "{schema}"')
         context.run_migrations()
 else:
     motore = crea_motore(config, url, poolclass=pool.NullPool)

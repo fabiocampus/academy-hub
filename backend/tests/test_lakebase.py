@@ -7,12 +7,14 @@ password tolta dall'URL e restituita dal generatore di token, come farebbe l'SDK
 from collections.abc import Callable, Iterator
 
 import pytest
+from databricks.sdk.service.postgres import DatabaseCredential
 from sqlalchemy import Engine, create_engine, inspect, select, text, update
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
-from academy_hub.avvio import porta
+from academy_hub.avvio import porta, prepara
 from academy_hub.config import Impostazioni, impostazioni
+from academy_hub.db import motore as motore_lakebase
 from academy_hub.db.amministratore import assicura_amministratore
 from academy_hub.db.migrazioni import aggiorna_schema, controlla_allineamento
 from academy_hub.db.modelli import Persona, Team
@@ -65,7 +67,63 @@ def test_senza_endpoint_nessun_token() -> None:
         raise AssertionError("token chiesto senza endpoint Lakebase")
 
     motore = crea_motore(Impostazioni(), "postgresql+psycopg://nessuno@127.0.0.1:1/x", genera)
-    assert motore.url.password is None
+    # do_connect è un evento del dialetto, connect del pool: nessun listener in più
+    # rispetto a un motore creato direttamente.
+    semplice = create_engine("postgresql+psycopg://nessuno@127.0.0.1:1/x")
+    assert not motore.dialect.dispatch.do_connect
+    assert len(motore.pool.dispatch.connect) == len(semplice.pool.dispatch.connect)
+
+
+def test_token_vuoto_rifiutato(monkeypatch: pytest.MonkeyPatch) -> None:
+    class ClientFinto:
+        class postgres:  # noqa: N801 - imita l'attributo dell'SDK
+            @staticmethod
+            def generate_database_credential(endpoint: str) -> DatabaseCredential:
+                return DatabaseCredential(token="")
+
+    monkeypatch.setattr(motore_lakebase, "_client", lambda: ClientFinto())
+    with pytest.raises(RuntimeError, match="non ha restituito un token"):
+        motore_lakebase.token_databricks(ENDPOINT)
+
+
+def test_token_dall_sdk(monkeypatch: pytest.MonkeyPatch) -> None:
+    chiesti: list[str] = []
+
+    class ClientFinto:
+        class postgres:  # noqa: N801 - imita l'attributo dell'SDK
+            @staticmethod
+            def generate_database_credential(endpoint: str) -> DatabaseCredential:
+                chiesti.append(endpoint)
+                return DatabaseCredential(token="tok")  # noqa: S106 - finto
+
+    monkeypatch.setattr(motore_lakebase, "_client", lambda: ClientFinto())
+    assert motore_lakebase.token_databricks(ENDPOINT) == "tok"
+    assert chiesti == [ENDPOINT]
+
+
+@pytest.mark.integrazione
+def test_avvio_prepara_due_volte(
+    nuovo_database: Callable[[str], str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Il comando dell'App al primo avvio e al riavvio: schema, una sola persona admin."""
+    url = nuovo_database("academy_avvio")
+    monkeypatch.setenv("ACADEMY_DATABASE_URL", url)
+    monkeypatch.setenv("ACADEMY_DATABASE_SCHEMA", "academy_prova")
+    monkeypatch.setenv("ACADEMY_ADMIN_EMAIL", "admin@example.com")
+
+    prepara()
+    prepara()
+
+    motore = crea_motore(impostazioni())
+    try:
+        with Session(motore) as sessione:
+            persone = sessione.scalars(select(Persona)).all()
+            assert [(p.email, p.ruoli) for p in persone] == [
+                ("admin@example.com", ["dipendente", "admin_academy"])
+            ]
+    finally:
+        motore.dispose()
+    assert "persone" in inspect(create_engine(url)).get_table_names(schema="academy_prova")
 
 
 @pytest.mark.integrazione

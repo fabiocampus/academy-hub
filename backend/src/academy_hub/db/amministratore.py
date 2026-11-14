@@ -3,6 +3,9 @@
 Su Databricks si entra con l'email dell'account, che non può stare nel repository
 pubblico: arriva da `ACADEMY_ADMIN_EMAIL`, valorizzata dalla variabile del bundle al
 deploy. Senza una persona con `admin_academy` nessuno potrebbe creare il catalogo.
+
+Come `db/demo.py` è codice di bootstrap fuori dalle richieste: usa l'ORM direttamente e
+non passa da `repository/`, che serve le rotte e i servizi.
 """
 
 from sqlalchemy import Engine, select

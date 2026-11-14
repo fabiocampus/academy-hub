@@ -38,13 +38,18 @@ def prepara() -> None:
 
 
 def main() -> int:
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    logging.basicConfig(
+        level=impostazioni().livello_log, format="%(levelname)s %(name)s: %(message)s"
+    )
     prepara()
     uvicorn.run(
         "academy_hub.main:app",
         host=os.environ.get("UVICORN_HOST", "0.0.0.0"),  # noqa: S104 - dietro il proxy dell'App
         port=porta(dict(os.environ)),
+        # L'App è raggiungibile solo dal proxy di Databricks Apps (verificato, ADR-0010),
+        # che non è su 127.0.0.1: senza "*" uvicorn ignorerebbe X-Forwarded-For/-Proto.
         proxy_headers=True,
+        forwarded_allow_ips="*",
     )
     return 0
 

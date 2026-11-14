@@ -32,13 +32,16 @@ def esegui(comando: list[str], cartella: Path) -> str:
     if eseguibile is None:
         sys.exit(f"{comando[0]} non trovato nel PATH")
     risultato = subprocess.run(  # noqa: S603 - comandi fissi, nessun input esterno
-        [eseguibile, *comando[1:]], cwd=cartella, check=True, capture_output=True, text=True
+        [eseguibile, *comando[1:]], cwd=cartella, capture_output=True, text=True, check=False
     )
+    if risultato.returncode != 0:
+        sys.stderr.write(risultato.stdout + risultato.stderr)
+        sys.exit(f"{' '.join(comando)} fallito (codice {risultato.returncode})")
     return risultato.stdout
 
 
 def main() -> int:
-    argomenti = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    argomenti = argparse.ArgumentParser(description="Prepara build/app per la Databricks App")
     argomenti.add_argument("--senza-npm", action="store_true", help="non ricompilare il frontend")
     opzioni = argomenti.parse_args()
 
