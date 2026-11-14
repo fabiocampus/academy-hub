@@ -6,7 +6,7 @@ Prototipo di studio: iscrizioni ai corsi di un'Academy aziendale (parte transazi
 
 Fase 5 (API a livelli), in tre PR (issue #49): errori RFC 9457, ETag/If-Match, contratto OpenAPI versionato, corsi, edizioni e catalogo; flusso delle iscrizioni (richiesta idempotente, approvazione del responsabile diretto, conferma, annullamento, audit); promozione dalla lista d'attesa nella stessa transazione, cancellazione dell'edizione e job di sistema (ADR-0007). Convenzioni in `docs/adr/0005-convenzioni-dell-api.md`.
 
-Fase 6 (identità e sicurezza, issue #36): identità da token OIDC di Keycloak in locale e da `X-Forwarded-Email` su Databricks Apps, ruoli dal database, persona trovata per email (ADR-0008).
+Fase 6 (identità e sicurezza, issue #36): identità da token OIDC di Keycloak in locale e da `X-Forwarded-Email` su Databricks Apps, ruoli dal database, persona trovata per email (ADR-0008). Seconda PR (issue #56): matrice di autorizzazione rotta × profilo (`backend/tests/test_autorizzazione.py`: una rotta nuova senza la sua riga fa fallire i test), pip-audit e CodeQL in CI, threat model STRIDE in `docs/threat-model.md`.
 
 ## Ambiente locale
 
@@ -55,7 +55,7 @@ Dopo ogni modifica a un file `.py` del backend l'hook `.claude/hooks/dopo_modifi
 - `backend/contratto/`: contratto OpenAPI e impronte per versione; `tests/test_contratto.py` fallisce se l'API cambia senza aumentare la versione.
 - `backend/tests/`: test pytest. I test HTTP usano la fixture `client` (TestClient sull'app collegata al database di test, identità provvisoria `X-Persona-Id`) e `tests/api.py`; i test del token usano `tests/oidc.py` (chiave RSA di test). `dati.py` crea dati sintetici; `conftest.py` avvia PostgreSQL con la stessa immagine di docker compose e applica le migrazioni.
 - `backend/Dockerfile`: multi-stage con uv, runtime non root (uid 10001).
-- `.github/workflows/`: `ci.yml` (lint, typecheck, test, immagine + Trivy, compose, gitleaks) e `pr-issue.yml` (la PR deve collegare una issue). Sono status check obbligatori del ruleset su `main`.
+- `.github/workflows/`: `ci.yml` (lint, typecheck, test, dipendenze con pip-audit su `uv.lock`, immagine + Trivy, compose, gitleaks), `codeql.yml` (CodeQL su Python e Actions) e `pr-issue.yml` (la PR deve collegare una issue). Sono status check obbligatori del ruleset su `main`. Sul repository sono attivi secret scanning con push protection, avvisi e aggiornamenti di sicurezza di Dependabot.
 
 ## Flusso di lavoro
 
