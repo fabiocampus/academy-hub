@@ -4,6 +4,8 @@ Host e porta arrivano da ``UVICORN_HOST`` e ``UVICORN_PORT``, che Databricks App
 imposta da sé e il Dockerfile fissa per l'ambiente locale.
 """
 
+from pathlib import Path
+
 from fastapi import FastAPI
 from sqlalchemy import Engine, create_engine
 
@@ -13,10 +15,16 @@ from academy_hub.api.errori import registra_gestori
 from academy_hub.api.identita import ProviderIdentita, provider
 from academy_hub.api.rotte import catalogo, corsi, edizioni, iscrizioni, profilo
 from academy_hub.config import impostazioni
+from academy_hub.frontend import monta_frontend, origine
 
 
-def crea_app(motore: Engine | None = None, identita: ProviderIdentita | None = None) -> FastAPI:
-    """App FastAPI. `motore` e `identita` servono ai test; altrimenti nascono dalla configurazione.
+def crea_app(
+    motore: Engine | None = None,
+    identita: ProviderIdentita | None = None,
+    frontend: Path | None = None,
+) -> FastAPI:
+    """App FastAPI. `motore`, `identita` e `frontend` servono ai test; altrimenti nascono
+    dalla configurazione. Con una build del frontend l'app serve anche la SPA.
 
     `create_engine` non apre connessioni: l'app parte (e genera l'OpenAPI) anche
     senza database.
@@ -43,6 +51,12 @@ def crea_app(motore: Engine | None = None, identita: ProviderIdentita | None = N
     def health() -> dict[str, str]:  # pyright: ignore[reportUnusedFunction]
         return {"stato": "ok", "versione": __version__, "ambiente": impostazioni().ambiente}
 
+    config = impostazioni()
+    cartella = frontend or config.frontend_dir
+    if cartella is not None:
+        # Con oidc il browser parla anche con il provider (discovery, token, logout).
+        esterne = [origine(config.oidc_emittente)] if config.identita == "oidc" else []
+        monta_frontend(app, cartella, esterne)
     return app
 
 

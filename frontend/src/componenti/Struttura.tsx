@@ -1,11 +1,13 @@
 /** Intestazione, menu e area principale; il menu dipende dal profilo (ruoli). */
 import { AppShell, Burger, Button, Group, NavLink, Text } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
-import { NavLink as Collegamento, Outlet } from "react-router";
+import { Suspense } from "react";
+import { NavLink as Collegamento, Outlet, useLocation } from "react-router";
 
 import { useSessione } from "../accesso/contesto";
 import type { Schemi } from "../api/client";
 import { useProfilo } from "../api/query";
+import { ConfinePagina } from "./ConfinePagina";
 import { Caricamento, Errore } from "./Stati";
 
 export interface VoceMenu {
@@ -35,6 +37,7 @@ export function vociMenu(profilo: Schemi["Profilo"]): VoceMenu[] {
 
 export function Struttura() {
   const profilo = useProfilo();
+  const { pathname } = useLocation();
   const { esci } = useSessione();
   const [aperto, { toggle, close }] = useDisclosure();
 
@@ -91,7 +94,15 @@ export function Struttura() {
         {profilo.isError && (
           <Errore errore={profilo.error} riprova={() => void profilo.refetch()} />
         )}
-        {profilo.isSuccess && <Outlet />}
+        {profilo.isSuccess && (
+          // Le pagine arrivano in chunk separati (App.tsx): intestazione e menu restano,
+          // anche se un chunk non arriva; il confine riparte a ogni cambio di pagina.
+          <ConfinePagina key={pathname}>
+            <Suspense fallback={<Caricamento etichetta="Caricamento della pagina" />}>
+              <Outlet />
+            </Suspense>
+          </ConfinePagina>
+        )}
       </AppShell.Main>
     </AppShell>
   );

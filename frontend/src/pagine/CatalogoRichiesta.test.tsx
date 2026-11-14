@@ -15,6 +15,7 @@ import {
   voceCatalogo,
 } from "../test/server";
 import { mostra } from "../test/render";
+import { cancello, mostraSmontabile } from "../test/smontaggio";
 import { Catalogo } from "./Catalogo";
 
 const ISCRIVITI = "Iscriviti a Corso 1 dal 10 mar 2027 – 11 mar 2027";
@@ -48,6 +49,24 @@ describe("Richiesta d'iscrizione dal catalogo", () => {
     const riga = (await screen.findAllByRole("row"))[1] as HTMLElement;
     expect(await within(riga).findByText("Richiesta")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: ISCRIVITI })).not.toBeInTheDocument();
+  });
+
+  it("l'esito della richiesta si vede anche se il pulsante è già sparito", async () => {
+    conCatalogo([voceCatalogo(1)]);
+    const risposta = cancello();
+    server.use(
+      http.post(`${API}/iscrizioni`, async () => {
+        await risposta.attendi;
+        return HttpResponse.json(iscrizioneLetta(1, "Richiesta"), { status: 201 });
+      }),
+    );
+    mostraSmontabile(<Catalogo />);
+
+    await userEvent.click(await screen.findByRole("button", { name: ISCRIVITI }));
+    await userEvent.click(screen.getByRole("link", { name: "Altrove" }));
+    risposta.apri();
+
+    expect(await screen.findByText("Richiesta inviata per «Corso 1».")).toBeInTheDocument();
   });
 
   it("dopo un errore del server riprova con la stessa chiave: niente doppioni", async () => {

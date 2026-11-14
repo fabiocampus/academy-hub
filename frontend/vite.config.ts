@@ -14,9 +14,27 @@ export default defineConfig({
     strictPort: true,
     proxy: { "/api": backend, "/health": backend },
   },
+  build: {
+    rolldownOptions: {
+      output: {
+        // Librerie in chunk propri (ADR-0009 §16): cambiano di rado, quindi restano in
+        // cache del browser fra un rilascio e l'altro; le pagine sono chunk lazy (App.tsx).
+        // Rolldown usa "/" negli id dei moduli anche su Windows.
+        codeSplitting: {
+          groups: [
+            { name: "react", test: /node_modules\/(react|react-dom|scheduler|react-router)\// },
+            { name: "mantine", test: /node_modules\/@mantine\// },
+            { name: "librerie", test: /node_modules\// },
+          ],
+        },
+      },
+    },
+  },
   test: {
     environment: "jsdom",
     setupFiles: ["src/test/setup.ts"],
     restoreMocks: true,
+    // e2e/ è di Playwright (npm run e2e), su docker compose.
+    include: ["src/**/*.test.{ts,tsx}"],
   },
 });

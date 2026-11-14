@@ -6,7 +6,7 @@ import type { ReactElement } from "react";
 import { MemoryRouter } from "react-router";
 
 import { ContestoSessione, type Sessione } from "../accesso/contesto";
-import { tema } from "../tema";
+import { tema, variabiliCss } from "../tema";
 
 interface Opzioni {
   percorso?: string;
@@ -17,7 +17,7 @@ interface Opzioni {
 export function mostra(elemento: ReactElement, opzioni: Opzioni = {}): RenderResult {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MantineProvider theme={tema}>
+    <MantineProvider theme={tema} cssVariablesResolver={variabiliCss}>
       <Notifications />
       <ContestoSessione.Provider value={opzioni.sessione ?? {}}>
         <QueryClientProvider client={queryClient}>

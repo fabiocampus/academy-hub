@@ -5,7 +5,15 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 export default defineConfig(
-  { ignores: ["dist", "src/api/schema.d.ts", "postcss.config.cjs"] },
+  {
+    ignores: [
+      "dist",
+      "src/api/schema.d.ts",
+      "postcss.config.cjs",
+      "playwright-report",
+      "test-results",
+    ],
+  },
   js.configs.recommended,
   tseslint.configs.strictTypeChecked,
   reactHooks.configs.flat.recommended,

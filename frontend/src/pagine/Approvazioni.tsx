@@ -107,12 +107,11 @@ function Decisione({ richiesta, rifiuta }: { richiesta: Richiesta; rifiuta: () =
   const di = `la richiesta di ${richiesta.persona.nome} per ${richiesta.corso.titolo}`;
 
   function approva(): void {
-    approvazione.mutate(richiesta.iscrizione_id, {
-      onSuccess: () => {
-        avvisaSuccesso(`Richiesta di ${richiesta.persona.nome} approvata.`);
-      },
-      onError: avvisaErrore,
-    });
+    // mutateAsync, non mutate: la riga sparisce quando gli elenchi si rileggono e i
+    // callback di mutate() non arrivano a un componente smontato (test/smontaggio.tsx).
+    approvazione.mutateAsync(richiesta.iscrizione_id).then(() => {
+      avvisaSuccesso(`Richiesta di ${richiesta.persona.nome} approvata.`);
+    }, avvisaErrore);
   }
 
   return (

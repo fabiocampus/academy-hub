@@ -172,16 +172,15 @@ function PulsanteConferma({ voce }: { voce: Voce }) {
       aria-label={`Conferma l'iscrizione di ${voce.persona.nome}`}
       loading={conferma.isPending}
       onClick={() => {
-        conferma.mutate(voce.id, {
-          onSuccess: (iscrizione) => {
-            avvisaSuccesso(
-              iscrizione.stato === "Confermata"
-                ? `Iscrizione di ${voce.persona.nome} confermata.`
-                : `Posti esauriti: ${voce.persona.nome} è in lista d'attesa.`,
-            );
-          },
-          onError: avvisaErrore,
-        });
+        // mutateAsync, non mutate: il pulsante sparisce quando l'elenco si rilegge e i
+        // callback di mutate() non arrivano a un componente smontato (test/smontaggio.tsx).
+        conferma.mutateAsync(voce.id).then((iscrizione) => {
+          avvisaSuccesso(
+            iscrizione.stato === "Confermata"
+              ? `Iscrizione di ${voce.persona.nome} confermata.`
+              : `Posti esauriti: ${voce.persona.nome} è in lista d'attesa.`,
+          );
+        }, avvisaErrore);
       }}
     >
       Conferma

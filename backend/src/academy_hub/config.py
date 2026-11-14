@@ -1,6 +1,7 @@
 """Configurazione letta solo dalle variabili d'ambiente (prefisso ``ACADEMY_``)."""
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal, Self
 
 from pydantic import Field, model_validator
@@ -34,6 +35,8 @@ class Impostazioni(BaseSettings):
     oidc_client_web: str = "academy-web"
     # R5: un'iscrizione Confermata si annulla solo se mancano più di N giorni all'inizio.
     scadenza_annullamento_giorni: int = Field(default=3, ge=0, le=365)
+    # Build statica del frontend (frontend/dist) da servire insieme all'API; senza, solo API.
+    frontend_dir: Path | None = None
 
     @property
     def jwks_url(self) -> str:

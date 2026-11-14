@@ -58,22 +58,20 @@ function PulsanteIscriviti({
   const periodo = formattaPeriodo(voce.data_inizio, voce.data_fine);
 
   function richiedi(dopoUnaChiusa = false): void {
-    richiesta.mutate(
-      { edizioneId: voce.edizione_id, chiave: chiavi.per(voce.edizione_id) },
-      {
-        onSuccess: (iscrizione) => {
-          chiavi.usata(voce.edizione_id);
-          if (!STATI_ANNULLABILI.has(iscrizione.stato) && !dopoUnaChiusa) {
-            // La chiave apparteneva a un'iscrizione già chiusa (annullata altrove):
-            // l'API l'ha restituita com'è (ADR-0006). Si riprova con una chiave nuova.
-            richiedi(true);
-            return;
-          }
-          avvisaSuccesso(`Richiesta inviata per «${voce.corso.titolo}».`);
-        },
-        onError: avvisaErrore,
-      },
-    );
+    // mutateAsync, non mutate: il pulsante diventa lo stato quando gli elenchi si rileggono e i
+    // callback di mutate() non arrivano a un componente smontato (test/smontaggio.tsx).
+    richiesta
+      .mutateAsync({ edizioneId: voce.edizione_id, chiave: chiavi.per(voce.edizione_id) })
+      .then((iscrizione) => {
+        chiavi.usata(voce.edizione_id);
+        if (!STATI_ANNULLABILI.has(iscrizione.stato) && !dopoUnaChiusa) {
+          // La chiave apparteneva a un'iscrizione già chiusa (annullata altrove):
+          // l'API l'ha restituita com'è (ADR-0006). Si riprova con una chiave nuova.
+          richiedi(true);
+          return;
+        }
+        avvisaSuccesso(`Richiesta inviata per «${voce.corso.titolo}».`);
+      }, avvisaErrore);
   }
 
   return (

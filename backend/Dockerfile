@@ -1,8 +1,18 @@
 # syntax=docker/dockerfile:1
 # Immagine del backend: build con uv, runtime minimo con utente non root.
 # Python 3.11 come il runtime di Databricks Apps (ADR-0001).
+# Il frontend arriva dal contesto con nome "frontend" (compose: additional_contexts;
+# a mano: docker build --build-context frontend=../frontend backend) e la sua build
+# statica è servita da FastAPI nello stesso processo (ADR-0009 §14).
 
 FROM ghcr.io/astral-sh/uv:0.13.8@sha256:5cc1805e2426484abca4ad46ea783bab281fdb225fd82d8ce6d66a81254bac85 AS uv
+
+FROM --platform=$BUILDPLATFORM node:24.22.3-trixie-slim@sha256:af02d57b57719b9657a45199a79264a9437940cd55b3c7b3fc99615654f124a0 AS build-frontend
+WORKDIR /frontend
+COPY --from=frontend package.json package-lock.json .npmrc ./
+RUN --mount=type=cache,target=/root/.npm npm ci --ignore-scripts
+COPY --from=frontend . .
+RUN npm run build
 
 FROM python:3.11.18-slim-trixie@sha256:07d4824036af339fa1b6ef769cc99d9c10a141769538b52b3b597c84f7a7b535 AS build
 COPY --from=uv /uv /usr/local/bin/uv
@@ -29,7 +39,9 @@ RUN apt-get update \
     && groupadd --system --gid 10001 app \
     && useradd --system --uid 10001 --gid app --no-create-home --shell /usr/sbin/nologin app
 COPY --from=build --chown=app:app /app/.venv /app/.venv
+COPY --from=build-frontend --chown=app:app /frontend/dist /app/static
 ENV PATH="/app/.venv/bin:$PATH" \
+    ACADEMY_FRONTEND_DIR=/app/static \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     UVICORN_HOST=0.0.0.0 \

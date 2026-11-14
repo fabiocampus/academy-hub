@@ -8,19 +8,19 @@ Fase 5 (API a livelli), in tre PR (issue #49): errori RFC 9457, ETag/If-Match, c
 
 Fase 6 (identità e sicurezza, issue #36): identità da token OIDC di Keycloak in locale e da `X-Forwarded-Email` su Databricks Apps, ruoli dal database, persona trovata per email (ADR-0008). Seconda PR (issue #56): matrice di autorizzazione rotta × profilo (`backend/tests/test_autorizzazione.py`: una rotta nuova senza la sua riga fa fallire i test), pip-audit e CodeQL in CI, threat model STRIDE in `docs/threat-model.md`.
 
-Fase 7 (frontend, issue #59), in tre PR: A) base in `frontend/` (React, Vite, Mantine, React Query, client dal contratto, login OIDC con PKCE, catalogo; ADR-0009); B) mie iscrizioni con annullamento, richiesta dal catalogo, approvazioni (issue #62), poi gestione di corsi, edizioni e iscrizioni dell'edizione per `admin_academy` (issue #64, elenchi nuovi nel contratto 1.5.0, modifiche con ETag/If-Match); C) build servita da FastAPI, end-to-end con Playwright e axe.
+Fase 7 (frontend, issue #59), in tre PR: A) base in `frontend/` (React, Vite, Mantine, React Query, client dal contratto, login OIDC con PKCE, catalogo; ADR-0009); B) mie iscrizioni con annullamento, richiesta dal catalogo, approvazioni (issue #62), poi gestione di corsi, edizioni e iscrizioni dell'edizione per `admin_academy` (issue #64, elenchi nuovi nel contratto 1.5.0, modifiche con ETag/If-Match); C) build servita da FastAPI nello stesso processo, end-to-end con Playwright su docker compose e axe, bundle diviso per pagina (issue #66).
 
 ## Ambiente locale
 
 Dalla radice del repository, senza altri passaggi (il `.env` è facoltativo, vedi `.env.example`):
 
 ```bash
-docker compose up -d --build --wait   # db, migrazioni, demo, keycloak, otel-lgtm, backend, job
+docker compose up -d --build --wait   # db, migrazioni, demo, keycloak, otel-lgtm, backend (+ frontend), job
 python scripts/fumo_identita.py       # token veri da Keycloak e flusso richiesta -> approvazione -> conferma
 docker compose down                   # -v per cancellare anche i dati
 ```
 
-Frontend in sviluppo (Node 24, in `frontend/`): `npm ci`, poi `npm run dev` su http://localhost:5173 con il backend di compose dietro il proxy di Vite; si entra con un utente di prova di Keycloak.
+L'app completa è su http://localhost:8000 (usa `localhost`, non `127.0.0.1`: è l'origine registrata in Keycloak): l'immagine del backend contiene la build del frontend, quindi dopo una modifica al frontend serve `--build`. Frontend in sviluppo (Node 24, in `frontend/`): `npm ci`, poi `npm run dev` su http://localhost:5173 con il backend di compose dietro il proxy di Vite; si entra con un utente di prova di Keycloak.
 
 Porte su 127.0.0.1: backend 8000 (`/health`, `/docs`), Keycloak 8080 (console admin/admin; realm `academy` da `keycloak/realm-academy.json`, utenti di prova `dipendente`, `responsabile`, `dirigente`, `admin`, `docente`, `esterna` con password uguale al nome), Grafana 3000, PostgreSQL 5432, OTLP 4317/4318. In alternativa c'è il dev container (`.devcontainer/`).
 
@@ -58,6 +58,8 @@ npm run formato              # Prettier in verifica (npm run formatta per correg
 npm run tipi                 # tsc
 npm test                     # Vitest + Testing Library + MSW
 npm run build                # build statica in dist/
+npx playwright install chromium   # una volta: il browser degli end-to-end
+npm run e2e                  # Playwright + axe su docker compose acceso (http://localhost:8000)
 ```
 
 ## Architettura
@@ -69,11 +71,12 @@ npm run build                # build statica in dist/
   - `repository/`: le query, con i lock `FOR UPDATE`. Ordine dei lock: prima l'edizione, poi le sue iscrizioni (ADR-0004).
   - `servizi/`: le regole. Ogni cambio di stato di un'iscrizione passa da un solo punto che verifica la transizione e scrive l'audit (R6). Ogni posto liberato passa da `promuovi_dalla_lista` nella stessa transazione (R4).
   - `job.py`: job di sistema (scadenza all'inizio dell'edizione, rete di sicurezza della promozione), una transazione per edizione (ADR-0007).
+  - `frontend.py`: serve la build del frontend (`ACADEMY_FRONTEND_DIR`) con fallback su `index.html` per le rotte del client; `/api` resta JSON (ADR-0009 §14).
 - `backend/contratto/`: contratto OpenAPI e impronte per versione; `tests/test_contratto.py` fallisce se l'API cambia senza aumentare la versione.
 - `backend/tests/`: test pytest. I test HTTP usano la fixture `client` (TestClient sull'app collegata al database di test, identità provvisoria `X-Persona-Id`) e `tests/api.py`; i test del token usano `tests/oidc.py` (chiave RSA di test). `dati.py` crea dati sintetici; `conftest.py` avvia PostgreSQL con la stessa immagine di docker compose e applica le migrazioni.
-- `frontend/src/`: `api/` (client `openapi-fetch` tipizzato da `schema.d.ts` generato, `ErroreApi` RFC 9457, hook React Query in `query.ts`), `accesso/` (OIDC o Databricks, secondo `GET /api/v1/configurazione`), `componenti/` (struttura con menu per profilo, stati di caricamento/errore/vuoto, notifiche degli esiti, paginazione), `pagine/` (catalogo, mie iscrizioni, approvazioni; `gestione/` con corsi, edizioni del corso e iscrizioni dell'edizione, hook in `api/gestione.ts`), `test/` (MSW e render con i provider). I test stanno accanto ai file (`*.test.tsx`).
-- `backend/Dockerfile`: multi-stage con uv, runtime non root (uid 10001).
-- `.github/workflows/`: `ci.yml` (lint, typecheck, test, dipendenze con pip-audit su `uv.lock`, frontend, immagine + Trivy, compose, gitleaks), `codeql.yml` (CodeQL su Python, JavaScript/TypeScript e Actions) e `pr-issue.yml` (la PR deve collegare una issue). Sono status check obbligatori del ruleset su `main`. Sul repository sono attivi secret scanning con push protection, avvisi e aggiornamenti di sicurezza di Dependabot.
+- `frontend/src/`: `api/` (client `openapi-fetch` tipizzato da `schema.d.ts` generato, `ErroreApi` RFC 9457, hook React Query in `query.ts`), `accesso/` (OIDC o Databricks, secondo `GET /api/v1/configurazione`), `componenti/` (struttura con menu per profilo, stati di caricamento/errore/vuoto, notifiche degli esiti, paginazione), `pagine/` (catalogo, mie iscrizioni, approvazioni; `gestione/` con corsi, edizioni del corso e iscrizioni dell'edizione, hook in `api/gestione.ts`), `test/` (MSW e render con i provider). I test stanno accanto ai file (`*.test.tsx`). `frontend/e2e/`: Playwright su docker compose (`flusso.spec.ts` richiesta → approvazione → conferma, `accessibilita.spec.ts` axe per profilo; `sessione.ts` fa il login su Keycloak e crea con l'API un corso e un'edizione per test).
+- `backend/Dockerfile`: multi-stage con uv e uno stage Node che compila il frontend (contesto con nome `frontend`: `docker build --build-context frontend=../frontend backend`), runtime non root (uid 10001).
+- `.github/workflows/`: `ci.yml` (lint, typecheck, test, dipendenze con pip-audit su `uv.lock`, frontend, immagine + Trivy, compose, e2e con Playwright e axe, gitleaks), `codeql.yml` (CodeQL su Python, JavaScript/TypeScript e Actions) e `pr-issue.yml` (la PR deve collegare una issue). Sono status check obbligatori del ruleset su `main`. Sul repository sono attivi secret scanning con push protection, avvisi e aggiornamenti di sicurezza di Dependabot.
 
 ## Flusso di lavoro
 

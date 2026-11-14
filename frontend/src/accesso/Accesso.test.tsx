@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { impostaAlNonAutenticato, impostaToken } from "../api/client";
 import { useProfilo } from "../api/query";
-import { tema } from "../tema";
+import { tema, variabiliCss } from "../tema";
 import { API, profiloDipendente, server } from "../test/server";
 import { Accesso, creaGestoreOidc, dopoIlLogin, percorsoDiRitorno } from "./Accesso";
 
@@ -21,7 +21,7 @@ function mostraAccesso(
 ) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MantineProvider theme={tema}>
+    <MantineProvider theme={tema} cssVariablesResolver={variabiliCss}>
       <QueryClientProvider client={queryClient}>
         <Accesso configurazione={configurazione}>{figli}</Accesso>
       </QueryClientProvider>

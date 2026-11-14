@@ -1,13 +1,25 @@
+import { lazy } from "react";
 import { Route, Routes } from "react-router";
 
 import { Struttura } from "./componenti/Struttura";
 import { Vuoto } from "./componenti/Stati";
-import { Approvazioni } from "./pagine/Approvazioni";
-import { Catalogo } from "./pagine/Catalogo";
-import { Corsi } from "./pagine/gestione/Corsi";
-import { EdizioniCorso } from "./pagine/gestione/EdizioniCorso";
-import { IscrizioniEdizione } from "./pagine/gestione/IscrizioniEdizione";
-import { MieIscrizioni } from "./pagine/MieIscrizioni";
+
+// Una pagina per chunk, scaricata alla prima visita (ADR-0009 §16): chi non gestisce i
+// corsi non scarica mai le pagine di gestione.
+const Catalogo = lazy(() => import("./pagine/Catalogo").then((m) => ({ default: m.Catalogo })));
+const MieIscrizioni = lazy(() =>
+  import("./pagine/MieIscrizioni").then((m) => ({ default: m.MieIscrizioni })),
+);
+const Approvazioni = lazy(() =>
+  import("./pagine/Approvazioni").then((m) => ({ default: m.Approvazioni })),
+);
+const Corsi = lazy(() => import("./pagine/gestione/Corsi").then((m) => ({ default: m.Corsi })));
+const EdizioniCorso = lazy(() =>
+  import("./pagine/gestione/EdizioniCorso").then((m) => ({ default: m.EdizioniCorso })),
+);
+const IscrizioniEdizione = lazy(() =>
+  import("./pagine/gestione/IscrizioniEdizione").then((m) => ({ default: m.IscrizioniEdizione })),
+);
 
 export function App() {
   return (
