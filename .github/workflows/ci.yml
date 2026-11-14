@@ -82,6 +82,15 @@ jobs:
       - name: Schema migrato da Alembic
         working-directory: .
         run: docker compose exec -T db psql -U academy -d academy -tAc "SELECT version_num FROM alembic_version" | grep -E '^[0-9]+$'
+      - name: Prima passata del job di sistema
+        # Il servizio job non ha healthcheck: "up --wait" vede solo che è partito.
+        working-directory: .
+        run: |
+          for _ in $(seq 1 15); do
+            docker compose logs job | grep -q "Passata del job" && exit 0
+            sleep 2
+          done
+          exit 1
       - name: Log in caso di errore
         if: failure()
         working-directory: .

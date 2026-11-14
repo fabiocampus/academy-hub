@@ -4,14 +4,14 @@ Prototipo di studio: iscrizioni ai corsi di un'Academy aziendale (parte transazi
 
 ## Stato
 
-Fase 5 (API a livelli), in tre PR (issue #49). Fatte le prime due: errori RFC 9457, ETag/If-Match, contratto OpenAPI versionato, corsi, edizioni e catalogo; flusso delle iscrizioni (richiesta idempotente, approvazione del responsabile diretto, conferma, annullamento, audit). Restano i job e la promozione dalla lista d'attesa (US-09, US-17, US-18). L'identità è ancora provvisoria (header `X-Persona-Id`, solo in locale con `ACADEMY_IDENTITA_PROVVISORIA=true`) fino alla fase 6. Convenzioni in `docs/adr/0005-convenzioni-dell-api.md`.
+Fase 5 (API a livelli), in tre PR (issue #49): errori RFC 9457, ETag/If-Match, contratto OpenAPI versionato, corsi, edizioni e catalogo; flusso delle iscrizioni (richiesta idempotente, approvazione del responsabile diretto, conferma, annullamento, audit); promozione dalla lista d'attesa nella stessa transazione, cancellazione dell'edizione e job di sistema (ADR-0007). L'identità è ancora provvisoria (header `X-Persona-Id`, solo in locale con `ACADEMY_IDENTITA_PROVVISORIA=true`) fino alla fase 6. Convenzioni in `docs/adr/0005-convenzioni-dell-api.md`.
 
 ## Ambiente locale
 
 Dalla radice del repository, senza altri passaggi (il `.env` è facoltativo, vedi `.env.example`):
 
 ```bash
-docker compose up -d --build --wait   # db, migrazioni, keycloak, otel-lgtm, backend
+docker compose up -d --build --wait   # db, migrazioni, keycloak, otel-lgtm, backend, job
 docker compose down                   # -v per cancellare anche i dati
 ```
 
@@ -28,6 +28,7 @@ uv sync                      # crea .venv e installa le dipendenze
 uv run pytest                # tutti i test (quelli `integrazione` avviano PostgreSQL con Testcontainers: serve Docker)
 uv run pytest -m "not integrazione"   # solo i test veloci, senza Docker
 uv run python -m academy_hub.db.migrazioni   # migra il PostgreSQL locale (o ACADEMY_DATABASE_URL)
+uv run python -m academy_hub.job              # una passata del job di sistema (--ogni N per ripeterla)
 uv run python -m academy_hub.contratto        # rigenera backend/contratto/ dopo un cambio dell'API (aumenta VERSIONE_API)
 uv run ruff check --fix      # lint
 uv run ruff format           # formattazione
@@ -45,7 +46,8 @@ Dopo ogni modifica a un file `.py` del backend l'hook `.claude/hooks/dopo_modifi
   - `dominio/`: stati dell'iscrizione e transizioni (R7), ruoli, attore, errori di dominio con il loro `tipo`, calendario di Roma; Python puro, senza database.
   - `db/`: modelli SQLAlchemy (`modelli.py`) e migrazioni Alembic (`schema/versions/`). Lo schema cambia solo con una migrazione. Vedi `docs/database.md`.
   - `repository/`: le query, con i lock `FOR UPDATE`. Ordine dei lock: prima l'edizione, poi le sue iscrizioni (ADR-0004).
-  - `servizi/`: le regole. Ogni cambio di stato di un'iscrizione passa da un solo punto che verifica la transizione e scrive l'audit (R6).
+  - `servizi/`: le regole. Ogni cambio di stato di un'iscrizione passa da un solo punto che verifica la transizione e scrive l'audit (R6). Ogni posto liberato passa da `promuovi_dalla_lista` nella stessa transazione (R4).
+  - `job.py`: job di sistema (scadenza all'inizio dell'edizione, rete di sicurezza della promozione), una transazione per edizione (ADR-0007).
 - `backend/contratto/`: contratto OpenAPI e impronte per versione; `tests/test_contratto.py` fallisce se l'API cambia senza aumentare la versione.
 - `backend/tests/`: test pytest. I test HTTP usano la fixture `client` (TestClient sull'app collegata al database di test) e `tests/api.py`. `dati.py` crea dati sintetici; `conftest.py` avvia PostgreSQL con la stessa immagine di docker compose e applica le migrazioni.
 - `backend/Dockerfile`: multi-stage con uv, runtime non root (uid 10001).

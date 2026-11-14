@@ -1,4 +1,4 @@
-"""Rotte delle edizioni (US-02)."""
+"""Rotte delle edizioni (US-02, US-18)."""
 
 from fastapi import APIRouter, Response, status
 
@@ -51,5 +51,21 @@ def modifica_edizione(
     edizione = catalogo.modifica_edizione(
         sessione, attore, edizione_id, versione, **dati.model_dump(exclude_unset=True)
     )
+    risposta.headers["ETag"] = etag(edizione.versione)
+    return EdizioneLetta.model_validate(edizione)
+
+
+@router.post(
+    "/{edizione_id}/cancellazione",
+    responses=risposte(403, 404, 409),
+    operation_id="cancellaEdizione",
+    summary="Cancella un'edizione non iniziata: le iscrizioni attive diventano Annullata",
+)
+def cancella_edizione(
+    edizione_id: int, sessione: SessioneDb, attore: AttoreCorrente, risposta: Response
+) -> EdizioneLetta:
+    """Comando, come i cambi di stato delle iscrizioni: lo stato si verifica sotto lock,
+    quindi niente `If-Match` (ADR-0005, punto 3). Ripetuto, restituisce l'edizione com'è."""
+    edizione = catalogo.cancella_edizione(sessione, attore, edizione_id)
     risposta.headers["ETag"] = etag(edizione.versione)
     return EdizioneLetta.model_validate(edizione)

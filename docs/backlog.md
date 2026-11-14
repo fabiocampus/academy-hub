@@ -202,7 +202,7 @@ Revisione critica delle storie rispetto al diagramma degli stati e alle regole R
 | # | Domanda | Decisione |
 |---|---|---|
 | D1 | `Approvata → InAttesa`: alla conferma dell'Academy o subito all'approvazione? | Alla conferma dell'Academy: se non ci sono posti, l'iscrizione va `InAttesa`. L'Academy resta l'unico punto che assegna posti. |
-| D2 | `InAttesa → Confermata`: automatica o manuale? Fino a quando? | Automatica, tramite job in background con autore «sistema»; nessuna promozione a edizione iniziata. |
+| D2 | `InAttesa → Confermata`: automatica o manuale? Fino a quando? | Automatica, con autore «sistema», nella stessa transazione che libera il posto; un job periodico fa da rete di sicurezza (ADR-0007). Nessuna promozione a edizione iniziata. |
 | D3 | Il diagramma originale non prevedeva `InAttesa → Annullata`. | Transizione aggiunta: chi è in lista d'attesa può ritirarsi. |
 | D4 | Dopo `Rifiutata` o `Annullata` si può chiedere di nuovo l'iscrizione? | Sì: R1 conta solo le iscrizioni attive. |
 | D5 | Che cosa conta come presenza per passare a `Completata`? | Una riga per persona e giornata; `Completata` con almeno il 75% delle giornate. Soglia configurabile. |

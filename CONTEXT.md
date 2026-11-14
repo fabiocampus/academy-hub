@@ -17,6 +17,9 @@ Termini usati in codice, test, issue e documentazione. Nel codice i nomi restano
 | **Iscrizione** | La richiesta di una persona di partecipare a un'edizione, con il suo stato. | Presenza |
 | **Iscrizione attiva** | Un'iscrizione in stato `Richiesta`, `Approvata`, `InAttesa` o `Confermata`. Al massimo una per persona ed edizione (R1). | — |
 | **Lista d'attesa** | Le iscrizioni `InAttesa` di un'edizione, ordinate per momento di approvazione. | — |
+| **Promozione** | Passaggio automatico `InAttesa → Confermata` del primo in lista d'attesa quando c'è un posto libero (R4): dopo un annullamento, un aumento di capienza o, come rete di sicurezza, al giro del job. Mai a edizione iniziata o cancellata (D2). | Conferma Academy |
+| **Iscrizione pendente** | Un'iscrizione attiva senza posto: `Richiesta`, `Approvata` o `InAttesa`. All'inizio dell'edizione diventa `Annullata` (D8). | Iscrizione attiva |
+| **Job di sistema** | Processo periodico (`python -m academy_hub.job`) che annulla le iscrizioni pendenti delle edizioni iniziate e ripara la promozione dove serve (ADR-0007). I suoi eventi hanno autore il sistema. | — |
 | **Chiave di idempotenza** | Valore scelto dal client (header `Idempotency-Key`) che rende ripetibile la richiesta d'iscrizione: con la stessa chiave si riceve la stessa iscrizione invece di crearne un'altra (ADR-0006). Vale per persona. | Iscrizione duplicata (R1) |
 | **Scadenza di annullamento** | Il numero N di giorni di calendario prima dell'inizio dell'edizione (fuso `Europe/Rome`) oltre il quale un'iscrizione `Confermata` non è più annullabile (R5). Configurabile per ambiente. | — |
 | **Edizione cancellata** | Edizione ritirata dall'Academy prima dell'inizio. Resta nel database (cancellazione logica); le sue iscrizioni attive diventano `Annullata`. | Edizione conclusa |
