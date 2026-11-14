@@ -5,15 +5,26 @@ from datetime import UTC, date, datetime, timedelta
 from sqlalchemy.orm import Session
 
 from academy_hub.db.modelli import Corso, Edizione, Iscrizione, Persona, Team
+from academy_hub.dominio.ruoli import Ruolo
 from academy_hub.dominio.stati import StatoIscrizione
 
 
-def crea_persona(sessione: Session, nome: str, team: Team | None = None) -> Persona:
+def crea_persona(
+    sessione: Session,
+    nome: str,
+    team: Team | None = None,
+    ruoli: tuple[Ruolo, ...] = (Ruolo.DIPENDENTE,),
+) -> Persona:
     if team is None:
         team = Team(nome=f"Team di {nome}")
         sessione.add(team)
         sessione.flush()
-    persona = Persona(nome=nome, email=f"{nome.lower()}@esempio.test", team_id=team.id)
+    persona = Persona(
+        nome=nome,
+        email=f"{nome.lower()}@esempio.test",
+        team_id=team.id,
+        ruoli=[r.value for r in ruoli],
+    )
     sessione.add(persona)
     sessione.flush()
     return persona

@@ -115,6 +115,11 @@ class Corso(Base):
     titolo: Mapped[str] = mapped_column(String(200))
     descrizione: Mapped[str] = mapped_column(Text, server_default="")
     durata_ore: Mapped[int]
+    # Archiviato: fuori dal catalogo, ma le edizioni passate restano nei report (US-01).
+    archiviato_il: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    versione: Mapped[int] = mapped_column(server_default="1")
+
+    __mapper_args__ = {"version_id_col": versione}  # noqa: RUF012
 
 
 class Edizione(Base):
@@ -138,6 +143,10 @@ class Edizione(Base):
     docente_id: Mapped[int | None] = mapped_column(ForeignKey("persone.id"))
     # Cancellazione logica (D10): l'edizione resta, le iscrizioni attive diventano Annullata.
     cancellata_il: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Concorrenza ottimistica (ETag): cresce a ogni modifica, anche del contatore dei posti.
+    versione: Mapped[int] = mapped_column(server_default="1")
+
+    __mapper_args__ = {"version_id_col": versione}  # noqa: RUF012
 
 
 class Iscrizione(Base):

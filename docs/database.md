@@ -24,12 +24,12 @@ I test svuotano le tabelle con `SET LOCAL session_replication_role = replica`, c
 |---|---|---|
 | `team` | Gerarchia dei team (`team_padre_id`) e responsabile | nome unico; un team non è padre di se stesso |
 | `persone` | Nome, email, team, ruoli applicativi | email unica; `ruoli` non vuoto e solo fra i codici di `CONTEXT.md` |
-| `corsi` | Titolo, descrizione, durata in ore | durata > 0 |
-| `edizioni` | Date, capienza, docente, `posti_confermati`, `cancellata_il` | capienza > 0; fine ≥ inizio; `posti_confermati` fra 0 e capienza (R3) |
+| `corsi` | Titolo, descrizione, durata in ore, `archiviato_il`, `versione` | durata > 0 |
+| `edizioni` | Date, capienza, docente, `posti_confermati`, `cancellata_il`, `versione` | capienza > 0; fine ≥ inizio; `posti_confermati` fra 0 e capienza (R3) |
 | `iscrizioni` | Persona, edizione, stato, momenti di richiesta e approvazione | stato fra quelli del glossario; `UNIQUE` parziale sulle attive (R1); data di approvazione obbligatoria dopo l'approvazione |
 | `eventi_audit` | Chi, quando, stato di partenza e di arrivo, motivo | solo aggiunta: i trigger rifiutano `UPDATE`, `DELETE` e `TRUNCATE` (R6); `autore_id` nullo = sistema |
 
-Le edizioni non si cancellano: `cancellata_il` le ritira dal catalogo (D10). Gli stati sono testo con un `CHECK`, non un tipo `ENUM` di PostgreSQL: aggiungere uno stato è una migrazione che cambia un vincolo, senza `ALTER TYPE`.
+Le edizioni non si cancellano: `cancellata_il` le ritira dal catalogo (D10). I corsi archiviati (`archiviato_il`) escono dal catalogo con le loro edizioni, che restano per i report (US-01). `versione` è il contatore della concorrenza ottimistica: lo incrementa SQLAlchemy a ogni modifica (`version_id_col`) e l'API lo espone come `ETag` (ADR-0005). Gli stati sono testo con un `CHECK`, non un tipo `ENUM` di PostgreSQL: aggiungere uno stato è una migrazione che cambia un vincolo, senza `ALTER TYPE`.
 
 La concorrenza sull'ultimo posto è descritta in [ADR-0004](adr/0004-concorrenza-sull-ultimo-posto.md).
 
@@ -54,6 +54,8 @@ Indici sulle ricerche frequenti previste dal backlog:
 | Primo in lista d'attesa | Index Scan su `ix_iscrizioni_lista_attesa`, si ferma alla prima riga | 0,09 ms |
 | Audit di un'iscrizione | Index Scan su `ix_eventi_audit_iscrizione` | 0,2 ms |
 
-Indici ancora assenti, da valutare con le ricerche della fase 5: `edizioni.docente_id` e `eventi_audit.autore_id`.
+Indici non creati, di proposito: `edizioni.docente_id` ed `eventi_audit.autore_id`. Nessuna ricerca dell'API filtra per docente o per autore, e le persone non si cancellano, quindi PostgreSQL non deve mai cercare le righe che le referenziano. Da riconsiderare con le presenze del docente (US-12) e con eventuali report per autore.
+
+Il catalogo filtra per titolo con `ILIKE '%…%'`, che non usa indici: con poche migliaia di corsi la scansione è trascurabile; con molti di più servirebbe un indice trigrammi (`pg_trgm`).
 
 Il caso istruttivo è la lista d'attesa. Togliendo i due indici su `edizione_id`, PostgreSQL ripiega sull'indice parziale `uq_iscrizioni_attiva`: legge tutte le 29 iscrizioni attive dell'edizione, ne scarta 23 con un filtro e le ordina. Il tempo sale a circa 1 ms, dieci volte tanto. L'indice parziale con `approvata_il` restituisce invece la prima riga già in ordine.

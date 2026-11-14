@@ -2,6 +2,8 @@
 
 from enum import StrEnum
 
+from academy_hub.dominio.errori import Conflitto
+
 
 class StatoIscrizione(StrEnum):
     RICHIESTA = "Richiesta"
@@ -39,8 +41,11 @@ TRANSIZIONI: dict[StatoIscrizione, frozenset[StatoIscrizione]] = {
 }
 
 
-class TransizioneNonConsentita(Exception):
+class TransizioneNonConsentita(Conflitto):
     """Transizione non prevista dalla macchina a stati (R7)."""
+
+    tipo = "transizione-non-consentita"
+    titolo = "Transizione di stato non consentita"
 
     def __init__(self, da: StatoIscrizione, a: StatoIscrizione) -> None:
         self.da = da

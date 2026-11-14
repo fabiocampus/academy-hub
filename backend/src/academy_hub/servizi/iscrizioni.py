@@ -3,6 +3,7 @@
 from sqlalchemy.orm import Session
 
 from academy_hub.db.modelli import Iscrizione
+from academy_hub.dominio.errori import Conflitto
 from academy_hub.dominio.stati import (
     StatoIscrizione,
     TransizioneNonConsentita,
@@ -11,7 +12,10 @@ from academy_hub.dominio.stati import (
 from academy_hub.repository import iscrizioni as repository
 
 
-class EdizioneCancellata(Exception):
+class EdizioneCancellata(Conflitto):
+    tipo = "edizione-cancellata"
+    titolo = "Edizione cancellata"
+
     def __init__(self, edizione_id: int) -> None:
         self.edizione_id = edizione_id
         super().__init__(f"Edizione {edizione_id} cancellata")
