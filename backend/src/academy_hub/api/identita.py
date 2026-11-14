@@ -6,6 +6,7 @@ Così lo stesso codice di autorizzazione (i servizi) funziona sopra Keycloak in 
 sopra l'identità che Databricks Apps passa all'App.
 """
 
+import logging
 import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -15,6 +16,8 @@ import jwt
 
 from academy_hub.config import Impostazioni
 from academy_hub.dominio.errori import ErroreDominio, NonAutenticato
+
+log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -58,7 +61,43 @@ def _email(valore: object) -> str:
 
 
 TrovaChiave = Callable[[str], Any]
-"""Dato il token, la chiave pubblica che lo deve aver firmato (dal JWKS, per `kid`)."""
+"""Dato il token, la chiave pubblica che lo deve aver firmato (dal JWKS, per `kid`).
+
+Solleva `IdentitaNonDisponibile` se le chiavi non si possono leggere (il client non ha
+colpa: 503) e `jwt.PyJWTError` se il token non indica una chiave del provider (401).
+"""
+
+# Guasti del JWKS: irraggiungibile o HTTP in errore (PyJWKClientConnectionError), corpo
+# non JSON (ValueError), non un oggetto o senza chiavi di firma (PyJWKClientError),
+# chiavi inutilizzabili (PyJWKSetError).
+_GUASTI_JWKS = (jwt.PyJWKClientError, jwt.PyJWKSetError, ValueError)
+
+
+def chiavi_da_jwks(jwks_url: str, durata_cache_s: float = 300) -> TrovaChiave:
+    """Chiavi dal JWKS del provider, con il JWK Set in cache per `durata_cache_s`.
+
+    Niente cache per singola chiave (`cache_keys` di PyJWT non scade mai): una chiave
+    tolta dal JWKS, perché ruotata o compromessa, smette di valere entro `durata_cache_s`.
+    Un `kid` sconosciuto fa rileggere il JWKS (rotazione), al più ogni 30 secondi.
+    """
+    client = jwt.PyJWKClient(jwks_url, lifespan=durata_cache_s, timeout=5)
+
+    def trova_chiave(token: str) -> Any:
+        kid = jwt.get_unverified_header(token).get("kid")
+        if not isinstance(kid, str):
+            raise jwt.InvalidTokenError("kid mancante nell'header del token")
+        try:
+            client.get_signing_keys()
+        except _GUASTI_JWKS as errore:
+            raise IdentitaNonDisponibile("Chiavi del provider d'identità non leggibili") from errore
+        try:
+            return client.get_signing_key(kid).key
+        except (jwt.PyJWKClientConnectionError, jwt.PyJWKSetError, ValueError) as errore:
+            # Il JWKS si è guastato proprio nella rilettura per un kid nuovo.
+            raise IdentitaNonDisponibile("Chiavi del provider d'identità non leggibili") from errore
+        # Resta PyJWKClientError: nessuna chiave con quel kid, anche dopo la rilettura.
+
+    return trova_chiave
 
 
 class Oidc:
@@ -78,9 +117,7 @@ class Oidc:
 
     @classmethod
     def da_jwks(cls, emittente: str, pubblico: str, jwks_url: str) -> "Oidc":
-        # Chiavi in cache; un `kid` sconosciuto (rotazione) fa rileggere il JWKS.
-        client = jwt.PyJWKClient(jwks_url, cache_keys=True, lifespan=300, timeout=5)
-        return cls(emittente, pubblico, lambda token: client.get_signing_key_from_jwt(token).key)
+        return cls(emittente, pubblico, chiavi_da_jwks(jwks_url))
 
     def identifica(self, intestazioni: Mapping[str, str]) -> Identificazione:
         token = _bearer(intestazioni.get("authorization"))
@@ -99,8 +136,11 @@ class Oidc:
             raise IdentitaNonDisponibile("Chiavi del provider d'identità non raggiungibili") from (
                 errore
             )
-        except (jwt.InvalidTokenError, jwt.PyJWKClientError) as errore:
-            raise NonAutenticato(f"Token non valido: {errore}") from errore
+        except jwt.PyJWTError as errore:
+            # Il motivo esatto (pubblico, emittente, kid attesi) resta nel log, non nella
+            # risposta.
+            log.info("Token rifiutato: %s", errore)
+            raise NonAutenticato("Token non valido") from errore
         if dati.get("email_verified") is not True:
             raise NonAutenticato("L'email del token non è verificata dal provider")
         return PerEmail(_email(dati.get("email")))

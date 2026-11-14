@@ -48,6 +48,13 @@ class Impostazioni(BaseSettings):
                 "identita=databricks non è ammessa in locale: senza il proxy di Databricks Apps "
                 "chiunque può scrivere X-Forwarded-Email"
             )
+        if self.identita == "oidc" and self.ambiente != "locale":
+            for nome, url in (("oidc_emittente", self.oidc_emittente), ("jwks", self.jwks_url)):
+                if not url.startswith("https://"):
+                    raise ValueError(
+                        f"{nome} deve essere https fuori dal locale: le chiavi lette in chiaro "
+                        "si possono sostituire"
+                    )
         return self
 
 

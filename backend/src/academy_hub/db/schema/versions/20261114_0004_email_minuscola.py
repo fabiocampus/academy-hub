@@ -16,6 +16,8 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    # Se due email differiscono solo per maiuscole l'UPDATE viola l'indice unico e la
+    # migrazione fallisce: va scelta a mano la persona giusta (sono la stessa identità).
     # Con il vincolo, l'indice UNIQUE già esistente vale anche senza distinguere
     # maiuscole e minuscole, e la ricerca per email resta un confronto esatto.
     op.execute("UPDATE persone SET email = lower(email) WHERE email <> lower(email)")

@@ -25,6 +25,7 @@ def test_health_risponde_ok() -> None:
 
 def test_ambiente_letto_dalla_variabile(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ACADEMY_AMBIENTE", "collaudo")
+    monkeypatch.setenv("ACADEMY_IDENTITA", "databricks")
 
     assert TestClient(crea_app()).get("/health").json()["ambiente"] == "collaudo"
 
@@ -71,6 +72,37 @@ def test_identita_databricks_ammessa_sulla_piattaforma(
     monkeypatch.setenv("ACADEMY_IDENTITA", "databricks")
 
     assert Impostazioni().identita == "databricks"
+
+
+@pytest.mark.parametrize(
+    ("emittente", "jwks"),
+    [
+        ("http://kc.test/realms/academy", None),
+        ("https://kc.test/realms/academy", "http://kc.test/certs"),
+    ],
+)
+def test_oidc_in_chiaro_vietato_fuori_dal_locale(
+    monkeypatch: pytest.MonkeyPatch, emittente: str, jwks: str | None
+) -> None:
+    monkeypatch.setenv("ACADEMY_AMBIENTE", "collaudo")
+    monkeypatch.setenv("ACADEMY_IDENTITA", "oidc")
+    monkeypatch.setenv("ACADEMY_OIDC_EMITTENTE", emittente)
+    if jwks is None:
+        monkeypatch.delenv("ACADEMY_OIDC_JWKS_URL", raising=False)
+    else:
+        monkeypatch.setenv("ACADEMY_OIDC_JWKS_URL", jwks)
+
+    with pytest.raises(ValidationError, match="https"):
+        Impostazioni()
+
+
+def test_oidc_https_ammesso_fuori_dal_locale(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ACADEMY_AMBIENTE", "produzione")
+    monkeypatch.setenv("ACADEMY_IDENTITA", "oidc")
+    monkeypatch.setenv("ACADEMY_OIDC_EMITTENTE", "https://kc.test/realms/academy")
+    monkeypatch.delenv("ACADEMY_OIDC_JWKS_URL", raising=False)
+
+    assert Impostazioni().jwks_url.startswith("https://")
 
 
 def test_jwks_url_derivato_dall_emittente(monkeypatch: pytest.MonkeyPatch) -> None:

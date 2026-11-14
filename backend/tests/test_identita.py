@@ -109,7 +109,7 @@ def test_firmato_da_un_altra_chiave(provider: ProviderFinto) -> None:
 
 
 def test_kid_sconosciuto(provider: ProviderFinto) -> None:
-    with pytest.raises(NonAutenticato, match="kid"):
+    with pytest.raises(NonAutenticato):
         provider.oidc().identifica(_bearer(provider.token(kid="ruotata")))
 
 

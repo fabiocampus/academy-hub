@@ -11,7 +11,7 @@ from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
 from academy_hub.api import PREFISSO
-from academy_hub.api.identita import Oidc
+from academy_hub.api.identita import Databricks, Oidc
 from academy_hub.main import crea_app
 
 from .api import R
@@ -145,6 +145,48 @@ def test_provider_irraggiungibile_503(db: Engine, provider: ProviderFinto) -> No
 
     assert risposta.status_code == 503
     assert risposta.json()["type"] == "/problemi/identita-non-disponibile"
+
+
+@pytest.fixture
+def client_databricks(db: Engine) -> Iterator[TestClient]:
+    """App come su Databricks Apps: identità dall'header del proxy."""
+    with TestClient(crea_app(motore=db, identita=Databricks())) as client:
+        yield client
+
+
+def test_databricks_persona_dell_header(client_databricks: TestClient, db: Engine) -> None:
+    _persona(db, "Anna")
+
+    risposta = client_databricks.get(
+        f"{PREFISSO}/catalogo", headers={"X-Forwarded-Email": "Anna@esempio.test"}
+    )
+
+    assert risposta.status_code == 200
+
+
+@pytest.mark.parametrize(
+    "intestazioni",
+    [
+        pytest.param({}, id="senza-header"),
+        pytest.param({"Authorization": "Bearer qualcosa"}, id="solo-bearer"),
+        pytest.param({"X-Persona-Id": "1"}, id="solo-x-persona-id"),
+    ],
+)
+def test_databricks_senza_x_forwarded_email_401(
+    client_databricks: TestClient, db: Engine, intestazioni: dict[str, str]
+) -> None:
+    _persona(db, "Anna")
+
+    assert client_databricks.get(f"{PREFISSO}/catalogo", headers=intestazioni).status_code == 401
+
+
+def test_databricks_persona_non_registrata_403(client_databricks: TestClient) -> None:
+    risposta = client_databricks.get(
+        f"{PREFISSO}/catalogo", headers={"X-Forwarded-Email": "nessuno@esempio.test"}
+    )
+
+    assert risposta.status_code == 403
+    assert risposta.json()["type"] == "/problemi/persona-non-registrata"
 
 
 def test_health_senza_identita(client: TestClient) -> None:
