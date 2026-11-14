@@ -4,8 +4,11 @@ version = "0.1.0"
 description = "Academy Hub: iscrizioni ai corsi dell'Academy aziendale (prototipo di studio)"
 requires-python = ">=3.11,<3.12"
 dependencies = [
+    "alembic>=1.20.1",
     "fastapi>=0.162.7",
+    "psycopg[binary]>=3.3.9",
     "pydantic-settings>=2.16.3",
+    "sqlalchemy>=2.1.8",
     "uvicorn[standard]>=0.54.0",
 ]
 
@@ -16,6 +19,7 @@ dev = [
     "pyright",
     "pytest",
     "ruff",
+    "testcontainers[postgres]>=4.15.0",
 ]
 
 [build-system]
@@ -31,9 +35,16 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "S", "N", "RUF"]
+# N818: le eccezioni di dominio hanno nomi italiani (TransizioneNonConsentita), senza suffisso Error.
+ignore = ["N818"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101"]
+# Migrazioni generate da Alembic: SQL dei vincoli su una riga.
+"src/academy_hub/db/schema/versions/**" = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["academy_hub"]
 
 [tool.pyright]
 include = ["src", "tests"]
@@ -45,3 +56,6 @@ venv = ".venv"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers"
+markers = [
+    "integrazione: usa un PostgreSQL reale con Testcontainers (serve Docker)",
+]

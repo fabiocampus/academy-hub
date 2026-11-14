@@ -46,6 +46,7 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --locked
+      # I test `integrazione` avviano PostgreSQL con Testcontainers: Docker è già sul runner.
       - run: uv run pytest
 
   immagine:
@@ -67,7 +68,8 @@ jobs:
           format: table
 
   compose:
-    # Il criterio della fase 3: docker compose up da un clone pulito, senza .env.
+    # Il criterio della fase 3: docker compose up da un clone pulito, senza .env;
+    # dalla fase 4 il servizio migrazioni porta lo schema all'ultima versione.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -77,6 +79,9 @@ jobs:
       - name: Health del backend
         working-directory: .
         run: curl --fail --silent --show-error http://127.0.0.1:8000/health
+      - name: Schema migrato da Alembic
+        working-directory: .
+        run: docker compose exec -T db psql -U academy -d academy -tAc "SELECT version_num FROM alembic_version" | grep -E '^[0-9]+$'
       - name: Log in caso di errore
         if: failure()
         working-directory: .

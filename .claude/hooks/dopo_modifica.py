@@ -30,7 +30,8 @@ def main() -> int:
     passi = [
         ["uv", "run", "ruff", "format", str(file)],
         ["uv", "run", "ruff", "check", "--fix", str(file)],
-        ["uv", "run", "pytest", "-q", "-x", "--no-header"],
+        # I test con Testcontainers restano alla CI e a `uv run pytest`: qui servono risposte rapide.
+        ["uv", "run", "pytest", "-q", "-x", "--no-header", "-m", "not integrazione"],
     ]
     for passo in passi:
         esito = esegui(passo)

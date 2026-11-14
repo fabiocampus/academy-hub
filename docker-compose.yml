@@ -49,18 +49,28 @@ services:
       - "127.0.0.1:4317:4317"
       - "127.0.0.1:4318:4318"
 
+  # Porta lo schema all'ultima migrazione Alembic e termina; il backend parte dopo.
+  migrazioni:
+    build: ./backend
+    command: ["python", "-m", "academy_hub.db.migrazioni"]
+    environment:
+      ACADEMY_DATABASE_URL: &url-db postgresql+psycopg://${POSTGRES_USER:-academy}:${POSTGRES_PASSWORD:-academy}@db:5432/${POSTGRES_DB:-academy}
+    depends_on:
+      db:
+        condition: service_healthy
+
   backend:
     build: ./backend
     environment:
       ACADEMY_AMBIENTE: ${ACADEMY_AMBIENTE:-locale}
       ACADEMY_LIVELLO_LOG: ${ACADEMY_LIVELLO_LOG:-INFO}
-      ACADEMY_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-academy}:${POSTGRES_PASSWORD:-academy}@db:5432/${POSTGRES_DB:-academy}
+      ACADEMY_DATABASE_URL: *url-db
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-lgtm:4318
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
     depends_on:
-      db:
-        condition: service_healthy
+      migrazioni:
+        condition: service_completed_successfully
       keycloak:
         condition: service_healthy
       otel-lgtm:
