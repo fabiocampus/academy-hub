@@ -10,6 +10,19 @@ Fase 6 (identità e sicurezza, issue #36): identità da token OIDC di Keycloak i
 
 Fase 7 (frontend, issue #59), in tre PR: A) base in `frontend/` (React, Vite, Mantine, React Query, client dal contratto, login OIDC con PKCE, catalogo; ADR-0009); B) mie iscrizioni con annullamento, richiesta dal catalogo, approvazioni (issue #62), poi gestione di corsi, edizioni e iscrizioni dell'edizione per `admin_academy` (issue #64, elenchi nuovi nel contratto 1.5.0, modifiche con ETag/If-Match); C) build servita da FastAPI nello stesso processo, end-to-end con Playwright su docker compose e axe, bundle diviso per pagina (issue #66).
 
+Fase 8 (Databricks, issue #68), in due PR: A) l'App su Lakebase (issue #69): bundle `databricks.yml` con target `collaudo` e `prod`, un progetto Lakebase con un branch per ambiente, password del database = token OAuth per connessione, schema `academy`, avvio con migrazioni e persona amministratrice (ADR-0010); B) Unity Catalog e identità dell'utente (on-behalf-of-user).
+
+## Databricks
+
+Dalla radice, con il profilo `academy` della CLI e l'email dell'account in `ACADEMY_ADMIN_EMAIL` (mai nel repository):
+
+```bash
+python scripts/prepara_app.py   # build/app: pacchetto Python, build del frontend, requirements.txt con hash
+databricks bundle deploy -t prod -p academy --var admin_email=$ACADEMY_ADMIN_EMAIL       # la prima volta: crea il progetto Lakebase
+databricks bundle deploy -t collaudo -p academy --var admin_email=$ACADEMY_ADMIN_EMAIL
+databricks bundle run academy_hub -t collaudo -p academy   # avvia la versione caricata
+```
+
 ## Ambiente locale
 
 Dalla radice del repository, senza altri passaggi (il `.env` è facoltativo, vedi `.env.example`):
@@ -70,6 +83,7 @@ npm run e2e                  # Playwright + axe su docker compose acceso (http:/
   - `db/`: modelli SQLAlchemy (`modelli.py`) e migrazioni Alembic (`schema/versions/`). Lo schema cambia solo con una migrazione. Vedi `docs/database.md`.
   - `repository/`: le query, con i lock `FOR UPDATE`. Ordine dei lock: prima l'edizione, poi le sue iscrizioni (ADR-0004).
   - `servizi/`: le regole. Ogni cambio di stato di un'iscrizione passa da un solo punto che verifica la transizione e scrive l'audit (R6). Ogni posto liberato passa da `promuovi_dalla_lista` nella stessa transazione (R4).
+  - `db/motore.py`: `crea_motore`, l'unico modo di creare un motore SQLAlchemy (token OAuth come password su Lakebase, `search_path` sullo schema dedicato). `avvio.py`: comando dell'App su Databricks (migrazioni, `db/amministratore.py`, uvicorn).
   - `job.py`: job di sistema (scadenza all'inizio dell'edizione, rete di sicurezza della promozione), una transazione per edizione (ADR-0007).
   - `frontend.py`: serve la build del frontend (`ACADEMY_FRONTEND_DIR`) con fallback su `index.html` per le rotte del client; `/api` resta JSON (ADR-0009 §14).
 - `backend/contratto/`: contratto OpenAPI e impronte per versione; `tests/test_contratto.py` fallisce se l'API cambia senza aumentare la versione.

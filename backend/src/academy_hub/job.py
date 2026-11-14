@@ -19,10 +19,11 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from types import FrameType
 
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
 from academy_hub.config import impostazioni
+from academy_hub.db.motore import crea_motore
 from academy_hub.servizi import iscrizioni
 
 log = logging.getLogger("academy_hub.job")
@@ -109,7 +110,7 @@ def main(argv: list[str] | None = None) -> int:
     ogni: int | None = parser.parse_args(argv).ogni
     config = impostazioni()
     logging.basicConfig(level=config.livello_log, format="%(asctime)s %(levelname)s %(message)s")
-    motore = create_engine(config.database_url, pool_pre_ping=True)
+    motore = crea_motore(config, pool_pre_ping=True)
     try:
         if ogni is None:
             # Uscita diversa da 0 se qualcosa è fallito: lo scheduler lo deve vedere.

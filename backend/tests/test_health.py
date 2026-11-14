@@ -55,6 +55,27 @@ def test_identita_provvisoria_vietata_fuori_dal_locale(
         Impostazioni()
 
 
+def test_identita_provvisoria_vietata_senza_ambiente_dichiarato(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """#58: `locale` è il default, ma un deploy che dimentica l'ambiente non deve
+    accettare X-Persona-Id."""
+    monkeypatch.delenv("ACADEMY_AMBIENTE", raising=False)
+    monkeypatch.setenv("ACADEMY_IDENTITA", "provvisoria")
+
+    with pytest.raises(ValidationError, match="ACADEMY_AMBIENTE=locale dichiarato"):
+        Impostazioni()
+
+
+def test_identita_provvisoria_ammessa_con_locale_dichiarato(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ACADEMY_AMBIENTE", "locale")
+    monkeypatch.setenv("ACADEMY_IDENTITA", "provvisoria")
+
+    assert Impostazioni().identita == "provvisoria"
+
+
 def test_identita_databricks_vietata_in_locale(monkeypatch: pytest.MonkeyPatch) -> None:
     """Senza il proxy di Databricks Apps chiunque può scrivere X-Forwarded-Email."""
     monkeypatch.setenv("ACADEMY_AMBIENTE", "locale")

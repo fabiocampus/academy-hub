@@ -14,10 +14,22 @@ Identita = Literal["oidc", "databricks", "provvisoria"]
 class Impostazioni(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="ACADEMY_", extra="ignore")
 
+    # Per difetto `locale`, comodo per i comandi di sviluppo; l'identità provvisoria però
+    # esige che sia dichiarato (#58), così un deploy che lo dimentica non la accetta.
     ambiente: Ambiente = "locale"
     # Valore di sviluppo per il PostgreSQL di docker compose; negli altri ambienti
     # arriva dalla piattaforma. Mai credenziali reali qui.
     database_url: str = "postgresql+psycopg://academy:academy@localhost:5432/academy"
+    # Lakebase (ADR-0010): con l'endpoint impostato la password di ogni nuova connessione
+    # è un token OAuth dell'identità di chi gira (il service principal dell'App).
+    # Formato projects/<progetto>/branches/<branch>/endpoints/<endpoint>.
+    lakebase_endpoint: str | None = None
+    # Schema delle tabelle; None = quello di difetto (public). Su Lakebase il service
+    # principal crea e possiede il suo schema, perché public non è suo.
+    database_schema: str | None = Field(default=None, pattern=r"^[a-z_][a-z0-9_]{0,62}$")
+    # Persona con ruolo admin_academy creata all'avvio dell'App (academy_hub.avvio): l'email
+    # arriva dalla variabile del bundle, mai dal repository, che è pubblico.
+    admin_email: str | None = None
     livello_log: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     # Da dove arriva l'identità (ADR-0008):
     # - oidc: token Bearer di un provider OIDC (Keycloak in locale);
@@ -44,6 +56,11 @@ class Impostazioni(BaseSettings):
 
     @model_validator(mode="after")
     def _identita_coerente_con_ambiente(self) -> Self:
+        if self.identita == "provvisoria" and "ambiente" not in self.model_fields_set:
+            raise ValueError(
+                "identita=provvisoria richiede ACADEMY_AMBIENTE=locale dichiarato: un deploy "
+                "che non imposta l'ambiente non deve accettare X-Persona-Id"
+            )
         if self.identita == "provvisoria" and self.ambiente != "locale":
             raise ValueError(
                 f"identita=provvisoria non è ammessa con ambiente={self.ambiente!r}: solo in locale"

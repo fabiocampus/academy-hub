@@ -20,11 +20,12 @@ import sys
 from dataclasses import dataclass
 from datetime import date, timedelta
 
-from sqlalchemy import Engine, create_engine, select
+from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
 from academy_hub.config import impostazioni
 from academy_hub.db.modelli import Corso, Edizione, Persona, Team
+from academy_hub.db.motore import crea_motore
 from academy_hub.dominio.ruoli import Ruolo
 from academy_hub.dominio.tempo import oggi
 
@@ -128,7 +129,7 @@ def main() -> int:
         # Esce senza errore: il servizio demo di compose non deve fermare il backend.
         log.warning("Dati demo solo con ACADEMY_AMBIENTE=locale (ora %s): salto", config.ambiente)
         return 0
-    caricati = carica(create_engine(config.database_url))
+    caricati = carica(crea_motore(config))
     log.info("Dati demo %s", "caricati" if caricati else "già presenti: nessuna modifica")
     return 0
 
