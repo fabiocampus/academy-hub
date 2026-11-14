@@ -3,7 +3,7 @@
   "image": "mcr.microsoft.com/devcontainers/python:3.11-trixie",
   "features": {
     "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
-    "ghcr.io/devcontainers/features/node:1": { "version": "22" },
+    "ghcr.io/devcontainers/features/node:2": { "version": "22" },
     "ghcr.io/devcontainers/features/github-cli:1": {}
   },
   "postCreateCommand": "pip install --user uv==0.13.8 && cd backend && uv sync && uv run pre-commit install",
