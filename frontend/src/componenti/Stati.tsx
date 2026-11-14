@@ -20,7 +20,16 @@ export function messaggio(errore: unknown): { titolo: string; dettaglio?: string
   return { titolo: "Server non raggiungibile", dettaglio: "Controlla la connessione e riprova." };
 }
 
-export function Errore({ errore, riprova }: { errore: unknown; riprova?: () => void }) {
+export function Errore({
+  errore,
+  riprova,
+  azione = "Riprova",
+}: {
+  errore: unknown;
+  riprova?: () => void;
+  /** Etichetta del pulsante, es. «Ricarica i dati» dopo un 412. */
+  azione?: string;
+}) {
   const { titolo, dettaglio } = messaggio(errore);
   return (
     <Alert color="red" title={titolo} role="alert">
@@ -28,7 +37,7 @@ export function Errore({ errore, riprova }: { errore: unknown; riprova?: () => v
         {dettaglio !== undefined && <Text size="sm">{dettaglio}</Text>}
         {riprova !== undefined && (
           <Button size="xs" variant="light" color="red" onClick={riprova}>
-            Riprova
+            {azione}
           </Button>
         )}
       </Stack>

@@ -98,7 +98,7 @@ describe("vociMenu", () => {
     ]);
   });
 
-  it("all'admin Academy le approvazioni (decide dal vertice), non le iscrizioni", () => {
-    expect(etichette(profiloAdmin)).toEqual(["Catalogo", "Approvazioni"]);
+  it("all'admin Academy le approvazioni (decide dal vertice) e la gestione, non le iscrizioni", () => {
+    expect(etichette(profiloAdmin)).toEqual(["Catalogo", "Approvazioni", "Gestione"]);
   });
 });

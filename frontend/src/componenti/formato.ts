@@ -23,3 +23,10 @@ export function formattaIstante(iso: string): string {
 export function formattaPeriodo(inizio: string, fine: string): string {
   return `${formattaData(inizio)} – ${formattaData(fine)}`;
 }
+
+const giornoIso = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome" });
+
+/** Oggi a Roma come `2027-03-10`, il calendario del dominio: confrontabile con le date ISO. */
+export function oggiARoma(adesso: Date = new Date()): string {
+  return giornoIso.format(adesso);
+}
