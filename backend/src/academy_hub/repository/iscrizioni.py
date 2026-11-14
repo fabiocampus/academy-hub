@@ -6,6 +6,7 @@ from datetime import date, datetime
 from typing import cast
 
 from sqlalchemy import case, func, select, tuple_
+from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.orm import Session, aliased
 
 from academy_hub.db.modelli import Corso, Edizione, EventoAudit, Iscrizione, Persona, Team
@@ -287,23 +288,24 @@ def richieste_da_decidere(
     Stessa regola di `dominio.organigramma.responsabile_diretto`, in SQL: il primo
     responsabile risalendo dal team del richiedente, diverso dal richiedente; se non c'è,
     l'amministrazione (`amministratore=True`). Le proprie richieste non compaiono mai.
+
+    Il responsabile di ogni persona si calcola una volta sola per tutte (`DISTINCT ON`),
+    non con una sottoquery correlata per ogni richiedente: con 5 000 persone passa da
+    circa 150 ms a 15 ms (`docs/database.md`).
     """
     albero = antenati()
     team = aliased(Team)
-    responsabile = (
-        select(team.responsabile_id)
-        .select_from(albero)
+    persona = aliased(Persona)
+    responsabile_di = (
+        select(persona.id.label("persona_id"), team.responsabile_id)
+        .join(albero, albero.c.team_id == persona.team_id)
         .join(team, team.id == albero.c.antenato_id)
-        .where(
-            albero.c.team_id == Persona.team_id,
-            team.responsabile_id.is_not(None),
-            team.responsabile_id != Persona.id,
-        )
-        .order_by(albero.c.livello)
-        .limit(1)
-        .correlate(Persona)
-        .scalar_subquery()
+        .where(team.responsabile_id.is_not(None), team.responsabile_id != persona.id)
+        .order_by(persona.id, albero.c.livello)
+        .ext(distinct_on(persona.id))
+        .cte("responsabile_di")
     )
+    responsabile = responsabile_di.c.responsabile_id
     decide_io = responsabile == decisore_id
     if amministratore:
         decide_io = decide_io | responsabile.is_(None)
@@ -317,11 +319,13 @@ def richieste_da_decidere(
         select(func.count())
         .select_from(Iscrizione)
         .join(Persona, Persona.id == Iscrizione.persona_id)
+        .outerjoin(responsabile_di, responsabile_di.c.persona_id == Persona.id)
         .where(*filtri)
     )
     righe = sessione.execute(
         select(Iscrizione, Persona, Edizione, Corso)
         .join(Persona, Persona.id == Iscrizione.persona_id)
+        .outerjoin(responsabile_di, responsabile_di.c.persona_id == Persona.id)
         .join(Edizione, Edizione.id == Iscrizione.edizione_id)
         .join(Corso, Corso.id == Edizione.corso_id)
         .where(*filtri)
