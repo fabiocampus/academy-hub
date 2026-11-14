@@ -1,12 +1,23 @@
 """Rotte delle edizioni (US-02, US-18)."""
 
-from fastapi import APIRouter, Response, status
+from typing import Annotated
+
+from fastapi import APIRouter, Query, Response, status
 
 from academy_hub.api import PREFISSO
 from academy_hub.api.dipendenze import AttoreCorrente, SessioneDb, VersioneAttesa, etag
 from academy_hub.api.errori import risposte
-from academy_hub.api.schemi import EdizioneLetta, ModificaEdizione, NuovaEdizione
-from academy_hub.servizi import catalogo
+from academy_hub.api.schemi import (
+    EdizioneLetta,
+    IscrizioneLetta,
+    ModificaEdizione,
+    NuovaEdizione,
+    PaginaIscrizioniEdizione,
+    PersonaInBreve,
+    VoceIscrizioneEdizione,
+)
+from academy_hub.dominio.stati import StatoIscrizione
+from academy_hub.servizi import catalogo, iscrizioni
 
 router = APIRouter(prefix="/edizioni", tags=["edizioni"], responses=risposte(401))
 
@@ -69,3 +80,36 @@ def cancella_edizione(
     edizione = catalogo.cancella_edizione(sessione, attore, edizione_id)
     risposta.headers["ETag"] = etag(edizione.versione)
     return EdizioneLetta.model_validate(edizione)
+
+
+@router.get(
+    "/{edizione_id}/iscrizioni",
+    responses=risposte(403, 404, 422),
+    operation_id="iscrizioniDellEdizione",
+)
+def iscrizioni_dell_edizione(
+    edizione_id: int,
+    sessione: SessioneDb,
+    attore: AttoreCorrente,
+    stato: Annotated[StatoIscrizione | None, Query(description="Solo in questo stato")] = None,
+    limite: Annotated[int, Query(ge=1, le=100)] = 20,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> PaginaIscrizioniEdizione:
+    """Le iscrizioni dell'edizione, dalla richiesta più vecchia: l'Academy conferma le
+    Approvate da qui (US-08)."""
+    voci, totale = iscrizioni.iscrizioni_dell_edizione(
+        sessione, attore, edizione_id, stato, limite, offset
+    )
+    return PaginaIscrizioniEdizione(
+        elementi=[
+            VoceIscrizioneEdizione(
+                **IscrizioneLetta.model_validate(v.iscrizione).model_dump(),
+                persona=PersonaInBreve.model_validate(v.persona),
+                posizione_lista_attesa=v.posizione_lista_attesa,
+            )
+            for v in voci
+        ],
+        totale=totale,
+        limite=limite,
+        offset=offset,
+    )

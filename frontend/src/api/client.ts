@@ -105,6 +105,30 @@ export function dati<T>(esito: { data?: T; error?: unknown; response: Response }
   });
 }
 
+/** Corpo della risposta più il suo ETag, da rimandare in `If-Match` (ADR-0005). */
+export interface ConVersione<T> {
+  dati: T;
+  etag: string;
+}
+
+/** Come `dati`, ma tiene anche l'ETag: serve a modificare la risorsa letta. */
+export function datiConVersione<T>(esito: {
+  data?: T;
+  error?: unknown;
+  response: Response;
+}): ConVersione<T> {
+  const corpo = dati(esito);
+  const etag = esito.response.headers.get("ETag");
+  if (etag === null) {
+    throw new ErroreApi({
+      type: "about:blank",
+      title: "Risposta senza ETag",
+      status: esito.response.status,
+    });
+  }
+  return { dati: corpo, etag };
+}
+
 /** Errori di validazione per campo (422) da mostrare nel form: `{ motivo: "..." }`. */
 export function erroriDeiCampi(errore: unknown): Record<string, string> {
   if (!(errore instanceof ErroreApi)) {

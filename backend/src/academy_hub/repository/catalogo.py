@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import cast
 
-from sqlalchemy import func, select
+from sqlalchemy import ColumnElement, ScalarSelect, func, select
 from sqlalchemy.orm import Session
 
 from academy_hub.db.modelli import Corso, Edizione, Iscrizione
@@ -83,11 +83,7 @@ def catalogo(
     Usa `ix_edizioni_catalogo`. Per ogni edizione: lunghezza della lista d'attesa e stato
     dell'iscrizione attiva di `persona_id` (al massimo una, per R1).
     """
-    lista_attesa = (
-        select(func.count())
-        .where(Iscrizione.edizione_id == Edizione.id, Iscrizione.stato == StatoIscrizione.IN_ATTESA)
-        .scalar_subquery()
-    )
+    lista_attesa = _lista_attesa()
     mia = (
         select(Iscrizione.stato)
         .where(
@@ -121,3 +117,47 @@ def catalogo(
     # La sottoquery restituisce NULL senza iscrizione attiva, anche se il tipo non lo dice.
     voci = [VoceCatalogo(e, c, n, cast("StatoIscrizione | None", s)) for e, c, n, s in righe]
     return voci, totale or 0
+
+
+def _lista_attesa() -> ScalarSelect[int]:
+    """Iscrizioni InAttesa dell'edizione della riga esterna."""
+    return (
+        select(func.count())
+        .where(Iscrizione.edizione_id == Edizione.id, Iscrizione.stato == StatoIscrizione.IN_ATTESA)
+        .scalar_subquery()
+    )
+
+
+def corsi(
+    sessione: Session, titolo: str | None, limite: int, offset: int
+) -> tuple[list[Corso], int]:
+    """Tutti i corsi, archiviati compresi: prima gli attivi, poi per titolo (gestione)."""
+    filtri: list[ColumnElement[bool]] = []
+    if titolo:
+        filtri.append(Corso.titolo.ilike(f"%{_escape_like(titolo)}%", escape="\\"))
+    totale = sessione.scalar(select(func.count()).select_from(Corso).where(*filtri))
+    trovati = sessione.scalars(
+        select(Corso)
+        .where(*filtri)
+        .order_by(Corso.archiviato_il.is_not(None), Corso.titolo, Corso.id)
+        .limit(limite)
+        .offset(offset)
+    ).all()
+    return list(trovati), totale or 0
+
+
+def edizioni_del_corso(
+    sessione: Session, corso_id: int, limite: int, offset: int
+) -> tuple[list[tuple[Edizione, int]], int]:
+    """Edizioni del corso, passate e cancellate comprese, dalla più lontana nel futuro;
+    con la lunghezza della lista d'attesa. Usa l'indice su `edizioni.corso_id`."""
+    filtro = Edizione.corso_id == corso_id
+    totale = sessione.scalar(select(func.count()).select_from(Edizione).where(filtro))
+    righe = sessione.execute(
+        select(Edizione, _lista_attesa())
+        .where(filtro)
+        .order_by(Edizione.data_inizio.desc(), Edizione.id.desc())
+        .limit(limite)
+        .offset(offset)
+    ).all()
+    return [(e, n) for e, n in righe], totale or 0

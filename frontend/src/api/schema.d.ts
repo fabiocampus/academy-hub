@@ -48,7 +48,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Elenco Corsi
+         * @description Tutti i corsi, archiviati compresi (dopo gli attivi), per titolo: per la gestione.
+         */
+        get: operations["elencoCorsi"];
         put?: never;
         /** Crea Corso */
         post: operations["creaCorso"];
@@ -87,6 +91,46 @@ export interface paths {
         put?: never;
         /** Archivia un corso: esce dal catalogo, le edizioni restano nei report */
         post: operations["archiviaCorso"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/corsi/{corso_id}/edizioni": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Edizioni Del Corso
+         * @description Le edizioni del corso, passate e cancellate comprese, dalla più lontana nel futuro.
+         */
+        get: operations["edizioniDelCorso"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/docenti": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Elenco Docenti
+         * @description Le persone con il ruolo docente, per nome: chi può tenere un'edizione.
+         */
+        get: operations["elencoDocenti"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -143,6 +187,27 @@ export interface paths {
          *     quindi niente `If-Match` (ADR-0005, punto 3). Ripetuto, restituisce l'edizione com'è.
          */
         post: operations["cancellaEdizione"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/edizioni/{edizione_id}/iscrizioni": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Iscrizioni Dell Edizione
+         * @description Le iscrizioni dell'edizione, dalla richiesta più vecchia: l'Academy conferma le
+         *     Approvate da qui (US-08).
+         */
+        get: operations["iscrizioniDellEdizione"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -538,6 +603,39 @@ export interface components {
             /** Totale */
             totale: number;
         };
+        /** PaginaCorsi */
+        PaginaCorsi: {
+            /** Elementi */
+            elementi: components["schemas"]["CorsoLetto"][];
+            /** Limite */
+            limite: number;
+            /** Offset */
+            offset: number;
+            /** Totale */
+            totale: number;
+        };
+        /** PaginaEdizioni */
+        PaginaEdizioni: {
+            /** Elementi */
+            elementi: components["schemas"]["VoceEdizione"][];
+            /** Limite */
+            limite: number;
+            /** Offset */
+            offset: number;
+            /** Totale */
+            totale: number;
+        };
+        /** PaginaIscrizioniEdizione */
+        PaginaIscrizioniEdizione: {
+            /** Elementi */
+            elementi: components["schemas"]["VoceIscrizioneEdizione"][];
+            /** Limite */
+            limite: number;
+            /** Offset */
+            offset: number;
+            /** Totale */
+            totale: number;
+        };
         /** PaginaMieIscrizioni */
         PaginaMieIscrizioni: {
             /** Elementi */
@@ -673,6 +771,65 @@ export interface components {
             /** Posti Confermati */
             posti_confermati: number;
         };
+        /** VoceEdizione */
+        VoceEdizione: {
+            /** Cancellata Il */
+            cancellata_il: string | null;
+            /** Capienza */
+            capienza: number;
+            /** Corso Id */
+            corso_id: number;
+            /**
+             * Data Fine
+             * Format: date
+             */
+            data_fine: string;
+            /**
+             * Data Inizio
+             * Format: date
+             */
+            data_inizio: string;
+            /** Docente Id */
+            docente_id: number | null;
+            /** Id */
+            id: number;
+            /**
+             * Lista Attesa
+             * @description Iscrizioni InAttesa dell'edizione
+             */
+            lista_attesa: number;
+            /** Posti Confermati */
+            posti_confermati: number;
+        };
+        /** VoceIscrizioneEdizione */
+        VoceIscrizioneEdizione: {
+            /**
+             * Aggiornata Il
+             * Format: date-time
+             * @description Ultimo cambio di stato
+             */
+            aggiornata_il: string;
+            /** Approvata Il */
+            approvata_il: string | null;
+            /** Edizione Id */
+            edizione_id: number;
+            /** Id */
+            id: number;
+            persona: components["schemas"]["PersonaInBreve"];
+            /** Persona Id */
+            persona_id: number;
+            /**
+             * Posizione Lista Attesa
+             * @description Posizione in lista d'attesa (1 = la prossima), solo se InAttesa
+             */
+            posizione_lista_attesa: number | null;
+            /**
+             * Richiesta Il
+             * Format: date-time
+             */
+            richiesta_il: string;
+            stato: components["schemas"]["StatoIscrizione"];
+        };
         /** VoceMiaIscrizione */
         VoceMiaIscrizione: {
             /**
@@ -787,6 +944,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConfigurazioneClient"];
+                };
+            };
+        };
+    };
+    elencoCorsi: {
+        parameters: {
+            query?: {
+                /** @description Parte del titolo */
+                titolo?: string | null;
+                limite?: number;
+                offset?: number;
+            };
+            header?: {
+                /** @description Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008). */
+                "X-Persona-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginaCorsi"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
                 };
             };
         };
@@ -1054,6 +1266,120 @@ export interface operations {
             };
             /** @description Precondition Required */
             428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+        };
+    };
+    edizioniDelCorso: {
+        parameters: {
+            query?: {
+                limite?: number;
+                offset?: number;
+            };
+            header?: {
+                /** @description Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008). */
+                "X-Persona-Id"?: string | null;
+            };
+            path: {
+                corso_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginaEdizioni"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+        };
+    };
+    elencoDocenti: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008). */
+                "X-Persona-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonaInBreve"][];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1332,6 +1658,72 @@ export interface operations {
                 };
             };
             /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+        };
+    };
+    iscrizioniDellEdizione: {
+        parameters: {
+            query?: {
+                /** @description Solo in questo stato */
+                stato?: components["schemas"]["StatoIscrizione"] | null;
+                limite?: number;
+                offset?: number;
+            };
+            header?: {
+                /** @description Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008). */
+                "X-Persona-Id"?: string | null;
+            };
+            path: {
+                edizione_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginaIscrizioniEdizione"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Unprocessable Entity */
             422: {
                 headers: {
                     [name: string]: unknown;

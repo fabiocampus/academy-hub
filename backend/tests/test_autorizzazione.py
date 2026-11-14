@@ -127,6 +127,17 @@ MATRICE: dict[tuple[str, str], Riga] = {
         lambda m: Chiamata("POST", "/corsi", {"titolo": "Python", "durata_ore": 4}),
         _attesi(403, 403, 201, 403),
     ),
+    # Elenchi della gestione Academy (issue #64): solo l'amministrazione.
+    ("GET", "/corsi"): (lambda m: Chiamata("GET", "/corsi"), SOLO_ADMIN),
+    ("GET", "/corsi/{corso_id}/edizioni"): (
+        lambda m: Chiamata("GET", f"/corsi/{m.corso}/edizioni"),
+        SOLO_ADMIN,
+    ),
+    ("GET", "/edizioni/{edizione_id}/iscrizioni"): (
+        lambda m: Chiamata("GET", f"/edizioni/{m.edizione_libera}/iscrizioni"),
+        SOLO_ADMIN,
+    ),
+    ("GET", "/docenti"): (lambda m: Chiamata("GET", "/docenti"), SOLO_ADMIN),
     ("GET", "/corsi/{corso_id}"): (lambda m: Chiamata("GET", f"/corsi/{m.corso}"), TUTTI),
     ("PATCH", "/corsi/{corso_id}"): (
         lambda m: Chiamata("PATCH", f"/corsi/{m.corso}", {"titolo": "Nuovo"}, _IF_MATCH),

@@ -213,3 +213,26 @@ def catalogo(
 ) -> tuple[list[VoceCatalogo], int]:
     """Edizioni non ancora iniziate (calendario di Roma), per data di inizio (US-03)."""
     return repository.catalogo(sessione, attore.persona_id, oggi(), titolo, dal, al, limite, offset)
+
+
+# --- Gestione Academy (issue #64): elenchi per l'amministrazione ---------------------
+
+
+def corsi(
+    sessione: Session,
+    attore: Attore,
+    titolo: str | None = None,
+    limite: int = 20,
+    offset: int = 0,
+) -> tuple[list[Corso], int]:
+    attore.richiedi(Ruolo.ADMIN_ACADEMY)
+    return repository.corsi(sessione, titolo, limite, offset)
+
+
+def edizioni_del_corso(
+    sessione: Session, attore: Attore, corso_id: int, limite: int = 20, offset: int = 0
+) -> tuple[list[tuple[Edizione, int]], int]:
+    """Tutte le edizioni del corso con la lunghezza della lista d'attesa."""
+    attore.richiedi(Ruolo.ADMIN_ACADEMY)
+    repository.corso(sessione, corso_id)
+    return repository.edizioni_del_corso(sessione, corso_id, limite, offset)

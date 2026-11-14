@@ -30,7 +30,7 @@ export const chiavi = {
 };
 
 /** Gli elenchi che un cambio di stato di un'iscrizione può toccare. */
-function rileggiElenchi(queryClient: QueryClient): Promise<void> {
+export function rileggiElenchi(queryClient: QueryClient): Promise<void> {
   return Promise.all(
     ["catalogo", "iscrizioni", "richieste"].map((radice) =>
       queryClient.invalidateQueries({ queryKey: [radice] }),

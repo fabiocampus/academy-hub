@@ -101,6 +101,61 @@ export function voceCatalogo(
   };
 }
 
+export function corsoLetto(
+  id: number,
+  modifiche: Partial<Schemi["CorsoLetto"]> = {},
+): Schemi["CorsoLetto"] {
+  return {
+    id,
+    titolo: `Corso ${String(id)}`,
+    descrizione: "",
+    durata_ore: 8,
+    archiviato_il: null,
+    ...modifiche,
+  };
+}
+
+export function edizioneLetta(
+  id: number,
+  modifiche: Partial<Schemi["EdizioneLetta"]> = {},
+): Schemi["EdizioneLetta"] {
+  return {
+    id,
+    corso_id: 7,
+    data_inizio: "2099-03-10",
+    data_fine: "2099-03-11",
+    capienza: 10,
+    posti_confermati: 0,
+    docente_id: null,
+    cancellata_il: null,
+    ...modifiche,
+  };
+}
+
+export function voceEdizione(
+  id: number,
+  modifiche: Partial<Schemi["VoceEdizione"]> = {},
+): Schemi["VoceEdizione"] {
+  return { ...edizioneLetta(id), lista_attesa: 0, ...modifiche };
+}
+
+export function voceIscrizioneEdizione(
+  id: number,
+  modifiche: Partial<Schemi["VoceIscrizioneEdizione"]> = {},
+): Schemi["VoceIscrizioneEdizione"] {
+  return {
+    ...iscrizioneLetta(id, "Approvata"),
+    persona: { id: 1, nome: "Anna Dati" },
+    posizione_lista_attesa: null,
+    ...modifiche,
+  };
+}
+
+/** Risposta JSON con l'ETag della versione, come le GET di corso ed edizione. */
+export function conEtag<T extends object>(corpo: T, versione: number): HttpResponse<T> {
+  return HttpResponse.json(corpo, { headers: { ETag: `"${String(versione)}"` } });
+}
+
 export function pagina<T>(
   elementi: T[],
   totale = elementi.length,
@@ -116,6 +171,9 @@ export function problema(stato: number, modifiche: Partial<Problema> = {}): Http
 }
 
 export const handlerPredefiniti = [
+  http.get(`${API}/docenti`, () =>
+    HttpResponse.json<Schemi["PersonaInBreve"][]>([{ id: 50, nome: "Dora Docente" }]),
+  ),
   http.get(`${API}/io`, () => HttpResponse.json(profiloDipendente)),
   http.get(`${API}/catalogo`, () => HttpResponse.json(pagina([voceCatalogo(1)]))),
   http.get(`${API}/iscrizioni`, () => HttpResponse.json(pagina<Schemi["VoceMiaIscrizione"]>([]))),

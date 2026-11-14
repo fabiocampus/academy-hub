@@ -23,3 +23,19 @@ export function formattaIstante(iso: string): string {
 export function formattaPeriodo(inizio: string, fine: string): string {
   return `${formattaData(inizio)} – ${formattaData(fine)}`;
 }
+
+const giornoIso = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome" });
+
+/** Oggi a Roma come `2027-03-10`, il calendario del dominio: confrontabile con le date ISO. */
+export function oggiARoma(adesso: Date = new Date()): string {
+  return giornoIso.format(adesso);
+}
+
+/** Un id dall'indirizzo (`/gestione/corsi/7`): intero positivo, altrimenti `null`. */
+export function idDaPercorso(valore: string | undefined): number | null {
+  if (valore === undefined || !/^[1-9]\d*$/.test(valore)) {
+    return null;
+  }
+  const id = Number(valore);
+  return Number.isSafeInteger(id) ? id : null;
+}

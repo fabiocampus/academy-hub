@@ -27,6 +27,9 @@ export function vociMenu(profilo: Schemi["Profilo"]): VoceMenu[] {
   if (profilo.responsabile_di_team || profilo.ruoli.includes("admin_academy")) {
     voci.push({ percorso: "/approvazioni", etichetta: "Approvazioni" });
   }
+  if (profilo.ruoli.includes("admin_academy")) {
+    voci.push({ percorso: "/gestione", etichetta: "Gestione" });
+  }
   return voci;
 }
 
@@ -77,7 +80,7 @@ export function Struttura() {
               key={voce.percorso}
               component={Collegamento}
               to={voce.percorso}
-              end
+              end={voce.percorso !== "/gestione"}
               label={voce.etichetta}
               onClick={close}
             />
