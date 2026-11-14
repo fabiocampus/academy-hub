@@ -252,11 +252,17 @@ def test_l_elenco_coincide_con_chi_puo_decidere(
     """La regola SQL dell'elenco e quella del dominio (`verifica_decisore`) non divergono."""
     richieste = [richiesta(db, org, nome) for nome in org.ids]
     # Carla passa a un team senza responsabile, sotto Dati: decide Rossa.
+    # Rossa guida anche Analisi, sotto Dati, e ci si sposta: le sue richieste saltano
+    # entrambi i suoi team e arrivano al Dirigente.
     with Session(db) as sessione, sessione.begin():
         stage = Team(nome="Stage", team_padre_id=org.team["Dati"])
-        sessione.add(stage)
+        analisi = Team(
+            nome="Analisi", team_padre_id=org.team["Dati"], responsabile_id=org.ids["Rossa"]
+        )
+        sessione.add_all([stage, analisi])
         sessione.flush()
         sessione.get_one(Persona, org.ids["Carla"]).team_id = stage.id
+        sessione.get_one(Persona, org.ids["Rossa"]).team_id = analisi.id
 
     with Session(db) as sessione:
         for nome, persona_id in org.ids.items():
