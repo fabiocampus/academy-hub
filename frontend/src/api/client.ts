@@ -104,3 +104,11 @@ export function dati<T>(esito: { data?: T; error?: unknown; response: Response }
     status: esito.response.status,
   });
 }
+
+/** Errori di validazione per campo (422) da mostrare nel form: `{ motivo: "..." }`. */
+export function erroriDeiCampi(errore: unknown): Record<string, string> {
+  if (!(errore instanceof ErroreApi)) {
+    return {};
+  }
+  return Object.fromEntries((errore.problema.errori ?? []).map((e) => [e.campo, e.messaggio]));
+}

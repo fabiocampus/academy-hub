@@ -2,15 +2,16 @@ import { MantineProvider } from "@mantine/core";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
-import { User } from "oidc-client-ts";
+import userEvent from "@testing-library/user-event";
+import { User, UserManager } from "oidc-client-ts";
 import type { ReactNode } from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { impostaAlNonAutenticato, impostaToken } from "../api/client";
 import { useProfilo } from "../api/query";
 import { tema } from "../tema";
 import { API, profiloDipendente, server } from "../test/server";
-import { Accesso, creaGestoreOidc } from "./Accesso";
+import { Accesso, creaGestoreOidc, dopoIlLogin, percorsoDiRitorno } from "./Accesso";
 
 const OIDC = { emittente: "http://localhost:8080/realms/academy", client_id: "academy-web" };
 
@@ -130,5 +131,50 @@ describe("Accesso", () => {
     expect(gestore.settings.response_type).toBe("code");
     expect(gestore.settings.redirect_uri).toBe("http://localhost:5173/");
     expect(gestore.settings.disablePKCE).toBe(false);
+  });
+
+  it("cliccando «Accedi» ricorda la pagina aperta", async () => {
+    window.history.replaceState({}, "", "/approvazioni?pagina=2");
+    const accedi = vi.spyOn(UserManager.prototype, "signinRedirect").mockResolvedValue();
+    mostraAccesso({ identita: "oidc", oidc: OIDC });
+
+    await userEvent.click(await screen.findByRole("button", { name: "Accedi" }));
+
+    expect(accedi).toHaveBeenCalledWith(
+      expect.objectContaining({ state: { ritorno: "/approvazioni?pagina=2" } }),
+    );
+    window.history.replaceState({}, "", "/");
+  });
+});
+
+describe("ritorno dopo il login", () => {
+  it.each([
+    [{ ritorno: "/iscrizioni" }, "/iscrizioni"],
+    [{ ritorno: "/approvazioni?pagina=2#x" }, "/approvazioni?pagina=2#x"],
+    [{ ritorno: "//esterno.example/x" }, "/"],
+    [{ ritorno: "/\\esterno.example" }, "/"],
+    [{ ritorno: "/\t/esterno.example" }, "/"],
+    [{ ritorno: "/corsi/../iscrizioni" }, "/iscrizioni"],
+    [{ ritorno: "https://esterno.example" }, "/"],
+    [{ ritorno: 42 }, "/"],
+    [undefined, "/"],
+    ["/iscrizioni", "/"],
+  ])("da %j torna a %s", (stato, atteso) => {
+    expect(percorsoDiRitorno(stato)).toBe(atteso);
+  });
+
+  it("toglie code e state dall'indirizzo e porta alla pagina chiesta", () => {
+    window.history.replaceState({}, "", "/?code=abc&state=xyz");
+    const utente = new User({
+      access_token: "t",
+      token_type: "Bearer",
+      profile: { sub: "anna", iss: OIDC.emittente, aud: OIDC.client_id, exp: 0, iat: 0 },
+      userState: { ritorno: "/iscrizioni" },
+    });
+
+    dopoIlLogin(utente);
+
+    expect(window.location.pathname + window.location.search).toBe("/iscrizioni");
+    window.history.replaceState({}, "", "/");
   });
 });

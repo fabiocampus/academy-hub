@@ -1,37 +1,94 @@
-/** US-03: catalogo delle edizioni, filtrabile per titolo e paginato. */
-import { Badge, Group, Pagination, Stack, Table, Text, TextInput, Title } from "@mantine/core";
+/** US-03: catalogo delle edizioni, filtrabile per titolo e paginato; US-04: richiesta. */
+import { Button, Stack, Table, Text, TextInput, Title } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import type { Schemi } from "../api/client";
-import { useCatalogo } from "../api/query";
-import { formattaData } from "../componenti/formato";
+import { useCatalogo, useProfilo, useRichiediIscrizione } from "../api/query";
+import { avvisaErrore, avvisaSuccesso } from "../componenti/avvisi";
+import { formattaPeriodo } from "../componenti/formato";
+import { Paginazione } from "../componenti/Paginazione";
 import { Caricamento, Errore, Vuoto } from "../componenti/Stati";
+import { STATI_ANNULLABILI, StatoIscrizione } from "../componenti/StatoIscrizione";
 
 export const PER_PAGINA = 20;
 
-const COLORE_STATO: Record<Schemi["StatoIscrizione"], string> = {
-  Richiesta: "blue",
-  Approvata: "teal",
-  InAttesa: "yellow",
-  Confermata: "green",
-  Rifiutata: "gray",
-  Annullata: "gray",
-  Completata: "gray",
-};
-
-const ETICHETTA_STATO: Record<Schemi["StatoIscrizione"], string> = {
-  Richiesta: "Richiesta",
-  Approvata: "Approvata",
-  InAttesa: "In attesa",
-  Confermata: "Confermata",
-  Rifiutata: "Rifiutata",
-  Annullata: "Annullata",
-  Completata: "Completata",
-};
-
 function postiLiberi(n: number): string {
   return n === 1 ? "1 libero" : `${n} liberi`;
+}
+
+/**
+ * Una chiave d'idempotenza per edizione, tenuta finché la richiesta non riesce: se la
+ * risposta si perde e si clicca di nuovo, l'API riconosce la richiesta già fatta.
+ */
+function useChiaviIdempotenza(): ChiaviIdempotenza {
+  const chiavi = useRef(new Map<number, string>());
+  return {
+    per(edizioneId: number): string {
+      let chiave = chiavi.current.get(edizioneId);
+      if (chiave === undefined) {
+        chiave = crypto.randomUUID();
+        chiavi.current.set(edizioneId, chiave);
+      }
+      return chiave;
+    },
+    usata(edizioneId: number): void {
+      chiavi.current.delete(edizioneId);
+    },
+  };
+}
+
+interface ChiaviIdempotenza {
+  per(edizioneId: number): string;
+  usata(edizioneId: number): void;
+}
+
+/**
+ * Ogni riga ha la sua mutazione: due clic su righe diverse hanno ciascuno il proprio
+ * esito e il proprio indicatore di attesa.
+ */
+function PulsanteIscriviti({
+  voce,
+  chiavi,
+}: {
+  voce: Schemi["VoceCatalogo"];
+  chiavi: ChiaviIdempotenza;
+}) {
+  const richiesta = useRichiediIscrizione();
+  const periodo = formattaPeriodo(voce.data_inizio, voce.data_fine);
+
+  function richiedi(dopoUnaChiusa = false): void {
+    richiesta.mutate(
+      { edizioneId: voce.edizione_id, chiave: chiavi.per(voce.edizione_id) },
+      {
+        onSuccess: (iscrizione) => {
+          chiavi.usata(voce.edizione_id);
+          if (!STATI_ANNULLABILI.has(iscrizione.stato) && !dopoUnaChiusa) {
+            // La chiave apparteneva a un'iscrizione già chiusa (annullata altrove):
+            // l'API l'ha restituita com'è (ADR-0006). Si riprova con una chiave nuova.
+            richiedi(true);
+            return;
+          }
+          avvisaSuccesso(`Richiesta inviata per «${voce.corso.titolo}».`);
+        },
+        onError: avvisaErrore,
+      },
+    );
+  }
+
+  return (
+    <Button
+      size="xs"
+      variant="light"
+      aria-label={`Iscriviti a ${voce.corso.titolo} dal ${periodo}`}
+      loading={richiesta.isPending}
+      onClick={() => {
+        richiedi();
+      }}
+    >
+      Iscriviti
+    </Button>
+  );
 }
 
 export function Catalogo() {
@@ -43,6 +100,10 @@ export function Catalogo() {
     limite: PER_PAGINA,
     offset: (pagina - 1) * PER_PAGINA,
   });
+  const profilo = useProfilo();
+  // Solo comodità: l'API rifiuta comunque la richiesta a chi non è dipendente (403).
+  const puoRichiedere = profilo.data?.ruoli.includes("dipendente") ?? false;
+  const chiavi = useChiaviIdempotenza();
 
   return (
     <Stack>
@@ -90,20 +151,18 @@ export function Catalogo() {
                         {voce.corso.durata_ore} ore
                       </Text>
                     </Table.Td>
-                    <Table.Td>
-                      {formattaData(voce.data_inizio)} – {formattaData(voce.data_fine)}
-                    </Table.Td>
+                    <Table.Td>{formattaPeriodo(voce.data_inizio, voce.data_fine)}</Table.Td>
                     <Table.Td>
                       {postiLiberi(voce.capienza - voce.posti_confermati)} su {voce.capienza}
                     </Table.Td>
                     <Table.Td>{voce.lista_attesa}</Table.Td>
                     <Table.Td>
-                      {voce.mia_iscrizione === null ? (
-                        "—"
+                      {voce.mia_iscrizione !== null ? (
+                        <StatoIscrizione stato={voce.mia_iscrizione.stato} />
+                      ) : puoRichiedere ? (
+                        <PulsanteIscriviti voce={voce} chiavi={chiavi} />
                       ) : (
-                        <Badge color={COLORE_STATO[voce.mia_iscrizione.stato]} variant="light">
-                          {ETICHETTA_STATO[voce.mia_iscrizione.stato]}
-                        </Badge>
+                        "—"
                       )}
                     </Table.Td>
                   </Table.Tr>
@@ -111,21 +170,14 @@ export function Catalogo() {
               </Table.Tbody>
             </Table>
           </Table.ScrollContainer>
-          <Group justify="space-between">
-            <Text size="sm" c="dimmed">
-              {catalogo.data.totale} edizioni
-            </Text>
-            <Pagination
-              total={Math.ceil(catalogo.data.totale / PER_PAGINA)}
-              value={pagina}
-              onChange={setPagina}
-              aria-label="Pagine del catalogo"
-              getControlProps={(controllo) => ({
-                "aria-label": controllo === "previous" ? "Pagina precedente" : "Pagina successiva",
-              })}
-              getItemProps={(numero) => ({ "aria-label": `Pagina ${numero}` })}
-            />
-          </Group>
+          <Paginazione
+            totale={catalogo.data.totale}
+            perPagina={PER_PAGINA}
+            pagina={pagina}
+            cambia={setPagina}
+            di="del catalogo"
+            conteggio={`${catalogo.data.totale} edizioni`}
+          />
         </>
       )}
     </Stack>

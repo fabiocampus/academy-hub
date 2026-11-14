@@ -4,7 +4,7 @@
  * proxy aggiunge l'identità a ogni richiesta, quindi non c'è niente da fare.
  */
 import { Alert, Button, Center, Loader, Stack, Text, Title } from "@mantine/core";
-import { UserManager, WebStorageStateStore } from "oidc-client-ts";
+import { UserManager, WebStorageStateStore, type User } from "oidc-client-ts";
 import { useState, type ReactNode } from "react";
 import { AuthProvider, useAuth } from "react-oidc-context";
 
@@ -39,9 +39,44 @@ export function collegaAlClient(gestore: UserManager): void {
   impostaAlNonAutenticato(() => void gestore.removeUser());
 }
 
-/** Toglie `code` e `state` dall'indirizzo dopo il ritorno da Keycloak. */
-function dopoIlLogin(): void {
-  window.history.replaceState({}, document.title, window.location.pathname);
+/** Dove tornare dopo il login: la pagina aperta quando si è cliccato «Accedi». */
+interface StatoLogin {
+  ritorno: string;
+}
+
+export function statoLogin(posizione: Pick<Location, "pathname" | "search" | "hash">): StatoLogin {
+  return { ritorno: posizione.pathname + posizione.search + posizione.hash };
+}
+
+/**
+ * Il percorso salvato nello `state` del login, solo se resta sulla stessa origine: un
+ * indirizzo assoluto o `//host` porterebbe fuori (open redirect). Altrimenti la radice.
+ */
+export function percorsoDiRitorno(stato: unknown, origine = window.location.origin): string {
+  if (typeof stato !== "object" || stato === null || !("ritorno" in stato)) {
+    return "/";
+  }
+  const { ritorno } = stato;
+  if (typeof ritorno !== "string" || !ritorno.startsWith("/")) {
+    return "/";
+  }
+  // Normalizzato come lo farebbe il browser (`/<tab>/host` diventa `//host`): conta l'origine.
+  try {
+    const indirizzo = new URL(ritorno, origine);
+    return indirizzo.origin === origine
+      ? indirizzo.pathname + indirizzo.search + indirizzo.hash
+      : "/";
+  } catch {
+    return "/";
+  }
+}
+
+/**
+ * Toglie `code` e `state` dall'indirizzo dopo il ritorno da Keycloak e riporta alla
+ * pagina chiesta. Gira prima che il router venga montato, che quindi legge già questa.
+ */
+export function dopoIlLogin(utente: User | undefined): void {
+  window.history.replaceState({}, document.title, percorsoDiRitorno(utente?.state));
 }
 
 interface Proprieta {
@@ -101,7 +136,9 @@ function ConLogin({ children }: { children: ReactNode }) {
               {auth.error.message}
             </Alert>
           )}
-          <Button onClick={() => void auth.signinRedirect()}>Accedi</Button>
+          <Button onClick={() => void auth.signinRedirect({ state: statoLogin(window.location) })}>
+            Accedi
+          </Button>
         </Stack>
       </Center>
     );

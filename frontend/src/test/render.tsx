@@ -1,4 +1,5 @@
 import { MantineProvider } from "@mantine/core";
+import { Notifications } from "@mantine/notifications";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, type RenderResult } from "@testing-library/react";
 import type { ReactElement } from "react";
@@ -17,6 +18,7 @@ export function mostra(elemento: ReactElement, opzioni: Opzioni = {}): RenderRes
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <MantineProvider theme={tema}>
+      <Notifications />
       <ContestoSessione.Provider value={opzioni.sessione ?? {}}>
         <QueryClientProvider client={queryClient}>
           <MemoryRouter initialEntries={[opzioni.percorso ?? "/"]}>{elemento}</MemoryRouter>
