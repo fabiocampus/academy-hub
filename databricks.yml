@@ -8,8 +8,9 @@
 # Workspace e credenziali non stanno qui (repository pubblico): arrivano dal profilo
 # della CLI (-p) o, in CI, dalle variabili DATABRICKS_HOST e affini (fase 10).
 # Il progetto Lakebase è uno solo (Free Edition): lo possiede il target prod, il cui branch
-# è quello di difetto (`production`); collaudo aggiunge il suo branch. La prima volta si
-# fa quindi il deploy di prod prima di quello di collaudo.
+# è quello di difetto (`production`); collaudo aggiunge il suo branch, copia di production
+# al momento della creazione. La prima volta si fa quindi il deploy di prod prima di
+# quello di collaudo.
 
 bundle:
   name: academy-hub
@@ -37,6 +38,12 @@ variables:
     default: primary
   ambiente:
     description: ACADEMY_AMBIENTE dell'App.
+  schema_database:
+    description: >-
+      Schema Postgres dell'App, di proprietà del suo service principal. Un branch nasce
+      come copia di production, con lo schema dell'App di prod che il service principal
+      di collaudo non può usare: ogni target non-prod ha quindi uno schema suo.
+    default: academy
 
 resources:
   apps:
@@ -58,18 +65,13 @@ resources:
           - name: ACADEMY_LAKEBASE_ENDPOINT
             value: projects/${var.progetto_lakebase}/branches/${var.branch_lakebase}/endpoints/${var.endpoint_lakebase}
           - name: ACADEMY_DATABASE_SCHEMA
-            value: academy
+            value: ${var.schema_database}
           - name: ACADEMY_FRONTEND_DIR
             value: frontend
           - name: ACADEMY_ADMIN_EMAIL
             value: ${var.admin_email}
-      resources:
-        - name: postgres
-          description: Database transazionale (Lakebase)
-          postgres:
-            branch: projects/${var.progetto_lakebase}/branches/${var.branch_lakebase}
-            database: projects/${var.progetto_lakebase}/branches/${var.branch_lakebase}/databases/databricks-postgres
-            permission: CAN_CONNECT_AND_CREATE
+      # La risorsa postgres dell'App sta nei target: il branch è un riferimento
+      # all'endpoint del target, così il bundle crea prima Lakebase e poi l'App.
 
 targets:
   collaudo:
@@ -78,6 +80,7 @@ targets:
     variables:
       ambiente: collaudo
       branch_lakebase: collaudo
+      schema_database: academy_collaudo
     resources:
       postgres_branches:
         collaudo:
@@ -91,7 +94,17 @@ targets:
           endpoint_type: ENDPOINT_TYPE_READ_WRITE
           autoscaling_limit_min_cu: 0.5
           autoscaling_limit_max_cu: 1
-          suspend_timeout_duration: 300s
+          # Come per production: il branch nasce già con un endpoint read-write.
+          replace_existing: true
+      apps:
+        academy_hub:
+          resources:
+            - name: postgres
+              description: Database transazionale (Lakebase)
+              postgres:
+                branch: ${resources.postgres_endpoints.collaudo.parent}
+                database: ${resources.postgres_endpoints.collaudo.parent}/databases/databricks-postgres
+                permission: CAN_CONNECT_AND_CREATE
 
   prod:
     mode: production
@@ -106,3 +119,23 @@ targets:
           pg_version: 17
           lifecycle:
             prevent_destroy: true
+      postgres_endpoints:
+        # L'endpoint del branch di difetto nasce con il progetto (1 CU, sospeso dopo 24 ore):
+        # il bundle lo prende in carico per limitarlo come quello di collaudo. La sospensione
+        # non si cambia in Free Edition ("cannot be modified for this workspace tier").
+        production:
+          parent: ${resources.postgres_projects.academy_hub.id}/branches/production
+          endpoint_id: ${var.endpoint_lakebase}
+          endpoint_type: ENDPOINT_TYPE_READ_WRITE
+          autoscaling_limit_min_cu: 0.5
+          autoscaling_limit_max_cu: 1
+          replace_existing: true
+      apps:
+        academy_hub:
+          resources:
+            - name: postgres
+              description: Database transazionale (Lakebase)
+              postgres:
+                branch: ${resources.postgres_endpoints.production.parent}
+                database: ${resources.postgres_endpoints.production.parent}/databases/databricks-postgres
+                permission: CAN_CONNECT_AND_CREATE
