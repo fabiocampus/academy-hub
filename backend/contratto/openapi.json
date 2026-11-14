@@ -255,6 +255,7 @@
                 "type": "null"
               }
             ],
+            "description": "Assente: invariato; null: toglie il docente",
             "title": "Docente Id"
           }
         },
@@ -591,20 +592,20 @@
             }
           },
           {
-            "description": "Identità provvisoria della fase 5, accettata solo in ambiente locale. Dalla fase 6 l'identità arriva dal token OIDC.",
+            "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
             "in": "header",
             "name": "x-persona-id",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "type": "integer"
+                  "type": "string"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "Identità provvisoria della fase 5, accettata solo in ambiente locale. Dalla fase 6 l'identità arriva dal token OIDC.",
+              "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
               "title": "X-Persona-Id"
             }
           }
@@ -652,20 +653,20 @@
         "operationId": "creaCorso",
         "parameters": [
           {
-            "description": "Identità provvisoria della fase 5, accettata solo in ambiente locale. Dalla fase 6 l'identità arriva dal token OIDC.",
+            "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
             "in": "header",
             "name": "x-persona-id",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "type": "integer"
+                  "type": "string"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "Identità provvisoria della fase 5, accettata solo in ambiente locale. Dalla fase 6 l'identità arriva dal token OIDC.",
+              "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
               "title": "X-Persona-Id"
             }
           }
@@ -742,20 +743,20 @@
             }
           },
           {
-            "description": "Identità provvisoria della fase 5, accettata solo in ambiente locale. Dalla fase 6 l'identità arriva dal token OIDC.",
+            "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
             "in": "header",
             "name": "x-persona-id",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "type": "integer"
+                  "type": "string"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "Identità provvisoria della fase 5, accettata solo in ambiente locale. Dalla fase 6 l'identità arriva dal token OIDC.",
+              "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
               "title": "X-Persona-Id"
             }
           }
@@ -820,20 +821,20 @@
             }
           },
           {
-            "description": "Identità provvisoria della fase 5, accettata solo in ambiente locale. Dalla fase 6 l'identità arriva dal token OIDC.",
+            "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
             "in": "header",
             "name": "x-persona-id",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "type": "integer"
+                  "type": "string"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "Identità provvisoria della fase 5, accettata solo in ambiente locale. Dalla fase 6 l'identità arriva dal token OIDC.",
+              "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
               "title": "X-Persona-Id"
             }
           },
@@ -958,20 +959,20 @@
             }
           },
           {
-            "description": "Identità provvisoria della fase 5, accettata solo in ambiente locale. Dalla fase 6 l'identità arriva dal token OIDC.",
+            "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
             "in": "header",
             "name": "x-persona-id",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "type": "integer"
+                  "type": "string"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "Identità provvisoria della fase 5, accettata solo in ambiente locale. Dalla fase 6 l'identità arriva dal token OIDC.",
+              "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
               "title": "X-Persona-Id"
             }
           },
@@ -1077,20 +1078,20 @@
         "operationId": "creaEdizione",
         "parameters": [
           {
-            "description": "Identità provvisoria della fase 5, accettata solo in ambiente locale. Dalla fase 6 l'identità arriva dal token OIDC.",
+            "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
             "in": "header",
             "name": "x-persona-id",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "type": "integer"
+                  "type": "string"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "Identità provvisoria della fase 5, accettata solo in ambiente locale. Dalla fase 6 l'identità arriva dal token OIDC.",
+              "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
               "title": "X-Persona-Id"
             }
           }
@@ -1177,20 +1178,20 @@
             }
           },
           {
-            "description": "Identità provvisoria della fase 5, accettata solo in ambiente locale. Dalla fase 6 l'identità arriva dal token OIDC.",
+            "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
             "in": "header",
             "name": "x-persona-id",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "type": "integer"
+                  "type": "string"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "Identità provvisoria della fase 5, accettata solo in ambiente locale. Dalla fase 6 l'identità arriva dal token OIDC.",
+              "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
               "title": "X-Persona-Id"
             }
           }
@@ -1255,20 +1256,20 @@
             }
           },
           {
-            "description": "Identità provvisoria della fase 5, accettata solo in ambiente locale. Dalla fase 6 l'identità arriva dal token OIDC.",
+            "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
             "in": "header",
             "name": "x-persona-id",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "type": "integer"
+                  "type": "string"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "Identità provvisoria della fase 5, accettata solo in ambiente locale. Dalla fase 6 l'identità arriva dal token OIDC.",
+              "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
               "title": "X-Persona-Id"
             }
           },

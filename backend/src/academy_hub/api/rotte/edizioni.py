@@ -49,7 +49,7 @@ def modifica_edizione(
     risposta: Response,
 ) -> EdizioneLetta:
     edizione = catalogo.modifica_edizione(
-        sessione, attore, edizione_id, versione, **dati.model_dump(exclude_none=True)
+        sessione, attore, edizione_id, versione, **dati.model_dump(exclude_unset=True)
     )
     risposta.headers["ETag"] = etag(edizione.versione)
     return EdizioneLetta.model_validate(edizione)

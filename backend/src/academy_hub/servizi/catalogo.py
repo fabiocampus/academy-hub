@@ -4,6 +4,8 @@ Come negli altri servizi, la transazione la apre e la chiude il chiamante.
 """
 
 from datetime import UTC, date, datetime
+from enum import Enum
+from typing import Literal
 
 from sqlalchemy.orm import Session
 
@@ -15,6 +17,16 @@ from academy_hub.dominio.tempo import oggi
 from academy_hub.repository import catalogo as repository
 from academy_hub.repository import iscrizioni, persone
 from academy_hub.repository.catalogo import VoceCatalogo
+from academy_hub.servizi.iscrizioni import EdizioneCancellata
+
+
+class Invariato(Enum):
+    """Campo assente dalla modifica, distinto da `None` che lo svuota."""
+
+    INVARIATO = "invariato"
+
+
+INVARIATO = Invariato.INVARIATO
 
 
 class CorsoArchiviato(Conflitto):
@@ -93,8 +105,9 @@ def crea_edizione(
     docente_id: int | None = None,
 ) -> Edizione:
     attore.richiedi(Ruolo.ADMIN_ACADEMY)
+    # FOR SHARE: un'archiviazione concorrente aspetta la fine di questa transazione.
     try:
-        corso = repository.corso(sessione, corso_id)
+        corso = repository.blocca_corso_in_lettura(sessione, corso_id)
     except NonTrovato:
         raise DatiNonValidi("corso_id", "corso inesistente") from None
     if corso.archiviato_il is not None:
@@ -124,26 +137,31 @@ def modifica_edizione(
     data_inizio: date | None = None,
     data_fine: date | None = None,
     capienza: int | None = None,
-    docente_id: int | None = None,
+    docente_id: int | Literal[Invariato.INVARIATO] | None = INVARIATO,
 ) -> Edizione:
-    """Il lock sull'edizione rende affidabile il confronto con `posti_confermati` (R3)."""
+    """Modifica i campi passati; `docente_id=None` toglie il docente.
+
+    Il lock sull'edizione rende affidabile il confronto con `posti_confermati` (R3)."""
     attore.richiedi(Ruolo.ADMIN_ACADEMY)
     edizione = iscrizioni.blocca_edizione(sessione, edizione_id)
     verifica_versione(versione_attesa, edizione.versione)
-    inizio = data_inizio or edizione.data_inizio
-    fine = data_fine or edizione.data_fine
+    if edizione.cancellata_il is not None:
+        raise EdizioneCancellata(edizione.id)
+    inizio = edizione.data_inizio if data_inizio is None else data_inizio
+    fine = edizione.data_fine if data_fine is None else data_fine
     if fine < inizio:
         raise DatiNonValidi("data_fine", "la data di fine precede quella di inizio")
     if capienza is not None and capienza < edizione.posti_confermati:
         raise CapienzaSottoConfermati(
             f"{edizione.posti_confermati} posti già confermati: la capienza non può scendere sotto"
         )
-    _verifica_docente(sessione, docente_id)
+    if docente_id is not INVARIATO:
+        _verifica_docente(sessione, docente_id)
     # TODO(US-02, terza PR della fase 5): un aumento di capienza promuove dalla lista d'attesa.
     edizione.data_inizio, edizione.data_fine = inizio, fine
     if capienza is not None:
         edizione.capienza = capienza
-    if docente_id is not None:
+    if docente_id is not INVARIATO:
         edizione.docente_id = docente_id
     sessione.flush()
     return edizione

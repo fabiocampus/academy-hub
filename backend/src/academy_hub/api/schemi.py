@@ -73,7 +73,9 @@ class ModificaEdizione(BaseModel):
     data_inizio: date | None = None
     data_fine: date | None = None
     capienza: Capienza | None = None
-    docente_id: int | None = None
+    docente_id: int | None = Field(
+        default=None, description="Assente: invariato; null: toglie il docente"
+    )
 
 
 class EdizioneLetta(BaseModel):

@@ -148,7 +148,7 @@ def test_modifica_vietata_al_dipendente(client: TestClient, db: Engine) -> None:
     assert risposta.status_code == 403
 
 
-@pytest.mark.parametrize("if_match", ["*", 'W/"1"', "1", '"abc"'])
+@pytest.mark.parametrize("if_match", ['W/"1"', "1", '"abc"'])
 def test_if_match_malformato_412(client: TestClient, db: Engine, if_match: str) -> None:
     admin = persona(db, "Admin", Ruolo.ADMIN_ACADEMY)
     corso_id, _ = crea(client, admin)
@@ -159,3 +159,44 @@ def test_if_match_malformato_412(client: TestClient, db: Engine, if_match: str) 
 
     assert risposta.status_code == 412
     assert risposta.json()["type"] == "/problemi/versione-non-corrispondente"
+
+
+def test_if_match_asterisco_428(client: TestClient, db: Engine) -> None:
+    """`*` vale per qualunque versione: aggirerebbe la concorrenza ottimistica (ADR-0005)."""
+    admin = persona(db, "Admin", Ruolo.ADMIN_ACADEMY)
+    corso_id, _ = crea(client, admin)
+
+    risposta = client.patch(
+        f"/api/v1/corsi/{corso_id}", json={"titolo": "X"}, headers={**admin, "If-Match": "*"}
+    )
+
+    assert risposta.status_code == 428
+    assert risposta.json()["type"] == "/problemi/precondizione-richiesta"
+
+
+def test_archiviazione_vietata_al_dipendente_403(client: TestClient, db: Engine) -> None:
+    corso_id, versione = crea(client, persona(db, "Admin", Ruolo.ADMIN_ACADEMY))
+
+    risposta = client.post(
+        f"/api/v1/corsi/{corso_id}/archiviazione",
+        headers={**persona(db, "Anna"), "If-Match": versione},
+    )
+
+    assert risposta.status_code == 403
+
+
+def test_archiviazione_senza_if_match_428(client: TestClient, db: Engine) -> None:
+    admin = persona(db, "Admin", Ruolo.ADMIN_ACADEMY)
+    corso_id, _ = crea(client, admin)
+
+    risposta = client.post(f"/api/v1/corsi/{corso_id}/archiviazione", headers=admin)
+
+    assert risposta.status_code == 428
+
+
+def test_archiviazione_di_un_corso_inesistente_404(client: TestClient, db: Engine) -> None:
+    admin = persona(db, "Admin", Ruolo.ADMIN_ACADEMY)
+
+    risposta = client.post("/api/v1/corsi/999/archiviazione", headers={**admin, "If-Match": '"1"'})
+
+    assert risposta.status_code == 404

@@ -175,3 +175,38 @@ def test_corso_archiviato_esce_dal_catalogo(client: TestClient, db: Engine) -> N
     # Le edizioni restano: servono ai report.
     with Session(db) as sessione:
         assert sessione.get(Edizione, edizione_id) is not None
+
+
+def test_dalla_pianificazione_al_catalogo(client: TestClient, db: Engine) -> None:
+    """End-to-end solo via HTTP: corso, edizione, poi il dipendente la trova nel catalogo."""
+    admin = persona(db, "Admin", Ruolo.ADMIN_ACADEMY)
+    corso = client.post(
+        "/api/v1/corsi", json={"titolo": "Python per analisti", "durata_ore": 12}, headers=admin
+    ).json()
+    inizio = OGGI + timedelta(days=10)
+    edizione = client.post(
+        "/api/v1/edizioni",
+        json={
+            "corso_id": corso["id"],
+            "data_inizio": inizio.isoformat(),
+            "data_fine": (inizio + timedelta(days=2)).isoformat(),
+            "capienza": 15,
+        },
+        headers=admin,
+    ).json()
+
+    pagina = catalogo(client, persona(db, "Anna"))
+
+    assert pagina["totale"] == 1
+    assert pagina["elementi"] == [
+        {
+            "edizione_id": edizione["id"],
+            "corso": {"id": corso["id"], "titolo": "Python per analisti", "durata_ore": 12},
+            "data_inizio": inizio.isoformat(),
+            "data_fine": (inizio + timedelta(days=2)).isoformat(),
+            "capienza": 15,
+            "posti_confermati": 0,
+            "lista_attesa": 0,
+            "mia_iscrizione": None,
+        }
+    ]

@@ -8,14 +8,10 @@ from fastapi import Depends, Header, Request
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
-from academy_hub.api.errori import PrecondizioneRichiesta
+from academy_hub.api.errori import EtagNonValido, PrecondizioneRichiesta
 from academy_hub.config import impostazioni
 from academy_hub.dominio.attore import Attore
-from academy_hub.dominio.errori import (
-    ErroreDominio,
-    NonAutenticato,
-    VersioneNonCorrispondente,
-)
+from academy_hub.dominio.errori import NonAutenticato
 from academy_hub.repository import persone
 
 
@@ -34,32 +30,31 @@ def _sessione(richiesta: Request) -> Iterator[Session]:
 SessioneDb = Annotated[Session, Depends(_sessione, scope="function")]
 
 
+_PERSONA_ID = re.compile(r"^[1-9]\d{0,18}$")
+
+
 def _attore(
     sessione: SessioneDb,
     x_persona_id: Annotated[
-        int | None,
+        str | None,
         Header(
-            description="Identità provvisoria della fase 5, accettata solo in ambiente locale. "
+            description="Identità provvisoria della fase 5 (id numerico della persona), "
+            "accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. "
             "Dalla fase 6 l'identità arriva dal token OIDC."
         ),
     ] = None,
 ) -> Attore:
-    if x_persona_id is None or impostazioni().ambiente != "locale":
+    if x_persona_id is None or not impostazioni().identita_provvisoria:
         raise NonAutenticato("Identità mancante")
-    attore = persone.attore(sessione, x_persona_id)
+    if not _PERSONA_ID.match(x_persona_id):
+        raise NonAutenticato("Identità non valida")
+    attore = persone.attore(sessione, int(x_persona_id))
     if attore is None:
         raise NonAutenticato("Persona sconosciuta")
     return attore
 
 
 AttoreCorrente = Annotated[Attore, Depends(_attore)]
-
-
-class EtagNonValido(VersioneNonCorrispondente):
-    """Un ETag malformato non corrisponde a nessuna versione: 412 come per uno superato."""
-
-    def __init__(self, valore: str) -> None:
-        ErroreDominio.__init__(self, f"If-Match {valore!r} non è un ETag di questa API")
 
 
 _ETAG = re.compile(r'^"(\d+)"$')
@@ -76,6 +71,9 @@ def _versione_attesa(
 ) -> int:
     if if_match is None:
         raise PrecondizioneRichiesta("Rileggi la risorsa e manda il suo ETag in If-Match")
+    if if_match.strip() == "*":
+        # RFC 9110 lo accetterebbe per qualunque versione: aggirerebbe la concorrenza ottimistica.
+        raise PrecondizioneRichiesta("If-Match: * non è ammesso: manda l'ETag letto con la GET")
     trovato = _ETAG.match(if_match.strip())
     if trovato is None:
         raise EtagNonValido(if_match)

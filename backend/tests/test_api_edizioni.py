@@ -1,6 +1,6 @@
 """US-02 · Pianificare un'edizione, attraverso l'API."""
 
-from datetime import date, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -9,12 +9,17 @@ from sqlalchemy.orm import Session
 
 from academy_hub.db.modelli import Edizione
 from academy_hub.dominio.ruoli import Ruolo
+from academy_hub.dominio.stati import StatoIscrizione
+from academy_hub.dominio.tempo import oggi
+from academy_hub.servizi.iscrizioni import conferma_posto
 
 from .api import persona
+from .dati import crea_iscrizione, crea_persona
 
 pytestmark = pytest.mark.integrazione
 
-INIZIO = date.today() + timedelta(days=30)
+# Lo stesso calendario del servizio (Europe/Rome), anche se la CI gira in UTC.
+INIZIO = oggi() + timedelta(days=30)
 
 
 def corso(client: TestClient, admin: dict[str, str]) -> int:
@@ -184,3 +189,86 @@ def test_modifica_edizione_con_etag_superato_412(client: TestClient, db: Engine)
     )
 
     assert risposta.status_code == 412
+    assert risposta.json()["type"] == "/problemi/versione-non-corrispondente"
+    assert client.get(f"/api/v1/edizioni/{edizione_id}", headers=admin).json()["capienza"] == 8
+
+
+def test_una_conferma_cambia_l_etag_dell_edizione_412(client: TestClient, db: Engine) -> None:
+    """Il contatore dei posti è parte dell'edizione: chi l'ha letta prima deve rileggerla."""
+    admin, edizione_id = pianifica(client, db, posti_confermati=0)
+    letto = client.get(f"/api/v1/edizioni/{edizione_id}", headers=admin).headers["ETag"]
+    with Session(db) as sessione, sessione.begin():
+        anna = crea_persona(sessione, "Anna")
+        iscrizione = crea_iscrizione(
+            sessione, anna, sessione.get_one(Edizione, edizione_id), StatoIscrizione.APPROVATA
+        )
+        conferma_posto(sessione, iscrizione.id, anna.id)
+
+    risposta = client.patch(
+        f"/api/v1/edizioni/{edizione_id}",
+        json={"capienza": 9},
+        headers={**admin, "If-Match": letto},
+    )
+
+    assert risposta.status_code == 412
+    assert client.get(f"/api/v1/edizioni/{edizione_id}", headers=admin).headers["ETag"] != letto
+
+
+def test_edizione_cancellata_non_si_modifica_409(client: TestClient, db: Engine) -> None:
+    admin, edizione_id = pianifica(client, db, posti_confermati=0)
+    with Session(db) as sessione, sessione.begin():
+        sessione.get_one(Edizione, edizione_id).cancellata_il = datetime.now(UTC)
+
+    risposta = modifica(client, admin, edizione_id, capienza=8)
+
+    assert risposta.status_code == 409
+    assert risposta.json()["type"] == "/problemi/edizione-cancellata"
+    with Session(db) as sessione:
+        assert sessione.get_one(Edizione, edizione_id).capienza == 5
+
+
+def test_docente_null_toglie_il_docente(client: TestClient, db: Engine) -> None:
+    admin = persona(db, "Admin", Ruolo.ADMIN_ACADEMY)
+    dario = int(persona(db, "Dario", Ruolo.DOCENTE)["X-Persona-Id"])
+    edizione_id = client.post(
+        "/api/v1/edizioni", json=edizione(corso(client, admin), docente_id=dario), headers=admin
+    ).json()["id"]
+
+    invariato = modifica(client, admin, edizione_id, capienza=8)
+    tolto = modifica(client, admin, edizione_id, docente_id=None)
+
+    assert invariato.json()["docente_id"] == dario
+    assert tolto.status_code == 200
+    assert tolto.json()["docente_id"] is None
+
+
+def test_modifica_edizione_vietata_al_dipendente_403(client: TestClient, db: Engine) -> None:
+    admin, edizione_id = pianifica(client, db, posti_confermati=0)
+    versione = client.get(f"/api/v1/edizioni/{edizione_id}", headers=admin).headers["ETag"]
+
+    risposta = client.patch(
+        f"/api/v1/edizioni/{edizione_id}",
+        json={"capienza": 8},
+        headers={**persona(db, "Anna"), "If-Match": versione},
+    )
+
+    assert risposta.status_code == 403
+
+
+def test_modifica_edizione_senza_if_match_428(client: TestClient, db: Engine) -> None:
+    admin, edizione_id = pianifica(client, db, posti_confermati=0)
+
+    risposta = client.patch(f"/api/v1/edizioni/{edizione_id}", json={"capienza": 8}, headers=admin)
+
+    assert risposta.status_code == 428
+
+
+def test_edizione_inesistente_404(client: TestClient, db: Engine) -> None:
+    admin = persona(db, "Admin", Ruolo.ADMIN_ACADEMY)
+
+    letta = client.get("/api/v1/edizioni/999", headers=admin)
+    modificata = client.patch(
+        "/api/v1/edizioni/999", json={"capienza": 8}, headers={**admin, "If-Match": '"1"'}
+    )
+
+    assert (letta.status_code, modificata.status_code) == (404, 404)

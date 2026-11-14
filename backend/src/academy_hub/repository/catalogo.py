@@ -31,6 +31,19 @@ def blocca_corso(sessione: Session, corso_id: int) -> Corso:
     return trovato
 
 
+def blocca_corso_in_lettura(sessione: Session, corso_id: int) -> Corso:
+    """FOR SHARE: il corso non cambia (né viene archiviato) fino alla fine della transazione."""
+    trovato = sessione.scalar(
+        select(Corso)
+        .where(Corso.id == corso_id)
+        .with_for_update(read=True)
+        .execution_options(populate_existing=True)
+    )
+    if trovato is None:
+        raise NonTrovato("Corso", corso_id)
+    return trovato
+
+
 def aggiungi(sessione: Session, oggetto: object) -> None:
     sessione.add(oggetto)
     sessione.flush()

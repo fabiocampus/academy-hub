@@ -5,6 +5,7 @@ dominio: è stabile e i client possono confrontarlo. Il codice HTTP dipende solo
 classe base dell'errore (`STATO_HTTP`).
 """
 
+import logging
 from http import HTTPStatus
 from typing import Any
 
@@ -27,6 +28,8 @@ from academy_hub.dominio.errori import (
 
 TIPO_MEDIA = "application/problem+json"
 
+log = logging.getLogger(__name__)
+
 STATO_HTTP: dict[type[ErroreDominio], int] = {
     NonAutenticato: 401,
     AzioneNonConsentita: 403,
@@ -45,6 +48,20 @@ class PrecondizioneRichiesta(ErroreDominio):
 
 
 STATO_HTTP[PrecondizioneRichiesta] = 428
+
+
+class EtagNonValido(ErroreDominio):
+    """`If-Match` malformato: non corrisponde a nessuna versione, quindi 412 (RFC 9110)."""
+
+    tipo = VersioneNonCorrispondente.tipo
+    titolo = VersioneNonCorrispondente.titolo
+
+    def __init__(self, valore: str) -> None:
+        self.valore = valore
+        super().__init__(f"If-Match {valore!r} non è un ETag di questa API")
+
+
+STATO_HTTP[EtagNonValido] = 412
 
 
 class ErroreCampo(BaseModel):
@@ -183,9 +200,16 @@ async def _versione_superata(richiesta: Request, errore: Exception) -> JSONRespo
     )
 
 
+async def _imprevisto(richiesta: Request, errore: Exception) -> JSONResponse:
+    # Il dettaglio resta nel log: nel corpo potrebbe esporre dati interni.
+    log.error("Errore imprevisto su %s %s", richiesta.method, richiesta.url.path, exc_info=errore)
+    return problema(richiesta, 500, "about:blank", HTTPStatus(500).phrase)
+
+
 def registra_gestori(app: FastAPI) -> None:
     contratto_problem_json(app)
     app.add_exception_handler(ErroreDominio, _errore_dominio)
     app.add_exception_handler(RequestValidationError, _validazione)
     app.add_exception_handler(HTTPException, _http)
     app.add_exception_handler(StaleDataError, _versione_superata)
+    app.add_exception_handler(Exception, _imprevisto)

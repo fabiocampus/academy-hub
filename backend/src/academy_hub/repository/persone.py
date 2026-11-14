@@ -15,7 +15,3 @@ def attore(sessione: Session, persona_id: int) -> Attore | None:
     if riga is None:
         return None
     return Attore(persona_id, riga.team_id, frozenset(Ruolo(r) for r in riga.ruoli))
-
-
-def esiste(sessione: Session, persona_id: int) -> bool:
-    return sessione.get(Persona, persona_id) is not None

@@ -10,6 +10,7 @@ from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.engine import make_url
 from testcontainers.community.postgres import PostgresContainer
 
+from academy_hub.config import impostazioni
 from academy_hub.db.migrazioni import aggiorna_schema
 from academy_hub.main import crea_app
 
@@ -56,10 +57,19 @@ def motore(postgres: PostgresContainer) -> Iterator[Engine]:
 
 
 @pytest.fixture
-def client(db: Engine) -> Iterator[TestClient]:
-    """Client HTTP sull'app collegata al database di test (svuotato dopo ogni test)."""
-    with TestClient(crea_app(motore=db)) as client:
-        yield client
+def client(db: Engine, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
+    """Client HTTP sull'app collegata al database di test (svuotato dopo ogni test).
+
+    Accetta l'identità provvisoria `X-Persona-Id`, come docker compose in locale.
+    """
+    monkeypatch.setenv("ACADEMY_AMBIENTE", "locale")
+    monkeypatch.setenv("ACADEMY_IDENTITA_PROVVISORIA", "true")
+    impostazioni.cache_clear()
+    try:
+        with TestClient(crea_app(motore=db)) as client:
+            yield client
+    finally:
+        impostazioni.cache_clear()
 
 
 @pytest.fixture
