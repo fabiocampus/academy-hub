@@ -1,0 +1,29 @@
+name: PR
+
+# Verifica che la descrizione della PR colleghi una issue (Closes #n).
+# Gira su pull_request (mai pull_request_target): non ha accesso ai segreti.
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions: {}
+
+jobs:
+  issue-collegata:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cerca "Closes #n" nella descrizione
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+          AUTORE: ${{ github.event.pull_request.user.login }}
+        run: |
+          if [ "$AUTORE" = "dependabot[bot]" ]; then
+            echo "PR di Dependabot: controllo saltato."
+            exit 0
+          fi
+          if printf '%s' "$BODY" | grep -Eiq '(close[sd]?|fix(e[sd])?|resolve[sd]?) +#[0-9]+'; then
+            echo "Issue collegata trovata."
+          else
+            echo "::error::La descrizione della PR deve collegare una issue, ad esempio 'Closes #12'."
+            exit 1
+          fi
