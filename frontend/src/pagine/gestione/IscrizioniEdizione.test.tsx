@@ -18,6 +18,7 @@ import {
 } from "../../test/server";
 import { contaLettureCatalogo, SpiaCatalogo } from "../../test/catalogo";
 import { mostra } from "../../test/render";
+import { cancello, mostraSmontabile } from "../../test/smontaggio";
 import { IscrizioniEdizione } from "./IscrizioniEdizione";
 
 type Voce = Schemi["VoceIscrizioneEdizione"];
@@ -123,6 +124,30 @@ describe("Iscrizioni dell'edizione", () => {
     await waitFor(() => {
       expect(catalogo.letture).toBe(2);
     });
+  });
+
+  it("l'esito della conferma si vede anche se il pulsante è già sparito", async () => {
+    conIscrizioni([voceIscrizioneEdizione(4)]);
+    const risposta = cancello();
+    server.use(
+      http.post(`${API}/iscrizioni/:id/conferma`, async () => {
+        await risposta.attendi;
+        return HttpResponse.json(iscrizioneLetta(4, "Confermata"));
+      }),
+    );
+    mostraSmontabile(
+      <IscrizioniEdizione />,
+      "/gestione/edizioni/:edizioneId",
+      "/gestione/edizioni/3",
+    );
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Conferma l'iscrizione di Anna Dati" }),
+    );
+    await userEvent.click(screen.getByRole("link", { name: "Altrove" }));
+    risposta.apri();
+
+    expect(await screen.findByText("Iscrizione di Anna Dati confermata.")).toBeInTheDocument();
   });
 
   it("senza posti l'iscrizione va in lista d'attesa e lo dice", async () => {

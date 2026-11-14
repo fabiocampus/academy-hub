@@ -13,6 +13,7 @@ import {
   server,
 } from "../test/server";
 import { mostra } from "../test/render";
+import { cancello, mostraSmontabile } from "../test/smontaggio";
 import { Approvazioni, MOTIVO_MASSIMO } from "./Approvazioni";
 
 type Richiesta = Schemi["RichiestaDaApprovare"];
@@ -68,6 +69,24 @@ describe("Approvazioni", () => {
 
     expect(await screen.findByText("Richiesta di Anna Dati approvata.")).toBeInTheDocument();
     expect(await screen.findByText("Nessuna richiesta da decidere.")).toBeInTheDocument();
+  });
+
+  it("l'esito dell'approvazione si vede anche se la riga è già sparita", async () => {
+    conRichieste([richiestaDaApprovare(4)]);
+    const risposta = cancello();
+    server.use(
+      http.post(`${API}/iscrizioni/:id/approvazione`, async () => {
+        await risposta.attendi;
+        return HttpResponse.json(iscrizioneLetta(4, "Approvata"));
+      }),
+    );
+    mostraSmontabile(<Approvazioni />);
+
+    await userEvent.click(await screen.findByRole("button", { name: APPROVA }));
+    await userEvent.click(screen.getByRole("link", { name: "Altrove" }));
+    risposta.apri();
+
+    expect(await screen.findByText("Richiesta di Anna Dati approvata.")).toBeInTheDocument();
   });
 
   it("anche con il pulsante visibile, l'API può rifiutare l'azione: si vede il 403", async () => {

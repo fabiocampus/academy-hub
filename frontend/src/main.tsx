@@ -14,7 +14,7 @@ import { riprova } from "./api/client";
 import { leggiConfigurazione } from "./api/configurazione";
 import { App } from "./App";
 import { messaggio } from "./componenti/Stati";
-import { tema } from "./tema";
+import { tema, variabiliCss } from "./tema";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -31,7 +31,7 @@ const radice = createRoot(elemento);
 function mostra(contenuto: ReactNode): void {
   radice.render(
     <StrictMode>
-      <MantineProvider theme={tema}>
+      <MantineProvider theme={tema} cssVariablesResolver={variabiliCss}>
         <Notifications />
         {contenuto}
       </MantineProvider>

@@ -1,6 +1,7 @@
 /** Intestazione, menu e area principale; il menu dipende dal profilo (ruoli). */
 import { AppShell, Burger, Button, Group, NavLink, Text } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
+import { Suspense } from "react";
 import { NavLink as Collegamento, Outlet } from "react-router";
 
 import { useSessione } from "../accesso/contesto";
@@ -91,7 +92,12 @@ export function Struttura() {
         {profilo.isError && (
           <Errore errore={profilo.error} riprova={() => void profilo.refetch()} />
         )}
-        {profilo.isSuccess && <Outlet />}
+        {profilo.isSuccess && (
+          // Le pagine arrivano in chunk separati (App.tsx): intestazione e menu restano.
+          <Suspense fallback={<Caricamento etichetta="Caricamento della pagina" />}>
+            <Outlet />
+          </Suspense>
+        )}
       </AppShell.Main>
     </AppShell>
   );
