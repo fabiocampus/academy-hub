@@ -14,6 +14,10 @@ updates:
     directory: /backend
     schedule:
       interval: weekly
+    # ADR-0001: Python 3.11 come il runtime di Databricks Apps.
+    ignore:
+      - dependency-name: python
+        versions: [">=3.12"]
     commit-message:
       prefix: "build(deps)"
 
@@ -21,6 +25,10 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # ADR-0001: PostgreSQL 17 come Lakebase (da riverificare nella fase 8).
+    ignore:
+      - dependency-name: postgres
+        update-types: ["version-update:semver-major"]
     commit-message:
       prefix: "build(deps)"
 
