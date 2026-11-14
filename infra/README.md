@@ -21,9 +21,13 @@ GITHUB_TOKEN=$(gh auth token) terraform plan
 
 1. Su HCP Terraform: organizzazione `academy-hub-studio`, con execution mode di difetto **Local** (Settings → General). I workspace nascono al primo `terraform init`.
 2. Token: uno di HCP (User Settings → Tokens) e due fine-grained di GitHub limitati a questo repository, con scadenza:
-   - lettura: *Administration*, *Environments*, *Metadata*, *Issues*, *Secrets*, *Variables* in sola lettura;
-   - scrittura: gli stessi permessi in lettura e scrittura.
-3. Dal PC, `terraform apply` in `infra/github/`: importa ciò che esiste e crea gli environment `infra` e `infra-plan`.
+   - lettura: *Administration*, *Environments*, *Issues*, *Metadata* in sola lettura;
+   - scrittura: gli stessi permessi in lettura e scrittura (*Metadata* resta in lettura).
+
+   *Secrets* e *Variables* si aggiungono quando Terraform comincerà a gestirli (PR B della fase 9).
+3. Dal PC, `terraform apply` in `infra/github/`: importa ciò che esiste (anche `infra-plan`, creato dalla prima esecuzione del workflow) e crea l'environment `infra` con approvatore e policy sul ramo `main`.
+
+   Prima di questo passo nessun push su `main` deve toccare `infra/`: il job di apply farebbe nascere `infra` senza approvatore.
 4. Secret negli environment (mai nei file):
 
    ```bash

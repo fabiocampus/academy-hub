@@ -40,6 +40,11 @@ resource "github_repository_ruleset" "main_protetto" {
 
   # Nessun bypass, neanche per chi amministra: tutto passa da una PR.
 
+  # Distruggerlo e ricrearlo lascerebbe main scoperto per un momento.
+  lifecycle {
+    prevent_destroy = true
+  }
+
   rules {
     deletion         = true
     non_fast_forward = true

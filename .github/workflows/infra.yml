@@ -19,10 +19,11 @@ on:
 permissions:
   contents: read
 
-# Una sola esecuzione alla volta per configurazione: HCP Free fa una run per volta
-# e il lock dello stato non va conteso; nessuna esecuzione va interrotta a metà.
+# Nessuna esecuzione interrotta a metà. Un gruppo per evento: GitHub tiene una sola
+# esecuzione in attesa per gruppo, e un plan di deriva non deve cancellare un apply
+# che aspetta l'approvazione. Le scritture sullo stato le serializza il lock di HCP.
 concurrency:
-  group: infra-${{ github.ref }}
+  group: infra-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -48,12 +49,19 @@ jobs:
       HAS_TF_TOKEN: ${{ secrets.TF_API_TOKEN != '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e  # v4.0.1
         with:
           terraform_version: 1.17.1
           terraform_wrapper: false
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
       - run: terraform fmt -check -recursive -diff
+      - name: La deriva senza credenziali non si controlla
+        if: github.event_name != 'pull_request' && env.HAS_TF_TOKEN != 'true'
+        run: |
+          echo "::error::Manca TF_API_TOKEN nell'environment infra-plan: plan impossibile"
+          exit 1
       - name: Senza credenziali (PR di Dependabot o da fork) solo la sintassi
         if: env.HAS_TF_TOKEN != 'true'
         run: terraform init -backend=false && terraform validate
@@ -97,7 +105,7 @@ jobs:
             const { owner, repo } = context.repo;
             const issue_number = context.issue.number;
             const commenti = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
-            const vecchio = commenti.find(c => c.user.type === 'Bot' && c.body.startsWith(marca));
+            const vecchio = commenti.find(c => c.user.login === 'github-actions[bot]' && c.body.startsWith(marca));
             if (vecchio) {
               await github.rest.issues.updateComment({ owner, repo, comment_id: vecchio.id, body: corpo });
             } else {
@@ -128,6 +136,8 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GH_TERRAFORM_SCRITTURA }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e  # v4.0.1
         with:
           terraform_version: 1.17.1
