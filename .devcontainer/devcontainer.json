@@ -1,0 +1,26 @@
+{
+  "name": "Academy Hub",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11-trixie",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
+    "ghcr.io/devcontainers/features/node:1": { "version": "22" },
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "postCreateCommand": "pip install --user uv==0.13.8 && cd backend && uv sync && uv run pre-commit install",
+  "forwardPorts": [8000, 8080, 3000],
+  "portsAttributes": {
+    "8000": { "label": "backend" },
+    "8080": { "label": "keycloak" },
+    "3000": { "label": "grafana" }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "charliermarsh.ruff",
+        "ms-pyright.pyright",
+        "ms-azuretools.vscode-containers"
+      ]
+    }
+  }
+}

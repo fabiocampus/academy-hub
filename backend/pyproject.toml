@@ -3,10 +3,15 @@ name = "academy-hub"
 version = "0.1.0"
 description = "Academy Hub: iscrizioni ai corsi dell'Academy aziendale (prototipo di studio)"
 requires-python = ">=3.11,<3.12"
-dependencies = []
+dependencies = [
+    "fastapi>=0.162.7",
+    "pydantic-settings>=2.16.3",
+    "uvicorn[standard]>=0.54.0",
+]
 
 [dependency-groups]
 dev = [
+    "httpx2>=2.16.0",
     "pre-commit",
     "pyright",
     "pytest",

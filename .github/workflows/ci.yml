@@ -48,6 +48,44 @@ jobs:
       - run: uv sync --locked
       - run: uv run pytest
 
+  immagine:
+    # Build dell'immagine del backend e scansione con Trivy.
+    # trivy-action fissata allo SHA di una release immutabile (dopo CVE-2026-33634).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - name: Build
+        working-directory: backend
+        run: docker build -t academy-hub-backend:ci .
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
+        with:
+          version: v0.76.2
+          image-ref: academy-hub-backend:ci
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+          format: table
+
+  compose:
+    # Il criterio della fase 3: docker compose up da un clone pulito, senza .env.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - name: docker compose up
+        working-directory: .
+        run: docker compose up -d --build --wait --wait-timeout 300
+      - name: Health del backend
+        working-directory: .
+        run: curl --fail --silent --show-error http://127.0.0.1:8000/health
+      - name: Log in caso di errore
+        if: failure()
+        working-directory: .
+        run: docker compose logs --no-color
+      - name: docker compose down
+        if: always()
+        working-directory: .
+        run: docker compose down -v
+
   gitleaks:
     runs-on: ubuntu-latest
     permissions:
