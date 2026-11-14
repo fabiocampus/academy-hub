@@ -23,7 +23,7 @@ I test svuotano le tabelle con `SET LOCAL session_replication_role = replica`, c
 | Tabella | Contenuto | Vincoli principali |
 |---|---|---|
 | `team` | Gerarchia dei team (`team_padre_id`) e responsabile | nome unico; un team non è padre di se stesso |
-| `persone` | Nome, email, team, ruoli applicativi | email unica; `ruoli` non vuoto e solo fra i codici di `CONTEXT.md` |
+| `persone` | Nome, email, team, ruoli applicativi | email unica e minuscola (chiave verso l'identità, ADR-0008); `ruoli` non vuoto e solo fra i codici di `CONTEXT.md` |
 | `corsi` | Titolo, descrizione, durata in ore, `archiviato_il`, `versione` | durata > 0 |
 | `edizioni` | Date, capienza, docente, `posti_confermati`, `cancellata_il`, `versione` | capienza > 0; fine ≥ inizio; `posti_confermati` fra 0 e capienza (R3) |
 | `iscrizioni` | Persona, edizione, stato, momenti di richiesta e approvazione, chiave di idempotenza | stato fra quelli del glossario; `UNIQUE` parziale sulle attive (R1); data di approvazione obbligatoria dopo l'approvazione; `UNIQUE` parziale su (persona, chiave di idempotenza) (ADR-0006) |

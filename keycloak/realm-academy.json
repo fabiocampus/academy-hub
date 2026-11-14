@@ -1,0 +1,174 @@
+{
+  "realm": "academy",
+  "displayName": "Academy Hub (solo sviluppo)",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": false,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "clients": [
+    {
+      "clientId": "academy-web",
+      "name": "Academy Hub, frontend (fase 7)",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:5173/*",
+        "http://localhost:8000/*"
+      ],
+      "webOrigins": [
+        "http://localhost:5173",
+        "http://localhost:8000"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:5173/*##http://localhost:8000/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "pubblico academy-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "academy-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "academy-cli",
+      "name": "Academy Hub, script e CI (password grant, solo sviluppo)",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "protocolMappers": [
+        {
+          "name": "pubblico academy-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "academy-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "dirigente",
+      "email": "dirigente@academy.example",
+      "emailVerified": true,
+      "firstName": "Diana",
+      "lastName": "Dirigente",
+      "enabled": true,
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dirigente",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "responsabile",
+      "email": "responsabile@academy.example",
+      "emailVerified": true,
+      "firstName": "Rita",
+      "lastName": "Responsabile",
+      "enabled": true,
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "responsabile",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "dipendente",
+      "email": "dipendente@academy.example",
+      "emailVerified": true,
+      "firstName": "Dario",
+      "lastName": "Dipendente",
+      "enabled": true,
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dipendente",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "admin",
+      "email": "admin@academy.example",
+      "emailVerified": true,
+      "firstName": "Alba",
+      "lastName": "Admin",
+      "enabled": true,
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "docente",
+      "email": "docente@academy.example",
+      "emailVerified": true,
+      "firstName": "Dora",
+      "lastName": "Docente",
+      "enabled": true,
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "docente",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "esterna",
+      "email": "esterna@academy.example",
+      "emailVerified": true,
+      "firstName": "Elsa",
+      "lastName": "Esterna",
+      "enabled": true,
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "esterna",
+          "temporary": false
+        }
+      ]
+    }
+  ]
+}

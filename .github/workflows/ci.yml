@@ -82,6 +82,11 @@ jobs:
       - name: Schema migrato da Alembic
         working-directory: .
         run: docker compose exec -T db psql -U academy -d academy -tAc "SELECT version_num FROM alembic_version" | grep -E '^[0-9]+$'
+      - name: Identità con token Keycloak (US-16)
+        # Token veri dal realm importato, flusso richiesta -> approvazione -> conferma
+        # e casi vietati (401, 403).
+        working-directory: .
+        run: python3 scripts/fumo_identita.py
       - name: Prima passata del job di sistema
         # Il servizio job non ha healthcheck: "up --wait" vede solo che è partito.
         working-directory: .
