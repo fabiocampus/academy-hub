@@ -97,6 +97,16 @@ def test_ruolo_sconosciuto_rifiutato(db: Engine) -> None:
             sessione.flush()
 
 
+def test_email_con_maiuscole_rifiutata(db: Engine) -> None:
+    """L'email è la chiave verso l'identità OIDC: sempre minuscola (ADR-0008)."""
+    with Session(db) as sessione:
+        anna = crea_persona(sessione, "Anna")
+        anna.email = "Anna@esempio.test"
+
+        with pytest.raises(IntegrityError, match="ck_persone_email_minuscola"):
+            sessione.flush()
+
+
 def test_persona_ha_il_ruolo_dipendente_per_impostazione(db: Engine) -> None:
     with Session(db) as sessione:
         anna_id = crea_persona(sessione, "Anna").id

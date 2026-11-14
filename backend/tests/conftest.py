@@ -60,10 +60,11 @@ def motore(postgres: PostgresContainer) -> Iterator[Engine]:
 def client(db: Engine, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
     """Client HTTP sull'app collegata al database di test (svuotato dopo ogni test).
 
-    Accetta l'identità provvisoria `X-Persona-Id`, come docker compose in locale.
+    Accetta l'identità provvisoria `X-Persona-Id` (solo in locale, ADR-0008); i test del
+    token OIDC sono in `test_api_identita.py`.
     """
     monkeypatch.setenv("ACADEMY_AMBIENTE", "locale")
-    monkeypatch.setenv("ACADEMY_IDENTITA_PROVVISORIA", "true")
+    monkeypatch.setenv("ACADEMY_IDENTITA", "provvisoria")
     impostazioni.cache_clear()
     try:
         with TestClient(crea_app(motore=db)) as client:

@@ -898,12 +898,19 @@
         "title": "VoceMiaIscrizione",
         "type": "object"
       }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "description": "Access token OIDC (in locale da Keycloak, realm academy). ADR-0008.",
+        "scheme": "bearer",
+        "type": "http"
+      }
     }
   },
   "info": {
     "description": "Iscrizioni ai corsi dell'Academy. Errori in formato RFC 9457.",
     "title": "Academy Hub",
-    "version": "1.2.0"
+    "version": "1.3.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -992,9 +999,9 @@
             }
           },
           {
-            "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+            "description": "Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008).",
             "in": "header",
-            "name": "x-persona-id",
+            "name": "X-Persona-Id",
             "required": false,
             "schema": {
               "anyOf": [
@@ -1005,7 +1012,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+              "description": "Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008).",
               "title": "X-Persona-Id"
             }
           }
@@ -1042,6 +1049,11 @@
             "description": "Unprocessable Entity"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Consulta Catalogo",
         "tags": [
           "catalogo"
@@ -1053,9 +1065,9 @@
         "operationId": "creaCorso",
         "parameters": [
           {
-            "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+            "description": "Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008).",
             "in": "header",
-            "name": "x-persona-id",
+            "name": "X-Persona-Id",
             "required": false,
             "schema": {
               "anyOf": [
@@ -1066,7 +1078,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+              "description": "Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008).",
               "title": "X-Persona-Id"
             }
           }
@@ -1123,6 +1135,11 @@
             "description": "Unprocessable Entity"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Crea Corso",
         "tags": [
           "corsi"
@@ -1143,9 +1160,9 @@
             }
           },
           {
-            "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+            "description": "Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008).",
             "in": "header",
-            "name": "x-persona-id",
+            "name": "X-Persona-Id",
             "required": false,
             "schema": {
               "anyOf": [
@@ -1156,7 +1173,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+              "description": "Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008).",
               "title": "X-Persona-Id"
             }
           }
@@ -1203,6 +1220,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Leggi Corso",
         "tags": [
           "corsi"
@@ -1221,9 +1243,9 @@
             }
           },
           {
-            "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+            "description": "Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008).",
             "in": "header",
-            "name": "x-persona-id",
+            "name": "X-Persona-Id",
             "required": false,
             "schema": {
               "anyOf": [
@@ -1234,7 +1256,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+              "description": "Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008).",
               "title": "X-Persona-Id"
             }
           },
@@ -1339,6 +1361,11 @@
             "description": "Precondition Required"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Modifica Corso",
         "tags": [
           "corsi"
@@ -1359,9 +1386,9 @@
             }
           },
           {
-            "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+            "description": "Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008).",
             "in": "header",
-            "name": "x-persona-id",
+            "name": "X-Persona-Id",
             "required": false,
             "schema": {
               "anyOf": [
@@ -1372,7 +1399,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+              "description": "Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008).",
               "title": "X-Persona-Id"
             }
           },
@@ -1467,6 +1494,11 @@
             "description": "Precondition Required"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Archivia un corso: esce dal catalogo, le edizioni restano nei report",
         "tags": [
           "corsi"
@@ -1478,9 +1510,9 @@
         "operationId": "creaEdizione",
         "parameters": [
           {
-            "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+            "description": "Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008).",
             "in": "header",
-            "name": "x-persona-id",
+            "name": "X-Persona-Id",
             "required": false,
             "schema": {
               "anyOf": [
@@ -1491,7 +1523,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+              "description": "Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008).",
               "title": "X-Persona-Id"
             }
           }
@@ -1558,6 +1590,11 @@
             "description": "Unprocessable Entity"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Crea Edizione",
         "tags": [
           "edizioni"
@@ -1578,9 +1615,9 @@
             }
           },
           {
-            "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+            "description": "Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008).",
             "in": "header",
-            "name": "x-persona-id",
+            "name": "X-Persona-Id",
             "required": false,
             "schema": {
               "anyOf": [
@@ -1591,7 +1628,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+              "description": "Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008).",
               "title": "X-Persona-Id"
             }
           }
@@ -1638,6 +1675,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Leggi Edizione",
         "tags": [
           "edizioni"
@@ -1656,9 +1698,9 @@
             }
           },
           {
-            "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+            "description": "Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008).",
             "in": "header",
-            "name": "x-persona-id",
+            "name": "X-Persona-Id",
             "required": false,
             "schema": {
               "anyOf": [
@@ -1669,7 +1711,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+              "description": "Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008).",
               "title": "X-Persona-Id"
             }
           },
@@ -1784,6 +1826,11 @@
             "description": "Precondition Required"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Modifica Edizione",
         "tags": [
           "edizioni"
@@ -1805,9 +1852,9 @@
             }
           },
           {
-            "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+            "description": "Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008).",
             "in": "header",
-            "name": "x-persona-id",
+            "name": "X-Persona-Id",
             "required": false,
             "schema": {
               "anyOf": [
@@ -1818,7 +1865,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+              "description": "Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008).",
               "title": "X-Persona-Id"
             }
           }
@@ -1885,6 +1932,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Cancella un'edizione non iniziata: le iscrizioni attive diventano Annullata",
         "tags": [
           "edizioni"
@@ -1919,9 +1971,9 @@
             }
           },
           {
-            "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+            "description": "Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008).",
             "in": "header",
-            "name": "x-persona-id",
+            "name": "X-Persona-Id",
             "required": false,
             "schema": {
               "anyOf": [
@@ -1932,7 +1984,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+              "description": "Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008).",
               "title": "X-Persona-Id"
             }
           }
@@ -1969,6 +2021,11 @@
             "description": "Unprocessable Entity"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Mie Iscrizioni",
         "tags": [
           "iscrizioni"
@@ -1997,9 +2054,9 @@
             }
           },
           {
-            "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+            "description": "Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008).",
             "in": "header",
-            "name": "x-persona-id",
+            "name": "X-Persona-Id",
             "required": false,
             "schema": {
               "anyOf": [
@@ -2010,7 +2067,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+              "description": "Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008).",
               "title": "X-Persona-Id"
             }
           }
@@ -2077,6 +2134,11 @@
             "description": "Unprocessable Entity"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Chiede l'iscrizione a un'edizione (idempotente con Idempotency-Key)",
         "tags": [
           "iscrizioni"
@@ -2097,9 +2159,9 @@
             }
           },
           {
-            "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+            "description": "Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008).",
             "in": "header",
-            "name": "x-persona-id",
+            "name": "X-Persona-Id",
             "required": false,
             "schema": {
               "anyOf": [
@@ -2110,7 +2172,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+              "description": "Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008).",
               "title": "X-Persona-Id"
             }
           }
@@ -2167,6 +2229,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Leggi Iscrizione",
         "tags": [
           "iscrizioni"
@@ -2187,9 +2254,9 @@
             }
           },
           {
-            "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+            "description": "Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008).",
             "in": "header",
-            "name": "x-persona-id",
+            "name": "X-Persona-Id",
             "required": false,
             "schema": {
               "anyOf": [
@@ -2200,7 +2267,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+              "description": "Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008).",
               "title": "X-Persona-Id"
             }
           }
@@ -2267,6 +2334,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Il titolare annulla la propria iscrizione (Confermata: entro la scadenza)",
         "tags": [
           "iscrizioni"
@@ -2287,9 +2359,9 @@
             }
           },
           {
-            "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+            "description": "Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008).",
             "in": "header",
-            "name": "x-persona-id",
+            "name": "X-Persona-Id",
             "required": false,
             "schema": {
               "anyOf": [
@@ -2300,7 +2372,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+              "description": "Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008).",
               "title": "X-Persona-Id"
             }
           }
@@ -2367,6 +2439,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Il responsabile diretto approva una Richiesta",
         "tags": [
           "iscrizioni"
@@ -2387,9 +2464,9 @@
             }
           },
           {
-            "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+            "description": "Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008).",
             "in": "header",
-            "name": "x-persona-id",
+            "name": "X-Persona-Id",
             "required": false,
             "schema": {
               "anyOf": [
@@ -2400,7 +2477,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+              "description": "Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008).",
               "title": "X-Persona-Id"
             }
           }
@@ -2467,6 +2544,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "L'Academy conferma un'Approvata: Confermata se c'è posto, altrimenti InAttesa",
         "tags": [
           "iscrizioni"
@@ -2487,9 +2569,9 @@
             }
           },
           {
-            "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+            "description": "Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008).",
             "in": "header",
-            "name": "x-persona-id",
+            "name": "X-Persona-Id",
             "required": false,
             "schema": {
               "anyOf": [
@@ -2500,7 +2582,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+              "description": "Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008).",
               "title": "X-Persona-Id"
             }
           }
@@ -2577,6 +2659,11 @@
             "description": "Unprocessable Entity"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Il responsabile diretto rifiuta una Richiesta, con motivo",
         "tags": [
           "iscrizioni"
@@ -2612,9 +2699,9 @@
             }
           },
           {
-            "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+            "description": "Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008).",
             "in": "header",
-            "name": "x-persona-id",
+            "name": "X-Persona-Id",
             "required": false,
             "schema": {
               "anyOf": [
@@ -2625,7 +2712,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+              "description": "Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008).",
               "title": "X-Persona-Id"
             }
           }
@@ -2662,6 +2749,11 @@
             "description": "Unprocessable Entity"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Richieste Da Approvare",
         "tags": [
           "iscrizioni"

@@ -5,13 +5,14 @@ from collections.abc import Iterator
 from typing import Annotated
 
 from fastapi import Depends, Header, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
 from academy_hub.api.errori import EtagNonValido, PrecondizioneRichiesta
-from academy_hub.config import impostazioni
+from academy_hub.api.identita import PerEmail, PerId, ProviderIdentita
 from academy_hub.dominio.attore import Attore
-from academy_hub.dominio.errori import NonAutenticato
+from academy_hub.dominio.errori import NonAutenticato, PersonaNonRegistrata
 from academy_hub.repository import persone
 
 
@@ -30,27 +31,37 @@ def _sessione(richiesta: Request) -> Iterator[Session]:
 SessioneDb = Annotated[Session, Depends(_sessione, scope="function")]
 
 
-_PERSONA_ID = re.compile(r"^[1-9]\d{0,18}$")
+_bearer = HTTPBearer(
+    auto_error=False,
+    description="Access token OIDC (in locale da Keycloak, realm academy). ADR-0008.",
+)
 
 
 def _attore(
+    richiesta: Request,
     sessione: SessioneDb,
-    x_persona_id: Annotated[
+    # I due parametri documentano nel contratto come ci si identifica; li legge il
+    # provider configurato (`api.identita`), che su Databricks usa invece X-Forwarded-Email.
+    _token: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)] = None,
+    _x_persona_id: Annotated[
         str | None,
         Header(
-            description="Identità provvisoria della fase 5 (id numerico della persona), "
-            "accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. "
-            "Dalla fase 6 l'identità arriva dal token OIDC."
+            alias="X-Persona-Id",
+            description="Identità provvisoria (id numerico della persona): solo in locale "
+            "con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008).",
         ),
     ] = None,
 ) -> Attore:
-    if x_persona_id is None or not impostazioni().identita_provvisoria:
-        raise NonAutenticato("Identità mancante")
-    if not _PERSONA_ID.match(x_persona_id):
-        raise NonAutenticato("Identità non valida")
-    attore = persone.attore(sessione, int(x_persona_id))
-    if attore is None:
-        raise NonAutenticato("Persona sconosciuta")
+    provider: ProviderIdentita = richiesta.app.state.identita
+    match provider.identifica(richiesta.headers):
+        case PerEmail(email):
+            attore = persone.attore_per_email(sessione, email)
+            if attore is None:
+                raise PersonaNonRegistrata(f"Nessuna persona con email {email}")
+        case PerId(persona_id):
+            attore = persone.attore(sessione, persona_id)
+            if attore is None:
+                raise NonAutenticato("Persona sconosciuta")
     return attore
 
 
