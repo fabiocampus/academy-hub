@@ -7,7 +7,7 @@ imposta da sé e il Dockerfile fissa per l'ambiente locale.
 from pathlib import Path
 
 from fastapi import FastAPI
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine
 
 from academy_hub import __version__
 from academy_hub.api import PREFISSO, VERSIONE_API
@@ -15,6 +15,7 @@ from academy_hub.api.errori import registra_gestori
 from academy_hub.api.identita import ProviderIdentita, provider
 from academy_hub.api.rotte import catalogo, corsi, edizioni, iscrizioni, profilo
 from academy_hub.config import impostazioni
+from academy_hub.db.motore import crea_motore
 from academy_hub.frontend import monta_frontend, origine
 
 
@@ -26,7 +27,7 @@ def crea_app(
     """App FastAPI. `motore`, `identita` e `frontend` servono ai test; altrimenti nascono
     dalla configurazione. Con una build del frontend l'app serve anche la SPA.
 
-    `create_engine` non apre connessioni: l'app parte (e genera l'OpenAPI) anche
+    Il motore non apre connessioni: l'app parte (e genera l'OpenAPI) anche
     senza database.
     """
     app = FastAPI(
@@ -34,7 +35,7 @@ def crea_app(
         version=VERSIONE_API,
         description="Iscrizioni ai corsi dell'Academy. Errori in formato RFC 9457.",
     )
-    app.state.motore = motore or create_engine(impostazioni().database_url, pool_pre_ping=True)
+    app.state.motore = motore or crea_motore(impostazioni(), pool_pre_ping=True)
     app.state.identita = identita or provider(impostazioni())
     registra_gestori(app)
     for router in (

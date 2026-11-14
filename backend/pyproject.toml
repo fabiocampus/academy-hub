@@ -5,6 +5,7 @@ description = "Academy Hub: iscrizioni ai corsi dell'Academy aziendale (prototip
 requires-python = ">=3.11,<3.12"
 dependencies = [
     "alembic>=1.20.1",
+    "databricks-sdk>=0.166.0",
     "fastapi>=0.162.7",
     "psycopg[binary]>=3.3.9",
     "pydantic-settings>=2.16.3",

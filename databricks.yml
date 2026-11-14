@@ -1,0 +1,108 @@
+# Declarative Automation Bundle di Academy Hub (fase 8, ADR-0010).
+#
+#   python scripts/prepara_app.py                       # codice dell'App in build/app
+#   databricks bundle deploy -t prod     -p academy --var admin_email=$ACADEMY_ADMIN_EMAIL
+#   databricks bundle deploy -t collaudo -p academy --var admin_email=$ACADEMY_ADMIN_EMAIL
+#   databricks bundle run academy_hub -t collaudo -p academy   # avvia la nuova versione
+#
+# Workspace e credenziali non stanno qui (repository pubblico): arrivano dal profilo
+# della CLI (-p) o, in CI, dalle variabili DATABRICKS_HOST e affini (fase 10).
+# Il progetto Lakebase è uno solo (Free Edition): lo possiede il target prod, il cui branch
+# è quello di difetto (`production`); collaudo aggiunge il suo branch. La prima volta si
+# fa quindi il deploy di prod prima di quello di collaudo.
+
+bundle:
+  name: academy-hub
+
+workspace:
+  # Una sola copia per target, nella cartella di chi fa il deploy (in CI: il service principal).
+  root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
+
+sync:
+  # Solo il codice dell'App, non tutto il repository; build/ è ignorata da Git.
+  paths:
+    - build/app
+  include:
+    - build/app/**
+
+variables:
+  admin_email:
+    description: Email della persona admin_academy creata all'avvio. Mai nel repository.
+  progetto_lakebase:
+    default: academy-hub
+  branch_lakebase:
+    description: Branch Lakebase del target.
+  endpoint_lakebase:
+    description: Endpoint read-write del branch.
+    default: primary
+  ambiente:
+    description: ACADEMY_AMBIENTE dell'App.
+
+resources:
+  apps:
+    academy_hub:
+      name: academy-hub-${bundle.target}
+      description: Iscrizioni ai corsi dell'Academy (prototipo di studio, dati sintetici)
+      source_code_path: ./build/app
+      config:
+        command: ["python", "-m", "academy_hub.avvio"]
+        env:
+          - name: ACADEMY_AMBIENTE
+            value: ${var.ambiente}
+          - name: ACADEMY_IDENTITA
+            value: databricks
+          # Host, porta, database, utente e TLS arrivano dalle variabili PG* che la
+          # risorsa postgres inietta; la password è un token generato per connessione.
+          - name: ACADEMY_DATABASE_URL
+            value: "postgresql+psycopg://"
+          - name: ACADEMY_LAKEBASE_ENDPOINT
+            value: projects/${var.progetto_lakebase}/branches/${var.branch_lakebase}/endpoints/${var.endpoint_lakebase}
+          - name: ACADEMY_DATABASE_SCHEMA
+            value: academy
+          - name: ACADEMY_FRONTEND_DIR
+            value: frontend
+          - name: ACADEMY_ADMIN_EMAIL
+            value: ${var.admin_email}
+      resources:
+        - name: postgres
+          description: Database transazionale (Lakebase)
+          postgres:
+            branch: projects/${var.progetto_lakebase}/branches/${var.branch_lakebase}
+            database: projects/${var.progetto_lakebase}/branches/${var.branch_lakebase}/databases/databricks-postgres
+            permission: CAN_CONNECT_AND_CREATE
+
+targets:
+  collaudo:
+    default: true
+    mode: production
+    variables:
+      ambiente: collaudo
+      branch_lakebase: collaudo
+    resources:
+      postgres_branches:
+        collaudo:
+          parent: projects/${var.progetto_lakebase}
+          branch_id: collaudo
+          no_expiry: true
+      postgres_endpoints:
+        collaudo:
+          parent: ${resources.postgres_branches.collaudo.id}
+          endpoint_id: ${var.endpoint_lakebase}
+          endpoint_type: ENDPOINT_TYPE_READ_WRITE
+          autoscaling_limit_min_cu: 0.5
+          autoscaling_limit_max_cu: 1
+          suspend_timeout_duration: 300s
+
+  prod:
+    mode: production
+    variables:
+      ambiente: produzione
+      branch_lakebase: production
+    resources:
+      postgres_projects:
+        academy_hub:
+          project_id: ${var.progetto_lakebase}
+          display_name: Academy Hub
+          pg_version: 17
+          lifecycle:
+            prevent_destroy: true
