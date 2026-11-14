@@ -30,6 +30,8 @@ class Impostazioni(BaseSettings):
     # l'emittente nei token resta localhost: per questo le chiavi hanno un URL a parte.
     oidc_jwks_url: str | None = None
     oidc_pubblico: str = "academy-api"
+    # Client pubblico del frontend (PKCE): il browser lo legge da GET /api/v1/configurazione.
+    oidc_client_web: str = "academy-web"
     # R5: un'iscrizione Confermata si annulla solo se mancano più di N giorni all'inizio.
     scadenza_annullamento_giorni: int = Field(default=3, ge=0, le=365)
 

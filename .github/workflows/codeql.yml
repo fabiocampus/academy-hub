@@ -1,7 +1,7 @@
 name: CodeQL
 
-# Analisi statica del codice Python e dei workflow di GitHub Actions (issue #56).
-# I job "CodeQL (python)" e "CodeQL (actions)" sono status check obbligatori su main;
+# Analisi statica del codice Python, del frontend TypeScript e dei workflow di GitHub
+# Actions (issue #56, #59). I job "CodeQL (<linguaggio>)" sono status check obbligatori su main;
 # gli avvisi stanno in Security > Code scanning. Setup avanzato: quello predefinito
 # del repository deve restare spento, altrimenti i due caricamenti si scontrano.
 
@@ -29,7 +29,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        linguaggio: [python, actions]
+        linguaggio: [python, actions, javascript-typescript]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:

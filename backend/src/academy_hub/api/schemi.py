@@ -1,7 +1,7 @@
 """Schemi Pydantic di richieste e risposte: la forma pubblica del contratto OpenAPI."""
 
 from datetime import date, datetime
-from typing import Annotated, TypeVar
+from typing import Annotated, Literal, TypeVar
 
 from pydantic import (
     BaseModel,
@@ -12,6 +12,7 @@ from pydantic import (
     field_validator,
 )
 
+from academy_hub.dominio.ruoli import Ruolo
 from academy_hub.dominio.stati import StatoIscrizione
 
 T = TypeVar("T")
@@ -216,3 +217,28 @@ class PaginaRichieste(BaseModel):
     totale: int
     limite: int
     offset: int
+
+
+class Profilo(BaseModel):
+    """La persona collegata: il frontend sceglie che cosa mostrare, l'API decide comunque."""
+
+    persona_id: int
+    nome: str
+    email: str
+    team_id: int
+    ruoli: list[Ruolo] = Field(description="In ordine alfabetico")
+    responsabile_di_team: bool = Field(
+        description="È responsabile_id di almeno un team: decide le richieste di quel team (R2)"
+    )
+
+
+class ConfigurazioneOidc(BaseModel):
+    emittente: str = Field(description="Issuer OIDC, raggiungibile dal browser")
+    client_id: str = Field(description="Client pubblico del frontend (authorization code + PKCE)")
+
+
+class ConfigurazioneClient(BaseModel):
+    """Come si accede: con `oidc` il frontend fa il login; con `databricks` lo fa la piattaforma."""
+
+    identita: Literal["oidc", "databricks", "provvisoria"]
+    oidc: ConfigurazioneOidc | None

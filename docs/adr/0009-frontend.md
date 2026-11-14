@@ -1,0 +1,29 @@
+# ADR-0009 · Frontend: React con Mantine, client dal contratto, login OIDC nel browser
+
+- **Stato:** accettato
+- **Data:** 2026-11-14
+- **Completa:** ADR-0001 (stack), ADR-0008 (identità)
+
+## Contesto
+
+Fase 7 (issue #59): un frontend React con TypeScript e Vite per catalogo, iscrizioni, approvazioni e gestione delle edizioni. ADR-0001 fissa React, Vite, React Query e un client generato dal contratto OpenAPI; in produzione la build statica è servita dallo stesso processo FastAPI, una sola Databricks App. ADR-0008 dice che in locale il token viene da Keycloak e su Databricks l'identità la mette il proxy della piattaforma.
+
+Restavano da decidere la libreria dei componenti, il generatore del client, la libreria OIDC e come il frontend sa quale delle due modalità d'accesso usare.
+
+## Decisione
+
+1. **Componenti: Mantine.** Libreria completa (layout, tabelle, form, modali, notifiche) con attenzione all'accessibilità; evita di scrivere a mano componenti come la paginazione o i dialoghi. Lo stile resta quello di Mantine con un tema minimo (`src/tema.ts`).
+2. **Client: `openapi-typescript` + `openapi-fetch`.** Dal contratto `backend/contratto/openapi.json` si generano solo i tipi (`src/api/schema.d.ts`, `npm run api:genera`); `openapi-fetch` fa chiamate tipizzate su percorso, parametri e corpo. Gli hook di React Query sono scritti a mano in `src/api/query.ts`: poche righe leggibili, chiavi delle query in un solo posto. La CI rigenera i tipi e fallisce se differiscono da quelli nel repository: un cambio dell'API senza il client aggiornato non passa.
+3. **Errori.** Ogni risposta d'errore diventa `ErroreApi` con il problema RFC 9457 (ADR-0005); le schermate mostrano `title` e `detail`. React Query non riprova gli errori 4xx.
+4. **Login: `oidc-client-ts` con `react-oidc-context`.** Authorization code con PKCE S256 sul client pubblico `academy-web`, standard OIDC e non legato a Keycloak. Il token sta in `sessionStorage` (sparisce con la scheda) e si rinnova in silenzio; il client HTTP lo aggiunge come `Authorization: Bearer`.
+5. **Modalità d'accesso letta a runtime.** `GET /api/v1/configurazione`, pubblica, dice `identita` (`oidc`, `databricks`, `provvisoria`) e, per `oidc`, emittente e client id: dati già visibili nella pagina di login. La stessa build funziona in locale e su Databricks, dove non c'è un login nostro. Con `provvisoria` il frontend non entra: quell'identità serve solo ai test dell'API.
+6. **Chi sono.** `GET /api/v1/io` restituisce persona, team, ruoli e se è responsabile di un team. Il frontend lo usa solo per decidere che cosa mostrare: l'autorizzazione resta nei servizi del backend, e la matrice di autorizzazione verifica i 403.
+7. **Strumenti.** npm con versioni esatte (`save-exact`) e `package-lock.json`; `npm ci --ignore-scripts` in CI; `npm audit` blocca la PR come `pip-audit`. Vitest con Testing Library e MSW per i test dei componenti (nessuna rete vera: una richiesta senza handler fa fallire il test). TypeScript resta alla 5.x finché `openapi-typescript` lo richiede. ESLint 10 con `typescript-eslint` strict e le regole degli hook di React; `eslint-plugin-jsx-a11y` non supporta ESLint 10, quindi l'accessibilità si controlla con axe (PR C).
+8. **Sviluppo.** `npm run dev` su `http://localhost:5173`, con proxy di `/api` verso il backend di docker compose: niente CORS da configurare. Keycloak accetta già `5173` e `8000` come redirect.
+
+## Conseguenze
+
+- Il frontend non conosce i ruoli necessari alle azioni: li deduce dal profilo per nascondere i pulsanti, e un test (PR B) dimostra che l'API rifiuta comunque.
+- Un cambio dell'API richiede tre passi: `VERSIONE_API`, `python -m academy_hub.contratto`, `npm run api:genera`.
+- Il bundle iniziale è di circa 150 kB compressi (Mantine compresa); accettabile per un'app interna, si può dividere per pagina se serve.
+- Dependabot aggiorna npm con una settimana di attesa sulle versioni nuove; TypeScript ed ESLint maggiori si aggiornano a mano per i vincoli dei plugin.

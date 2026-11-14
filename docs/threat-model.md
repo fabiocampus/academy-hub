@@ -1,7 +1,7 @@
 # Threat model del flusso di approvazione
 
 - **Metodo:** STRIDE per elemento del flusso, sul sistema com'è alla fine della fase 6 (issue #56).
-- **Perimetro:** richiesta, approvazione o rifiuto, conferma, annullamento, job di sistema. Fuori perimetro: la parte analitica su Databricks (fase 8 e seguenti), il frontend (fase 7), Keycloak stesso.
+- **Perimetro:** richiesta, approvazione o rifiuto, conferma, annullamento, job di sistema. Fuori perimetro: la parte analitica su Databricks (fase 8 e seguenti), Keycloak stesso. Del frontend (fase 7) ci sono per ora solo le minacce sull'accesso.
 - **Da rivedere:** quando cambia il provider d'identità, quando arriva il frontend, prima del primo deploy su Databricks Apps.
 
 ## Il sistema
@@ -91,6 +91,8 @@ Stato: **mitigata** (una difesa la copre), **accettata** (rischio residuo consap
 | Elenco delle richieste altrui | US-07 | la query applica la stessa regola del decisore, verificata da un test | mitigata |
 | Dettagli interni negli errori | tutti | D10 | mitigata |
 | Segreti nel repository pubblico | — | D12 (gitleaks in pre-commit e in CI, push protection), solo dati sintetici | mitigata |
+| `GET /configurazione` è pubblica e rivela emittente OIDC e client id del frontend | accesso | solo dati già visibili nella pagina di login; il client è pubblico (PKCE, nessun segreto) | accettata (fase 7, ADR-0009) |
+| Access token rubato dal browser con uno script iniettato (XSS) | tutti | React fa l'escape del testo, nessun HTML grezzo; token in `sessionStorage`, non in `localStorage`; durata breve del token di Keycloak | mitigata in parte: una Content Security Policy arriva quando FastAPI serve la build (fase 7, PR C) |
 
 ### D · Denial of service
 

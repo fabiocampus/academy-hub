@@ -1,6 +1,8 @@
 """Accesso ai dati delle persone e dell'organigramma."""
 
-from sqlalchemy import CTE, ColumnElement, Integer, literal, select
+from dataclasses import dataclass
+
+from sqlalchemy import CTE, ColumnElement, Integer, exists, literal, select
 from sqlalchemy.orm import Session, aliased
 
 from academy_hub.db.modelli import Persona, Team
@@ -28,6 +30,35 @@ def _attore(sessione: Session, condizione: ColumnElement[bool]) -> Attore | None
     if riga is None:
         return None
     return Attore(riga.id, riga.team_id, frozenset(Ruolo(r) for r in riga.ruoli))
+
+
+@dataclass(frozen=True)
+class Profilo:
+    persona_id: int
+    nome: str
+    email: str
+    team_id: int
+    ruoli: frozenset[Ruolo]
+    responsabile_di_team: bool
+
+
+def profilo(sessione: Session, persona_id: int) -> Profilo:
+    responsabile = exists().where(Team.responsabile_id == Persona.id).label("responsabile")
+    riga = sessione.execute(
+        select(
+            Persona.id, Persona.nome, Persona.email, Persona.team_id, Persona.ruoli, responsabile
+        ).where(Persona.id == persona_id)
+    ).one_or_none()
+    if riga is None:
+        raise NonTrovato("Persona", persona_id)
+    return Profilo(
+        riga.id,
+        riga.nome,
+        riga.email,
+        riga.team_id,
+        frozenset(Ruolo(r) for r in riga.ruoli),
+        bool(riga.responsabile),
+    )
 
 
 def blocca_persona(sessione: Session, persona_id: int) -> None:
