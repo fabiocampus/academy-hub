@@ -48,6 +48,17 @@ class EdizioneCancellata(Conflitto):
         super().__init__(f"Edizione {edizione_id} cancellata")
 
 
+class EdizioneIniziata(Conflitto):
+    """Edizione già iniziata (calendario di Roma): niente richieste, approvazioni, conferme."""
+
+    tipo = "edizione-iniziata"
+    titolo = "Edizione già iniziata"
+
+    def __init__(self, edizione_id: int) -> None:
+        self.edizione_id = edizione_id
+        super().__init__(f"Edizione {edizione_id} già iniziata")
+
+
 class DatiNonValidi(ErroreDominio):
     """Dati incoerenti che si scoprono solo confrontandoli con quelli salvati."""
 

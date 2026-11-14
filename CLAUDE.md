@@ -4,7 +4,7 @@ Prototipo di studio: iscrizioni ai corsi di un'Academy aziendale (parte transazi
 
 ## Stato
 
-Fase 5 (API a livelli), in tre PR (issue #49). Fatta la prima: errori RFC 9457, ETag/If-Match, contratto OpenAPI versionato, corsi, edizioni e catalogo. Restano il flusso delle iscrizioni e i job (promozione, scadenza, cancellazione). L'identità è ancora provvisoria (header `X-Persona-Id`, solo in locale con `ACADEMY_IDENTITA_PROVVISORIA=true`) fino alla fase 6. Convenzioni in `docs/adr/0005-convenzioni-dell-api.md`.
+Fase 5 (API a livelli), in tre PR (issue #49). Fatte le prime due: errori RFC 9457, ETag/If-Match, contratto OpenAPI versionato, corsi, edizioni e catalogo; flusso delle iscrizioni (richiesta idempotente, approvazione del responsabile diretto, conferma, annullamento, audit). Restano i job e la promozione dalla lista d'attesa (US-09, US-17, US-18). L'identità è ancora provvisoria (header `X-Persona-Id`, solo in locale con `ACADEMY_IDENTITA_PROVVISORIA=true`) fino alla fase 6. Convenzioni in `docs/adr/0005-convenzioni-dell-api.md`.
 
 ## Ambiente locale
 

@@ -9,7 +9,9 @@ from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
 
 from academy_hub.db.modelli import Edizione, Iscrizione
+from academy_hub.dominio.attore import Attore
 from academy_hub.dominio.errori import EdizioneCancellata
+from academy_hub.dominio.ruoli import Ruolo
 from academy_hub.dominio.stati import StatoIscrizione, TransizioneNonConsentita
 from academy_hub.repository.iscrizioni import IscrizioneNonTrovata, eventi_audit
 from academy_hub.servizi.iscrizioni import conferma_posto
@@ -26,7 +28,7 @@ def prepara(
 ) -> tuple[int, list[int], int]:
     """Edizione con `approvate` iscrizioni Approvata; restituisce (edizione, iscrizioni, admin)."""
     with Session(db) as sessione:
-        admin = crea_persona(sessione, "Admin")
+        admin = crea_persona(sessione, "Admin", ruoli=(Ruolo.ADMIN_ACADEMY,))
         edizione = crea_edizione(sessione, capienza=capienza, posti_confermati=posti_confermati)
         iscrizioni = [
             crea_iscrizione(
@@ -38,9 +40,13 @@ def prepara(
         return edizione.id, iscrizioni, admin.id
 
 
-def conferma(db: Engine, iscrizione_id: int, autore_id: int) -> StatoIscrizione:
+def admin(persona_id: int) -> Attore:
+    return Attore(persona_id, team_id=0, ruoli=frozenset({Ruolo.ADMIN_ACADEMY}))
+
+
+def conferma(db: Engine, iscrizione_id: int, admin_id: int) -> StatoIscrizione:
     with Session(db) as sessione, sessione.begin():
-        return conferma_posto(sessione, iscrizione_id, autore_id)
+        return conferma_posto(sessione, admin(admin_id), iscrizione_id).stato
 
 
 def test_con_posti_liberi_diventa_confermata(db: Engine) -> None:
@@ -85,7 +91,7 @@ def test_r6_la_conferma_scrive_l_evento_di_audit(db: Engine) -> None:
 @pytest.mark.parametrize("stato", [s for s in S if s is not S.APPROVATA])
 def test_r7_conferma_solo_da_approvata(db: Engine, stato: StatoIscrizione) -> None:
     with Session(db) as sessione:
-        admin = crea_persona(sessione, "Admin")
+        admin = crea_persona(sessione, "Admin", ruoli=(Ruolo.ADMIN_ACADEMY,))
         edizione = crea_edizione(sessione, capienza=5, posti_confermati=1)
         iscrizione = crea_iscrizione(sessione, crea_persona(sessione, "Anna"), edizione, stato)
         sessione.commit()
@@ -140,7 +146,7 @@ def test_r3_conferme_simultanee_sull_ultimo_posto_ne_passa_una_sola(
             # distanzia i thread e la gara non avviene.
             sessione.connection()
             via.wait()
-            return conferma_posto(sessione, iscrizione_id, admin_id)
+            return conferma_posto(sessione, admin(admin_id), iscrizione_id).stato
 
     with ThreadPoolExecutor(max_workers=concorrenti) as esecutore:
         esiti = list(esecutore.map(al_via, iscrizioni))

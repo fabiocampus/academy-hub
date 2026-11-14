@@ -26,12 +26,14 @@ I test svuotano le tabelle con `SET LOCAL session_replication_role = replica`, c
 | `persone` | Nome, email, team, ruoli applicativi | email unica; `ruoli` non vuoto e solo fra i codici di `CONTEXT.md` |
 | `corsi` | Titolo, descrizione, durata in ore, `archiviato_il`, `versione` | durata > 0 |
 | `edizioni` | Date, capienza, docente, `posti_confermati`, `cancellata_il`, `versione` | capienza > 0; fine ≥ inizio; `posti_confermati` fra 0 e capienza (R3) |
-| `iscrizioni` | Persona, edizione, stato, momenti di richiesta e approvazione | stato fra quelli del glossario; `UNIQUE` parziale sulle attive (R1); data di approvazione obbligatoria dopo l'approvazione |
+| `iscrizioni` | Persona, edizione, stato, momenti di richiesta e approvazione, chiave di idempotenza | stato fra quelli del glossario; `UNIQUE` parziale sulle attive (R1); data di approvazione obbligatoria dopo l'approvazione; `UNIQUE` parziale su (persona, chiave di idempotenza) (ADR-0006) |
 | `eventi_audit` | Chi, quando, stato di partenza e di arrivo, motivo | solo aggiunta: i trigger rifiutano `UPDATE`, `DELETE` e `TRUNCATE` (R6); `autore_id` nullo = sistema |
 
 Le edizioni non si cancellano: `cancellata_il` le ritira dal catalogo (D10). I corsi archiviati (`archiviato_il`) escono dal catalogo con le loro edizioni, che restano per i report (US-01). `versione` è il contatore della concorrenza ottimistica: lo incrementa SQLAlchemy a ogni modifica (`version_id_col`) e l'API lo espone come `ETag` (ADR-0005). Gli stati sono testo con un `CHECK`, non un tipo `ENUM` di PostgreSQL: aggiungere uno stato è una migrazione che cambia un vincolo, senza `ALTER TYPE`.
 
-La concorrenza sull'ultimo posto è descritta in [ADR-0004](adr/0004-concorrenza-sull-ultimo-posto.md).
+La concorrenza sull'ultimo posto è descritta in [ADR-0004](adr/0004-concorrenza-sull-ultimo-posto.md), quella delle richieste ripetute in [ADR-0006](adr/0006-idempotenza-della-richiesta.md).
+
+Il responsabile diretto si ricava risalendo `team.team_padre_id` con una CTE ricorsiva (`repository/persone.py:antenati`), limitata a 50 livelli come difesa da una gerarchia ciclica.
 
 ## Indici e piani di esecuzione
 
@@ -44,6 +46,7 @@ Indici sulle ricerche frequenti previste dal backlog:
 | Primo in lista d'attesa (US-09, R4) | `ix_iscrizioni_lista_attesa` su (`edizione_id`, `approvata_il`, `id`) `WHERE stato = 'InAttesa'`; `id` fa da spareggio a parità di momento di approvazione |
 | Iscrizioni di un'edizione per stato | `ix_iscrizioni_edizione_stato` |
 | Audit di un'iscrizione (US-11) | `ix_eventi_audit_iscrizione` su (`iscrizione_id`, `avvenuto_il`) |
+| Ripetizione di una richiesta (US-04) | `uq_iscrizioni_chiave_idempotenza` su (`persona_id`, `chiave_idempotenza`) `WHERE chiave_idempotenza IS NOT NULL` |
 
 `backend/sql/analisi_indici.sql` riempie il database locale con dati sintetici (5 000 persone, 1 000 edizioni, 50 000 iscrizioni, circa 93 000 eventi di audit) ed esegue `EXPLAIN ANALYZE` sulle ricerche. Risultati del 2026-11-14:
 

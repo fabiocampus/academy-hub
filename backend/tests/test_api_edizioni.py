@@ -8,6 +8,7 @@ from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
 from academy_hub.db.modelli import Edizione
+from academy_hub.dominio.attore import Attore
 from academy_hub.dominio.ruoli import Ruolo
 from academy_hub.dominio.stati import StatoIscrizione
 from academy_hub.dominio.tempo import oggi
@@ -202,7 +203,8 @@ def test_una_conferma_cambia_l_etag_dell_edizione_412(client: TestClient, db: En
         iscrizione = crea_iscrizione(
             sessione, anna, sessione.get_one(Edizione, edizione_id), StatoIscrizione.APPROVATA
         )
-        conferma_posto(sessione, iscrizione.id, anna.id)
+        attore = Attore(anna.id, anna.team_id, frozenset({Ruolo.ADMIN_ACADEMY}))
+        conferma_posto(sessione, attore, iscrizione.id)
 
     risposta = client.patch(
         f"/api/v1/edizioni/{edizione_id}",

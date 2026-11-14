@@ -12,10 +12,12 @@ Termini usati in codice, test, issue e documentazione. Nel codice i nomi restano
 | **Capienza** | Numero massimo di iscrizioni `Confermata` per un'edizione. | Numero di richieste |
 | **Persona** | Un dipendente con nome, email e team. Ha un ruolo applicativo. | Utente di Keycloak o di Databricks (l'identità tecnica) |
 | **Team** | Gruppo di persone con un solo responsabile. I team formano una gerarchia: ogni team, tranne quello al vertice, ha un team padre. | — |
-| **Responsabile diretto** | Per un dipendente: il responsabile del suo team. Per un responsabile: il responsabile del team padre; al vertice, l'amministratore Academy. Conta quello in carica al momento della decisione. | Amministratore Academy |
+| **Responsabile diretto** | Per un dipendente: il responsabile del suo team. Per un responsabile: il responsabile del team padre; al vertice, l'amministratore Academy. Conta quello in carica al momento della decisione. In generale: il primo della catena dei responsabili diverso dal richiedente. | Amministratore Academy |
+| **Catena dei responsabili** | I responsabili dal team di una persona fino al vertice dell'organigramma; un team senza responsabile si salta. Da qui si ricava il responsabile diretto (`dominio/organigramma.py`). | — |
 | **Iscrizione** | La richiesta di una persona di partecipare a un'edizione, con il suo stato. | Presenza |
 | **Iscrizione attiva** | Un'iscrizione in stato `Richiesta`, `Approvata`, `InAttesa` o `Confermata`. Al massimo una per persona ed edizione (R1). | — |
 | **Lista d'attesa** | Le iscrizioni `InAttesa` di un'edizione, ordinate per momento di approvazione. | — |
+| **Chiave di idempotenza** | Valore scelto dal client (header `Idempotency-Key`) che rende ripetibile la richiesta d'iscrizione: con la stessa chiave si riceve la stessa iscrizione invece di crearne un'altra (ADR-0006). Vale per persona. | Iscrizione duplicata (R1) |
 | **Scadenza di annullamento** | Il numero N di giorni di calendario prima dell'inizio dell'edizione (fuso `Europe/Rome`) oltre il quale un'iscrizione `Confermata` non è più annullabile (R5). Configurabile per ambiente. | — |
 | **Edizione cancellata** | Edizione ritirata dall'Academy prima dell'inizio. Resta nel database (cancellazione logica); le sue iscrizioni attive diventano `Annullata`. | Edizione conclusa |
 | **Presenza** | Riga importata da file: una persona ha frequentato una giornata di un'edizione. | Iscrizione |
@@ -49,8 +51,8 @@ stateDiagram-v2
 | Da | A | Chi | Condizione |
 |---|---|---|---|
 | — | `Richiesta` | dipendente | edizione non iniziata né cancellata; nessuna iscrizione attiva alla stessa edizione (R1) |
-| `Richiesta` | `Approvata` / `Rifiutata` | responsabile diretto | non sulle proprie richieste (R2); motivo obbligatorio per il rifiuto |
-| `Approvata` | `Confermata` / `InAttesa` | admin Academy | `Confermata` se ci sono posti (R3), altrimenti `InAttesa` |
+| `Richiesta` | `Approvata` / `Rifiutata` | responsabile diretto | non sulle proprie richieste (R2); `Approvata` solo con l'edizione non iniziata né cancellata; `Rifiutata` sempre, con motivo obbligatorio |
+| `Approvata` | `Confermata` / `InAttesa` | admin Academy | edizione non iniziata né cancellata; `Confermata` se ci sono posti (R3), altrimenti `InAttesa` |
 | `InAttesa` | `Confermata` | sistema | primo in ordine di approvazione (R4); solo prima dell'inizio |
 | `Richiesta`, `Approvata`, `InAttesa` | `Annullata` | titolare; sistema all'inizio dell'edizione; admin se cancella l'edizione | — |
 | `Confermata` | `Annullata` | titolare; admin se cancella l'edizione | il titolare solo fino a N giorni prima dell'inizio (R5) |
