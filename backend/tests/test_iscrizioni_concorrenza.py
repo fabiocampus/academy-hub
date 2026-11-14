@@ -87,18 +87,19 @@ def test_r1_richieste_simultanee_senza_chiave_una_sola_passa(db: Engine) -> None
     assert conta(db) == 1
 
 
-def test_us06_approvazioni_simultanee_una_sola_passa(db: Engine) -> None:
+@pytest.mark.parametrize("seconda", ["approva", "rifiuta"])
+def test_us06_decisioni_simultanee_una_sola_passa(db: Engine, seconda: str) -> None:
     org = organigramma(db)
     rossa = attore(db, org.ids["Rossa"])
     iscrizione_id = iscrizione(db, org.ids["Anna"], edizione(db), StatoIscrizione.RICHIESTA)
 
-    esiti = insieme(
-        db,
-        [
-            lambda s: iscrizioni.approva(s, rossa, iscrizione_id).stato,
-            lambda s: iscrizioni.rifiuta(s, rossa, iscrizione_id, "Budget").stato,
-        ],
-    )
+    def approva(s: Session) -> StatoIscrizione:
+        return iscrizioni.approva(s, rossa, iscrizione_id).stato
+
+    def rifiuta(s: Session) -> StatoIscrizione:
+        return iscrizioni.rifiuta(s, rossa, iscrizione_id, "Budget").stato
+
+    esiti = insieme(db, [approva, approva if seconda == "approva" else rifiuta])
 
     assert sum(isinstance(e, StatoIscrizione) for e in esiti) == 1, esiti
     assert sum(isinstance(e, TransizioneNonConsentita) for e in esiti) == 1, esiti

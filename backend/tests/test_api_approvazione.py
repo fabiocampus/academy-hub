@@ -2,7 +2,7 @@
 attraverso l'API. Organigramma in `tests/api.py`."""
 
 from collections.abc import Callable
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 import httpx2 as httpx
 import pytest
@@ -63,6 +63,9 @@ def test_il_responsabile_approva_con_audit(
     approvata = risposta.json()
     assert approvata["stato"] == "Approvata"
     assert approvata["approvata_il"] is not None
+    # La risposta riporta già l'istante del cambio, lo stesso che si rilegge dopo.
+    letta = client.get(f"{URL}/{iscrizione_id}", headers=org("Anna")).json()
+    assert approvata["aggiornata_il"] == letta["aggiornata_il"] == approvata["approvata_il"]
     [evento] = client.get(f"{URL}/{iscrizione_id}", headers=org("Anna")).json()["storia"]
     assert (evento["stato_da"], evento["stato_a"], evento["autore_id"]) == (
         "Richiesta",
@@ -183,6 +186,20 @@ def test_a_edizione_iniziata_non_si_approva_ma_si_rifiuta(
     assert risposta.status_code == 409
     assert tipo(risposta) == "/problemi/edizione-iniziata"
     assert rifiuta(client, org("Rossa"), seconda).status_code == 200
+
+
+def test_a_edizione_cancellata_non_si_approva(
+    client: TestClient, db: Engine, org: Organigramma
+) -> None:
+    edizione_id = edizione(db)
+    iscrizione_id = richiesta(db, org, "Anna", edizione_id)
+    with Session(db) as sessione, sessione.begin():
+        sessione.get_one(Edizione, edizione_id).cancellata_il = datetime.now(UTC)
+
+    risposta = approva(client, org("Rossa"), iscrizione_id)
+
+    assert risposta.status_code == 409
+    assert tipo(risposta) == "/problemi/edizione-cancellata"
 
 
 def test_iscrizione_inesistente_404(client: TestClient, org: Organigramma) -> None:

@@ -51,8 +51,8 @@ stateDiagram-v2
 | Da | A | Chi | Condizione |
 |---|---|---|---|
 | — | `Richiesta` | dipendente | edizione non iniziata né cancellata; nessuna iscrizione attiva alla stessa edizione (R1) |
-| `Richiesta` | `Approvata` / `Rifiutata` | responsabile diretto | non sulle proprie richieste (R2); motivo obbligatorio per il rifiuto |
-| `Approvata` | `Confermata` / `InAttesa` | admin Academy | `Confermata` se ci sono posti (R3), altrimenti `InAttesa` |
+| `Richiesta` | `Approvata` / `Rifiutata` | responsabile diretto | non sulle proprie richieste (R2); `Approvata` solo con l'edizione non iniziata né cancellata; `Rifiutata` sempre, con motivo obbligatorio |
+| `Approvata` | `Confermata` / `InAttesa` | admin Academy | edizione non iniziata né cancellata; `Confermata` se ci sono posti (R3), altrimenti `InAttesa` |
 | `InAttesa` | `Confermata` | sistema | primo in ordine di approvazione (R4); solo prima dell'inizio |
 | `Richiesta`, `Approvata`, `InAttesa` | `Annullata` | titolare; sistema all'inizio dell'edizione; admin se cancella l'edizione | — |
 | `Confermata` | `Annullata` | titolare; admin se cancella l'edizione | il titolare solo fino a N giorni prima dell'inizio (R5) |

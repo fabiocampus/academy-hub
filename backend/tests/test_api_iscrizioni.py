@@ -97,6 +97,33 @@ def test_stessa_chiave_di_idempotenza_stessa_risposta(client: TestClient, db: En
     assert conta_iscrizioni(db) == 1
 
 
+def test_la_ripetizione_mostra_lo_stato_attuale(client: TestClient, db: Engine) -> None:
+    org = organigramma(db)
+    edizione_id = edizione(db)
+    prima = richiedi(client, org("Anna"), edizione_id, "chiave-1").json()
+    client.post(f"{URL}/{prima['id']}/approvazione", headers=org("Rossa"))
+
+    ripetuta = richiedi(client, org("Anna"), edizione_id, "chiave-1")
+
+    assert ripetuta.status_code == 201
+    assert (ripetuta.json()["id"], ripetuta.json()["stato"]) == (prima["id"], "Approvata")
+
+
+def test_la_ripetizione_vale_anche_a_edizione_iniziata(client: TestClient, db: Engine) -> None:
+    """La chiave si controlla prima delle regole: la richiesta era riuscita, va restituita."""
+    anna = persona(db, "Anna")
+    edizione_id = edizione(db)
+    prima = richiedi(client, anna, edizione_id, "chiave-1").json()
+    with Session(db) as sessione, sessione.begin():
+        sessione.get_one(Edizione, edizione_id).data_inizio = oggi()
+
+    ripetuta = richiedi(client, anna, edizione_id, "chiave-1")
+
+    assert ripetuta.status_code == 201
+    assert ripetuta.json()["id"] == prima["id"]
+    assert conta_iscrizioni(db) == 1
+
+
 def test_la_chiave_vale_per_persona(client: TestClient, db: Engine) -> None:
     edizione_id = edizione(db)
 
@@ -241,7 +268,26 @@ def test_la_storia_la_vedono_il_titolare_e_l_amministratore(client: TestClient, 
 
 
 def test_iscrizione_inesistente_404(client: TestClient, db: Engine) -> None:
-    assert client.get(f"{URL}/999", headers=persona(db, "Anna")).status_code == 404
+    anna = persona(db, "Anna")
+
+    assert client.get(f"{URL}/999", headers=anna).status_code == 404
+    assert client.post(f"{URL}/999/annullamento", headers=anna).status_code == 404
+
+
+@pytest.mark.parametrize(
+    ("metodo", "percorso"),
+    [
+        ("GET", URL),
+        ("GET", f"{URL}/1"),
+        ("POST", f"{URL}/1/approvazione"),
+        ("POST", f"{URL}/1/rifiuto"),
+        ("POST", f"{URL}/1/conferma"),
+        ("POST", f"{URL}/1/annullamento"),
+        ("GET", "/api/v1/richieste-da-approvare"),
+    ],
+)
+def test_ogni_rotta_senza_identita_401(client: TestClient, metodo: str, percorso: str) -> None:
+    assert client.request(metodo, percorso, json={"motivo": "x"}).status_code == 401
 
 
 # --- US-10 · Annullare la propria iscrizione ---------------------------------------

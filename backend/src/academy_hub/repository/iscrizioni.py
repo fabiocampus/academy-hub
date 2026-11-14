@@ -1,6 +1,7 @@
 """Accesso ai dati di iscrizioni, edizioni ed eventi di audit. Unico posto con le query."""
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import cast
 
 from sqlalchemy import case, func, select, tuple_
@@ -100,6 +101,11 @@ def ha_iscrizione_attiva(sessione: Session, persona_id: int, edizione_id: int) -
         )
         is not None
     )
+
+
+def adesso(sessione: Session) -> datetime:
+    """Istante della transazione secondo il database: un solo orologio per tutte le repliche."""
+    return sessione.execute(select(func.now())).scalar_one()
 
 
 def aggiungi(sessione: Session, nuova: Iscrizione) -> None:

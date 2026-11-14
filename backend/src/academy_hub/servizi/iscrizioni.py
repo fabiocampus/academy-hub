@@ -4,8 +4,6 @@ il chiamante.
 Lock, sempre in quest'ordine (ADR-0004, ADR-0006): edizione, poi persona o iscrizione.
 """
 
-from datetime import UTC, datetime
-
 from sqlalchemy.orm import Session
 
 from academy_hub.db.modelli import Edizione, EventoAudit, Iscrizione
@@ -68,15 +66,19 @@ def _cambia_stato(
     """Unico punto in cui un'iscrizione cambia stato: R7, poi i dati derivati, poi l'audit (R6).
 
     Chi entra in `Confermata` o ne esce deve passare l'edizione già bloccata: qui si
-    aggiorna `posti_confermati` (ADR-0004).
+    aggiorna `posti_confermati` (ADR-0004). Le date vengono dall'orologio del database,
+    lo stesso di `richiesta_il` e dell'audit: `approvata_il` ordina la lista d'attesa (R4)
+    e la risposta del comando riporta già l'istante del cambio.
     """
     verifica_transizione(iscrizione.stato, nuovo)
     if S.CONFERMATA in (iscrizione.stato, nuovo):
         if edizione is None or edizione.id != iscrizione.edizione_id:
             raise ValueError("Per entrare in Confermata o uscirne serve l'edizione bloccata")
         edizione.posti_confermati += 1 if nuovo is S.CONFERMATA else -1
+    istante = repository.adesso(sessione)
+    iscrizione.aggiornata_il = istante
     if nuovo is S.APPROVATA:
-        iscrizione.approvata_il = datetime.now(UTC)
+        iscrizione.approvata_il = istante
     repository.registra_evento(sessione, iscrizione.id, iscrizione.stato, nuovo, autore_id, motivo)
     iscrizione.stato = nuovo
 
@@ -221,10 +223,12 @@ def annulla(
     `Confermata` solo se mancano più di `scadenza_giorni` giorni di calendario all'inizio
     (R5, D11): il valore arriva dalla configurazione dell'ambiente.
     """
+    # Titolare verificato prima dei lock: chi non può annullare non mette in fila le
+    # conferme dell'edizione. La persona di un'iscrizione non cambia mai.
+    if repository.iscrizione(sessione, iscrizione_id).persona_id != attore.persona_id:
+        raise AzioneNonConsentita("Puoi annullare solo le tue iscrizioni")
     edizione = repository.blocca_edizione(sessione, repository.edizione_di(sessione, iscrizione_id))
     iscrizione = repository.blocca_iscrizione(sessione, iscrizione_id)
-    if iscrizione.persona_id != attore.persona_id:
-        raise AzioneNonConsentita("Puoi annullare solo le tue iscrizioni")
     verifica_transizione(iscrizione.stato, S.ANNULLATA)
     if iscrizione.stato is S.CONFERMATA:
         mancano = (edizione.data_inizio - oggi()).days
