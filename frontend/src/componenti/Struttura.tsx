@@ -4,6 +4,7 @@ import { useDisclosure } from "@mantine/hooks";
 import { NavLink as Collegamento, Outlet } from "react-router";
 
 import { useSessione } from "../accesso/contesto";
+import type { Schemi } from "../api/client";
 import { useProfilo } from "../api/query";
 import { Caricamento, Errore } from "./Stati";
 
@@ -13,12 +14,20 @@ export interface VoceMenu {
 }
 
 /**
- * Le voci che il profilo può usare (le schermate per ruolo arrivano con la PR B). È
- * solo comodità: l'API rifiuta comunque con 403 le azioni non permesse (matrice in
+ * Le voci che il profilo può usare. È solo comodità: le pagine restano raggiungibili
+ * dall'indirizzo e l'API rifiuta comunque con 403 le azioni non permesse (matrice in
  * backend/tests/test_autorizzazione.py).
  */
-export function vociMenu(): VoceMenu[] {
-  return [{ percorso: "/", etichetta: "Catalogo" }];
+export function vociMenu(profilo: Schemi["Profilo"]): VoceMenu[] {
+  const voci: VoceMenu[] = [{ percorso: "/", etichetta: "Catalogo" }];
+  if (profilo.ruoli.includes("dipendente")) {
+    voci.push({ percorso: "/iscrizioni", etichetta: "Le mie iscrizioni" });
+  }
+  // Decide il responsabile diretto; per chi non ne ha uno sopra, l'admin Academy (US-07).
+  if (profilo.responsabile_di_team || profilo.ruoli.includes("admin_academy")) {
+    voci.push({ percorso: "/approvazioni", etichetta: "Approvazioni" });
+  }
+  return voci;
 }
 
 export function Struttura() {
@@ -63,11 +72,12 @@ export function Struttura() {
       </AppShell.Header>
       <AppShell.Navbar p="xs" aria-label="Menu principale">
         {profilo.data !== undefined &&
-          vociMenu().map((voce) => (
+          vociMenu(profilo.data).map((voce) => (
             <NavLink
               key={voce.percorso}
               component={Collegamento}
               to={voce.percorso}
+              end
               label={voce.etichetta}
               onClick={close}
             />

@@ -1,12 +1,19 @@
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { http } from "msw";
+import { http, HttpResponse } from "msw";
 import { Route, Routes } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
-import { API, problema, server } from "../test/server";
+import {
+  API,
+  problema,
+  profiloAdmin,
+  profiloDipendente,
+  profiloResponsabile,
+  server,
+} from "../test/server";
 import { mostra } from "../test/render";
-import { Struttura } from "./Struttura";
+import { Struttura, vociMenu } from "./Struttura";
 
 function conPagina() {
   return (
@@ -58,5 +65,40 @@ describe("Struttura", () => {
 
     expect(await screen.findByText("Persona non registrata")).toBeInTheDocument();
     expect(screen.queryByText("Contenuto")).not.toBeInTheDocument();
+  });
+
+  it("mostra le voci del menu in base al profilo", async () => {
+    server.use(http.get(`${API}/io`, () => HttpResponse.json(profiloResponsabile)));
+    mostra(conPagina());
+
+    expect(await screen.findByRole("link", { name: "Le mie iscrizioni" })).toHaveAttribute(
+      "href",
+      "/iscrizioni",
+    );
+    expect(screen.getByRole("link", { name: "Approvazioni" })).toHaveAttribute(
+      "href",
+      "/approvazioni",
+    );
+  });
+});
+
+describe("vociMenu", () => {
+  const etichette = (profilo: typeof profiloDipendente) =>
+    vociMenu(profilo).map((voce) => voce.etichetta);
+
+  it("al dipendente: catalogo e le sue iscrizioni, non le approvazioni", () => {
+    expect(etichette(profiloDipendente)).toEqual(["Catalogo", "Le mie iscrizioni"]);
+  });
+
+  it("al responsabile di un team anche le approvazioni", () => {
+    expect(etichette(profiloResponsabile)).toEqual([
+      "Catalogo",
+      "Le mie iscrizioni",
+      "Approvazioni",
+    ]);
+  });
+
+  it("all'admin Academy le approvazioni (decide dal vertice), non le iscrizioni", () => {
+    expect(etichette(profiloAdmin)).toEqual(["Catalogo", "Approvazioni"]);
   });
 });

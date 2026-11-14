@@ -1,7 +1,9 @@
 import "@mantine/core/styles.css";
+import "@mantine/notifications/styles.css";
 import "./stile.css";
 
 import { Alert, Center, MantineProvider } from "@mantine/core";
+import { Notifications } from "@mantine/notifications";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StrictMode, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
@@ -29,7 +31,10 @@ const radice = createRoot(elemento);
 function mostra(contenuto: ReactNode): void {
   radice.render(
     <StrictMode>
-      <MantineProvider theme={tema}>{contenuto}</MantineProvider>
+      <MantineProvider theme={tema}>
+        <Notifications />
+        {contenuto}
+      </MantineProvider>
     </StrictMode>,
   );
 }

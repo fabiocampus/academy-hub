@@ -1,5 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 
+import { notifications } from "@mantine/notifications";
 import { cleanup } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll } from "vitest";
 
@@ -26,6 +27,10 @@ class ResizeObserverFinto {
 }
 window.ResizeObserver = ResizeObserverFinto;
 window.HTMLElement.prototype.scrollIntoView = () => undefined;
+// Il Textarea con autosize ascolta il caricamento dei font.
+Object.defineProperty(document, "fonts", {
+  value: { addEventListener: () => undefined, removeEventListener: () => undefined },
+});
 
 // Ogni richiesta senza handler fa fallire il test: niente rete vera.
 beforeAll(() => {
@@ -33,6 +38,7 @@ beforeAll(() => {
 });
 afterEach(() => {
   cleanup();
+  notifications.clean();
   server.resetHandlers();
   window.sessionStorage.clear();
 });
