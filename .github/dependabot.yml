@@ -66,6 +66,13 @@ updates:
     commit-message:
       prefix: "build(deps)"
 
+  - package-ecosystem: terraform
+    directories: ["/infra/*"]
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "build(deps)"
+
   - package-ecosystem: github-actions
     directory: /
     schedule:

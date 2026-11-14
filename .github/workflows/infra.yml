@@ -1,0 +1,138 @@
+name: Infrastruttura
+
+# ADR-0012: plan nella PR, apply su main solo dopo l'approvazione nell'environment `infra`,
+# plan settimanale per la deriva. Mai pull_request_target: le PR da fork non vedono i secret.
+on:
+  pull_request:
+    paths:
+      - "infra/**"
+      - ".github/workflows/infra.yml"
+  push:
+    branches: [main]
+    paths:
+      - "infra/**"
+      - ".github/workflows/infra.yml"
+  schedule:
+    - cron: "17 6 * * 1"  # lunedì: deriva
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Una sola esecuzione alla volta per configurazione: HCP Free fa una run per volta
+# e il lock dello stato non va conteso; nessuna esecuzione va interrotta a metà.
+concurrency:
+  group: infra-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    environment: infra-plan
+    permissions:
+      contents: read
+      pull-requests: write
+    strategy:
+      fail-fast: false
+      matrix:
+        cartella: [github]
+    defaults:
+      run:
+        working-directory: infra/${{ matrix.cartella }}
+    env:
+      TF_IN_AUTOMATION: "1"
+      TF_INPUT: "0"
+      # Token GitHub di sola lettura: il plan legge, non cambia niente.
+      GITHUB_TOKEN: ${{ secrets.GH_TERRAFORM_LETTURA }}
+      HAS_TF_TOKEN: ${{ secrets.TF_API_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e  # v4.0.1
+        with:
+          terraform_version: 1.17.1
+          terraform_wrapper: false
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+      - run: terraform fmt -check -recursive -diff
+      - name: Senza credenziali (PR di Dependabot o da fork) solo la sintassi
+        if: env.HAS_TF_TOKEN != 'true'
+        run: terraform init -backend=false && terraform validate
+      - if: env.HAS_TF_TOKEN == 'true'
+        run: terraform init
+      - if: env.HAS_TF_TOKEN == 'true'
+        run: terraform validate
+      - name: Plan
+        id: plan
+        if: env.HAS_TF_TOKEN == 'true'
+        # -detailed-exitcode: 0 nessuna modifica, 2 modifiche, 1 errore.
+        run: |
+          set +e
+          terraform plan -no-color -lock-timeout=5m -detailed-exitcode > plan.txt 2>&1
+          codice=$?
+          set -e
+          cat plan.txt
+          echo "codice=$codice" >> "$GITHUB_OUTPUT"
+          if [ "$codice" = 1 ]; then exit 1; fi
+      - name: Plan nel commento della PR
+        if: github.event_name == 'pull_request' && steps.plan.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9.0.0
+        env:
+          CARTELLA: ${{ matrix.cartella }}
+          CODICE: ${{ steps.plan.outputs.codice }}
+        with:
+          script: |
+            const fs = require('fs');
+            const cartella = process.env.CARTELLA;
+            const marca = `<!-- terraform-plan:${cartella} -->`;
+            let plan = fs.readFileSync(`infra/${cartella}/plan.txt`, 'utf8');
+            // Un commento ha al massimo 65536 caratteri: il plan completo resta nel log del job.
+            const massimo = 60000;
+            if (plan.length > massimo) {
+              plan = plan.slice(-massimo) + '\n\n(troncato: il plan completo è nel log del job)';
+            }
+            const esito = process.env.CODICE === '0' ? 'nessuna modifica' : 'modifiche da applicare';
+            const corpo = `${marca}\n### Terraform plan · \`infra/${cartella}\` · ${esito}\n\n` +
+              '```\n' + plan + '\n```\n' +
+              `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const commenti = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
+            const vecchio = commenti.find(c => c.user.type === 'Bot' && c.body.startsWith(marca));
+            if (vecchio) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: vecchio.id, body: corpo });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body: corpo });
+            }
+      - name: Deriva
+        if: github.event_name == 'schedule' && steps.plan.outputs.codice == '2'
+        run: |
+          echo "::error::Deriva in infra/${{ matrix.cartella }}: la piattaforma non corrisponde al codice"
+          exit 1
+
+  apply:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    # Il job aspetta l'approvazione: prima di approvare si guarda il plan nella PR.
+    environment: infra
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        cartella: [github]
+    defaults:
+      run:
+        working-directory: infra/${{ matrix.cartella }}
+    env:
+      TF_IN_AUTOMATION: "1"
+      TF_INPUT: "0"
+      GITHUB_TOKEN: ${{ secrets.GH_TERRAFORM_SCRITTURA }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e  # v4.0.1
+        with:
+          terraform_version: 1.17.1
+          terraform_wrapper: false
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+      - run: terraform init
+      - run: terraform plan -no-color -lock-timeout=5m -out=piano.tfplan
+      - run: terraform apply -no-color -lock-timeout=5m piano.tfplan

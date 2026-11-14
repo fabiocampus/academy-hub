@@ -47,6 +47,7 @@ Asset da proteggere: l'esito delle richieste (chi va al corso), i posti delle ed
 | D13 | Container non root, porte di compose solo su `127.0.0.1` | `backend/Dockerfile`, `docker-compose.yml` |
 | D15 | Report letti con il token dell'utente (on-behalf-of-user, scope `sql`): decide Unity Catalog; il service principal dell'App non ha grant su Unity Catalog; catalogo e schema come parametri, query fissa; token mai nei log; `Cache-Control: no-store` | `academy_hub/report.py`, `databricks.yml`, ADR-0011 |
 | D14 | HTML dell'app con `Content-Security-Policy` (script solo dalla stessa origine, nessun `object`, `base-uri` e `form-action` limitati, `frame-ancestors 'none'`, rete solo verso l'app e l'emittente OIDC), `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`; file serviti solo da dentro la build, `/api` mai coperto dal fallback | `academy_hub/frontend.py`, ADR-0009 §14 |
+| D16 | Infrastruttura nel codice: ruleset, environment e permessi cambiano solo con una PR e un apply approvato nell'environment `infra` (solo da `main`); token GitHub di sola lettura per il plan, quello che scrive solo nell'environment approvato; stato su HCP (cifrato, con lock), mai nel repository; deriva cercata ogni settimana | `infra/`, `.github/workflows/infra.yml`, ADR-0012 |
 
 ## Minacce
 
@@ -121,6 +122,7 @@ Stato: **mitigata** (una difesa la copre), **accettata** (rischio residuo consap
 | `admin_academy` che decide al posto del responsabile | approvazione | D4: decide solo il responsabile diretto; l'admin solo per le richieste dal vertice | mitigata |
 | Dipendenza vulnerabile (Python, immagine, azioni) | — | D12 | mitigata per le vulnerabilità note |
 | Codice vulnerabile o workflow iniettabile | — | D12 (CodeQL `security-extended`, permessi minimi nei workflow) | mitigata in parte |
+| Ruleset o environment allentati a mano dalla UI, o con un workflow modificato in una PR che legge i secret dell'infrastruttura | — | D16; il plan delle PR ha solo credenziali di lettura, le PR da fork non hanno secret; un ramo non protetto non entra nell'environment `infra` | mitigata; il proprietario resta amministratore e può cambiare tutto dalla UI (lo rileva il plan del lunedì) |
 
 ## Rischi accettati e limiti del piano gratuito
 
