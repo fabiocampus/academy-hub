@@ -40,7 +40,8 @@ export function Struttura() {
               onClick={toggle}
               hiddenFrom="sm"
               size="sm"
-              aria-label="Apri il menu"
+              aria-label={aperto ? "Chiudi il menu" : "Apri il menu"}
+              aria-expanded={aperto}
             />
             <Text fw={700} size="lg">
               Academy Hub

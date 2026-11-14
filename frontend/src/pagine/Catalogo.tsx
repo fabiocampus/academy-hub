@@ -20,6 +20,20 @@ const COLORE_STATO: Record<Schemi["StatoIscrizione"], string> = {
   Completata: "gray",
 };
 
+const ETICHETTA_STATO: Record<Schemi["StatoIscrizione"], string> = {
+  Richiesta: "Richiesta",
+  Approvata: "Approvata",
+  InAttesa: "In attesa",
+  Confermata: "Confermata",
+  Rifiutata: "Rifiutata",
+  Annullata: "Annullata",
+  Completata: "Completata",
+};
+
+function postiLiberi(n: number): string {
+  return n === 1 ? "1 libero" : `${n} liberi`;
+}
+
 export function Catalogo() {
   const [titolo, setTitolo] = useState("");
   const [cercato] = useDebouncedValue(titolo.trim(), 300);
@@ -80,7 +94,7 @@ export function Catalogo() {
                       {formattaData(voce.data_inizio)} – {formattaData(voce.data_fine)}
                     </Table.Td>
                     <Table.Td>
-                      {voce.capienza - voce.posti_confermati} liberi su {voce.capienza}
+                      {postiLiberi(voce.capienza - voce.posti_confermati)} su {voce.capienza}
                     </Table.Td>
                     <Table.Td>{voce.lista_attesa}</Table.Td>
                     <Table.Td>
@@ -88,7 +102,7 @@ export function Catalogo() {
                         "—"
                       ) : (
                         <Badge color={COLORE_STATO[voce.mia_iscrizione.stato]} variant="light">
-                          {voce.mia_iscrizione.stato}
+                          {ETICHETTA_STATO[voce.mia_iscrizione.stato]}
                         </Badge>
                       )}
                     </Table.Td>

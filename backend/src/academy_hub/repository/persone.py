@@ -43,7 +43,7 @@ class Profilo:
 
 
 def profilo(sessione: Session, persona_id: int) -> Profilo:
-    responsabile = exists().where(Team.responsabile_id == Persona.id)
+    responsabile = exists().where(Team.responsabile_id == Persona.id).label("responsabile")
     riga = sessione.execute(
         select(
             Persona.id, Persona.nome, Persona.email, Persona.team_id, Persona.ruoli, responsabile
@@ -57,7 +57,7 @@ def profilo(sessione: Session, persona_id: int) -> Profilo:
         riga.email,
         riga.team_id,
         frozenset(Ruolo(r) for r in riga.ruoli),
-        bool(riga[5]),
+        bool(riga.responsabile),
     )
 
 

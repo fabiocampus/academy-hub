@@ -8,7 +8,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 
 import { Accesso } from "./accesso/Accesso";
-import { ErroreApi } from "./api/client";
+import { riprova } from "./api/client";
 import { leggiConfigurazione } from "./api/configurazione";
 import { App } from "./App";
 import { messaggio } from "./componenti/Stati";
@@ -16,11 +16,7 @@ import { tema } from "./tema";
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: {
-      // Gli errori del client (401, 403, 404, ...) non passano riprovando.
-      retry: (tentativi, errore) =>
-        !(errore instanceof ErroreApi && errore.stato < 500) && tentativi < 2,
-    },
+    queries: { retry: riprova },
   },
 });
 

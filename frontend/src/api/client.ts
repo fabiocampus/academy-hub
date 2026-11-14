@@ -21,6 +21,16 @@ export function impostaToken(lettore: LeggiToken): void {
   leggiToken = lettore;
 }
 
+let alNonAutenticato: () => void = () => undefined;
+
+/**
+ * Che cosa fare quando l'API risponde 401 (token scaduto e rinnovo fallito, sessione
+ * revocata): con OIDC si torna alla schermata d'accesso invece di riprovare a vuoto.
+ */
+export function impostaAlNonAutenticato(azione: () => void): void {
+  alNonAutenticato = azione;
+}
+
 const autenticazione: Middleware = {
   async onRequest({ request }) {
     const token = await leggiToken();
@@ -29,7 +39,24 @@ const autenticazione: Middleware = {
     }
     return request;
   },
+  onResponse({ response }) {
+    if (response.status === 401) {
+      alNonAutenticato();
+    }
+    return response;
+  },
 };
+
+/**
+ * Retry di React Query: gli errori del client (401, 403, 404, ...) non passano
+ * riprovando; errori del server e di rete sì, al più due volte.
+ */
+export function riprova(tentativi: number, errore: unknown): boolean {
+  if (errore instanceof ErroreApi && errore.stato < 500) {
+    return false;
+  }
+  return tentativi < 2;
+}
 
 export const api = createClient<paths>({
   baseUrl: window.location.origin,

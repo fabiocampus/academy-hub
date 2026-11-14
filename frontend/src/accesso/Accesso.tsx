@@ -8,7 +8,7 @@ import { UserManager, WebStorageStateStore } from "oidc-client-ts";
 import { useState, type ReactNode } from "react";
 import { AuthProvider, useAuth } from "react-oidc-context";
 
-import { impostaToken } from "../api/client";
+import { impostaAlNonAutenticato, impostaToken } from "../api/client";
 import type { Configurazione } from "../api/configurazione";
 import { ContestoSessione } from "./contesto";
 
@@ -24,6 +24,19 @@ export function creaGestoreOidc(oidc: Oidc, origine = window.location.origin): U
     // sessionStorage: il token sparisce con la scheda, non resta sul disco.
     userStore: new WebStorageStateStore({ store: window.sessionStorage }),
   });
+}
+
+/**
+ * Il client HTTP prende il token dal gestore; un token scaduto (rinnovo silenzioso
+ * fallito, scheda rimasta in background) non si manda. Un 401 toglie l'utente: si
+ * torna alla schermata d'accesso.
+ */
+export function collegaAlClient(gestore: UserManager): void {
+  impostaToken(async () => {
+    const utente = await gestore.getUser();
+    return utente === null || utente.expired === true ? undefined : utente.access_token;
+  });
+  impostaAlNonAutenticato(() => void gestore.removeUser());
 }
 
 /** Toglie `code` e `state` dall'indirizzo dopo il ritorno da Keycloak. */
@@ -57,7 +70,7 @@ function AccessoOidc({ oidc, children }: { oidc: Oidc; children: ReactNode }) {
   // Un solo gestore per tutta la vita della pagina: tiene il token e lo rinnova.
   const [gestore] = useState(() => {
     const creato = creaGestoreOidc(oidc);
-    impostaToken(async () => (await creato.getUser())?.access_token);
+    collegaAlClient(creato);
     return creato;
   });
   return (
@@ -72,8 +85,8 @@ function ConLogin({ children }: { children: ReactNode }) {
 
   if (auth.isLoading || auth.activeNavigator !== undefined) {
     return (
-      <Center h="100vh">
-        <Loader aria-label="Accesso in corso" />
+      <Center h="100vh" role="status" aria-label="Accesso in corso">
+        <Loader />
       </Center>
     );
   }

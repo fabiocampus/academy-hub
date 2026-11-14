@@ -6,8 +6,8 @@ import { ErroreApi } from "../api/client";
 
 export function Caricamento({ etichetta = "Caricamento" }: { etichetta?: string }) {
   return (
-    <Center py="xl">
-      <Loader aria-label={etichetta} />
+    <Center py="xl" role="status" aria-label={etichetta}>
+      <Loader />
     </Center>
   );
 }

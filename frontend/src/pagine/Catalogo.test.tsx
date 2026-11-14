@@ -17,7 +17,7 @@ describe("Catalogo", () => {
             voceCatalogo(2, {
               corso: { id: 2, titolo: "SQL avanzato", durata_ore: 16 },
               capienza: 5,
-              posti_confermati: 5,
+              posti_confermati: 4,
               lista_attesa: 2,
               mia_iscrizione: { stato: "InAttesa" },
             }),
@@ -28,13 +28,13 @@ describe("Catalogo", () => {
 
     mostra(<Catalogo />);
 
-    expect(screen.getByLabelText("Caricamento del catalogo")).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Caricamento del catalogo" })).toBeInTheDocument();
     const righe = await screen.findAllByRole("row");
     expect(righe).toHaveLength(3); // intestazione + 2 edizioni
     const sql = within(righe[2] as HTMLElement);
     expect(sql.getByText("SQL avanzato")).toBeInTheDocument();
-    expect(sql.getByText("0 liberi su 5")).toBeInTheDocument();
-    expect(sql.getByText("InAttesa")).toBeInTheDocument();
+    expect(sql.getByText("1 libero su 5")).toBeInTheDocument();
+    expect(sql.getByText("In attesa")).toBeInTheDocument();
     expect(
       within(righe[1] as HTMLElement).getByText("10 mar 2027 – 11 mar 2027"),
     ).toBeInTheDocument();

@@ -31,6 +31,9 @@ updates:
       # eslint-plugin-react-hooks e typescript-eslint seguono ESLint: si aggiorna a mano.
       - dependency-name: eslint
         update-types: ["version-update:semver-major"]
+      # I tipi di Node seguono il runtime fissato in frontend/.nvmrc (24).
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     commit-message:
       prefix: "build(deps)"
 
