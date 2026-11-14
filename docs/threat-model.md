@@ -1,8 +1,8 @@
 # Threat model del flusso di approvazione
 
-- **Metodo:** STRIDE per elemento del flusso, sul sistema com'è alla fine della fase 6 (issue #56).
-- **Perimetro:** richiesta, approvazione o rifiuto, conferma, annullamento, job di sistema. Fuori perimetro: la parte analitica su Databricks (fase 8 e seguenti), Keycloak stesso. Del frontend (fase 7) ci sono per ora solo le minacce sull'accesso.
-- **Da rivedere:** quando cambia il provider d'identità, quando arriva il frontend, prima del primo deploy su Databricks Apps.
+- **Metodo:** STRIDE per elemento del flusso, sul sistema com'è alla fine della fase 6 (issue #56); aggiornato con il frontend servito dallo stesso processo (fase 7, issue #66).
+- **Perimetro:** richiesta, approvazione o rifiuto, conferma, annullamento, job di sistema. Fuori perimetro: la parte analitica su Databricks (fase 8 e seguenti), Keycloak stesso. Del frontend (fase 7) ci sono le minacce sull'accesso e sul browser (XSS, clickjacking, file serviti).
+- **Da rivedere:** quando cambia il provider d'identità, prima del primo deploy su Databricks Apps.
 
 ## Il sistema
 
@@ -45,6 +45,7 @@ Asset da proteggere: l'esito delle richieste (chi va al corso), i posti delle ed
 | D11 | Input con limiti (lunghezze, paginazione al massimo 100, `extra="forbid"`) | `api/schemi.py` |
 | D12 | Catena di fornitura: azioni fissate per SHA, immagini per digest, Dependabot, `pip-audit` su `uv.lock`, Trivy sull'immagine, CodeQL (Python e Actions), gitleaks e secret scanning con push protection | `.github/` |
 | D13 | Container non root, porte di compose solo su `127.0.0.1` | `backend/Dockerfile`, `docker-compose.yml` |
+| D14 | HTML dell'app con `Content-Security-Policy` (script solo dalla stessa origine, nessun `object`, `base-uri` e `form-action` limitati, `frame-ancestors 'none'`, rete solo verso l'app e l'emittente OIDC), `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`; file serviti solo da dentro la build, `/api` mai coperto dal fallback | `academy_hub/frontend.py`, ADR-0009 §14 |
 
 ## Minacce
 
@@ -92,7 +93,8 @@ Stato: **mitigata** (una difesa la copre), **accettata** (rischio residuo consap
 | Dettagli interni negli errori | tutti | D10 | mitigata |
 | Segreti nel repository pubblico | — | D12 (gitleaks in pre-commit e in CI, push protection), solo dati sintetici | mitigata |
 | `GET /configurazione` è pubblica e rivela emittente OIDC e client id del frontend | accesso | solo dati già visibili nella pagina di login; il client è pubblico (PKCE, nessun segreto) | accettata (fase 7, ADR-0009) |
-| Access token rubato dal browser con uno script iniettato (XSS) | tutti | React fa l'escape del testo, nessun HTML grezzo; token in `sessionStorage`, non in `localStorage`; durata breve del token di Keycloak | mitigata in parte: una Content Security Policy arriva quando FastAPI serve la build (fase 7, PR C) |
+| Access token rubato dal browser con uno script iniettato (XSS): con l'HTML sulla stessa origine dell'API uno script vale una sessione intera | tutti | React fa l'escape del testo, nessun HTML grezzo; D14 (CSP: niente script inline o di altre origini, dati mandati solo all'app o all'emittente); token in `sessionStorage`, non in `localStorage`; durata breve del token di Keycloak | mitigata; resta `style-src 'unsafe-inline'` per gli stili di Mantine (iniezione di CSS, non di script) |
+| File del server letti dal fallback della SPA (`../`, percorsi assoluti, collegamenti) | — | D14: percorso risolto e accettato solo dentro la build; test con un file sentinella accanto alla build | mitigata |
 
 ### D · Denial of service
 
@@ -100,6 +102,7 @@ Stato: **mitigata** (una difesa la copre), **accettata** (rischio residuo consap
 |---|---|---|---|
 | Molte richieste da un utente autenticato | tutti | D11 (paginazione, lunghezze) | accettata: nessun limite di frequenza; in produzione lo darebbe il proxy di Databricks |
 | Lock tenuti a lungo su un'edizione per bloccare le conferme | conferma, annullamento | transazioni brevi; il titolare dell'annullamento è controllato prima dei lock | mitigata in parte: un utente qualunque che tenta una decisione blocca per un attimo la riga dell'iscrizione |
+| Percorsi con caratteri nulli che fanno sollevare un errore al file system (500 e righe di log a volontà, senza login) | — | D14: 404 prima di toccare il file system, con test | mitigata |
 | Keycloak irraggiungibile | tutti | cache del JWKS 5 minuti, poi 503 `identita-non-disponibile` | accettata |
 | Un'edizione che fa fallire il job ferma le altre | job | una transazione per edizione, errori isolati, uscita 1 (ADR-0007) | mitigata |
 
@@ -108,6 +111,7 @@ Stato: **mitigata** (una difesa la copre), **accettata** (rischio residuo consap
 | Minaccia | Passo | Difesa | Stato |
 |---|---|---|---|
 | Ruoli inseriti nel token (`realm_access`) | tutti | D2: ignorati | mitigata |
+| Clickjacking: l'app in un iframe di un altro sito per far cliccare «Approva» o «Conferma» | approvazione, conferma | D14 (`frame-ancestors 'none'`) | mitigata |
 | Rotta nuova dimenticata senza controllo | tutti | D5 | mitigata per ruolo, titolare e responsabile diretto sulle rotte di oggi; per una rotta nuova con un controllo sull'oggetto diverso serve aggiungere il profilo che lo mette alla prova |
 | `admin_academy` che decide al posto del responsabile | approvazione | D4: decide solo il responsabile diretto; l'admin solo per le richieste dal vertice | mitigata |
 | Dipendenza vulnerabile (Python, immagine, azioni) | — | D12 | mitigata per le vulnerabilità note |

@@ -153,7 +153,7 @@ jobs:
   e2e:
     # Criterio della fase 7: richiesta -> approvazione -> conferma da browser, con il login
     # vero su Keycloak e la build servita da FastAPI (un solo processo); axe sulle pagine
-    # principali di ogni profilo (ADR-0009 §14).
+    # principali di ogni profilo (ADR-0009 §15).
     runs-on: ubuntu-latest
     defaults:
       run:

@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-// End-to-end su docker compose (ADR-0009 §14): la build servita da FastAPI su :8000 e il
+// End-to-end su docker compose (ADR-0009 §15): la build servita da FastAPI su :8000 e il
 // login vero su Keycloak. localhost, non 127.0.0.1: è l'origine registrata nel client
 // academy-web e l'emittente dei token.
 const app = process.env.E2E_URL ?? "http://localhost:8000";

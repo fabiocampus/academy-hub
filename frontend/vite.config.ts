@@ -17,7 +17,7 @@ export default defineConfig({
   build: {
     rolldownOptions: {
       output: {
-        // Librerie in chunk propri (ADR-0009 §15): cambiano di rado, quindi restano in
+        // Librerie in chunk propri (ADR-0009 §16): cambiano di rado, quindi restano in
         // cache del browser fra un rilascio e l'altro; le pagine sono chunk lazy (App.tsx).
         // Rolldown usa "/" negli id dei moduli anche su Windows.
         codeSplitting: {

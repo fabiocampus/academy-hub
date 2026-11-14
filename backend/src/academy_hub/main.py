@@ -15,7 +15,7 @@ from academy_hub.api.errori import registra_gestori
 from academy_hub.api.identita import ProviderIdentita, provider
 from academy_hub.api.rotte import catalogo, corsi, edizioni, iscrizioni, profilo
 from academy_hub.config import impostazioni
-from academy_hub.frontend import monta_frontend
+from academy_hub.frontend import monta_frontend, origine
 
 
 def crea_app(
@@ -51,9 +51,12 @@ def crea_app(
     def health() -> dict[str, str]:  # pyright: ignore[reportUnusedFunction]
         return {"stato": "ok", "versione": __version__, "ambiente": impostazioni().ambiente}
 
-    cartella = frontend or impostazioni().frontend_dir
+    config = impostazioni()
+    cartella = frontend or config.frontend_dir
     if cartella is not None:
-        monta_frontend(app, cartella)
+        # Con oidc il browser parla anche con il provider (discovery, token, logout).
+        esterne = [origine(config.oidc_emittente)] if config.identita == "oidc" else []
+        monta_frontend(app, cartella, esterne)
     return app
 
 

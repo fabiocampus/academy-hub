@@ -5,16 +5,30 @@
  * può ripetere su un docker compose già usato senza `down -v` e senza dipendere dai
  * dati demo. Gli utenti di prova sono quelli del realm di sviluppo (password = nome).
  */
-import { expect, type APIRequestContext, type Browser, type Page } from "@playwright/test";
+import {
+  expect,
+  test,
+  type APIRequestContext,
+  type Browser,
+  type BrowserContext,
+  type Page,
+} from "@playwright/test";
 
 export type Utente = "dipendente" | "responsabile" | "admin";
 
 const KEYCLOAK = process.env.E2E_KEYCLOAK ?? "http://localhost:8080";
 const API = "/api/v1";
 
+// Un contesto del browser per utente; si chiudono tutti alla fine di ogni test.
+const aperti: BrowserContext[] = [];
+test.afterEach(async () => {
+  await Promise.all(aperti.splice(0).map((contesto) => contesto.close()));
+});
+
 /** Apre `percorso` in un contesto nuovo (sessione separata) ed entra come `utente`. */
 export async function entra(browser: Browser, utente: Utente, percorso = "/"): Promise<Page> {
   const contesto = await browser.newContext();
+  aperti.push(contesto);
   const pagina = await contesto.newPage();
   await pagina.goto(percorso);
   await pagina.getByRole("button", { name: "Accedi" }).click();

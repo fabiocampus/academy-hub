@@ -1,7 +1,8 @@
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { Route, Routes } from "react-router";
+import { lazy } from "react";
+import { Link, Route, Routes } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -26,6 +27,37 @@ function conPagina() {
 }
 
 describe("Struttura", () => {
+  it("se il chunk di una pagina non arriva lo dice e offre di ricaricare", async () => {
+    // Dopo un rilascio un chunk vecchio risponde 404 (ADR-0009 §14): senza un confine
+    // React smonterebbe tutta l'app e resterebbe una pagina bianca.
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const ricarica = vi.fn();
+    vi.stubGlobal("location", { reload: ricarica });
+    const Rotta = lazy(() =>
+      Promise.reject(new Error("Failed to fetch dynamically imported module")),
+    );
+    mostra(
+      <Routes>
+        <Route element={<Struttura />}>
+          <Route index element={<Link to="/altra">Altra</Link>} />
+          <Route path="rotta" element={<Rotta />} />
+          <Route path="altra" element={<p>Altra pagina</p>} />
+        </Route>
+      </Routes>,
+      { percorso: "/rotta" },
+    );
+
+    expect(await screen.findByText("Questa pagina non si è caricata")).toBeInTheDocument();
+    // Struttura e menu restano.
+    expect(screen.getByRole("navigation", { name: "Menu principale" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Ricarica l'app" }));
+    expect(ricarica).toHaveBeenCalledOnce();
+    // Cambiando pagina il confine riparte.
+    await userEvent.click(screen.getByRole("link", { name: "Catalogo" }));
+    expect(await screen.findByRole("link", { name: "Altra" })).toBeInTheDocument();
+    vi.unstubAllGlobals();
+  });
+
   it("mostra la persona collegata, il menu e la pagina", async () => {
     mostra(conPagina());
 

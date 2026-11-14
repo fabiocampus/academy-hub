@@ -62,7 +62,7 @@ services:
   migrazioni:
     build: &immagine-backend
       # Stessa immagine per i quattro servizi; il frontend è un contesto con nome perché
-      # la sua build statica finisce nell'immagine del backend (ADR-0009 §13).
+      # la sua build statica finisce nell'immagine del backend (ADR-0009 §14).
       context: ./backend
       additional_contexts:
         frontend: ./frontend

@@ -4,7 +4,7 @@ import { Route, Routes } from "react-router";
 import { Struttura } from "./componenti/Struttura";
 import { Vuoto } from "./componenti/Stati";
 
-// Una pagina per chunk, scaricata alla prima visita (ADR-0009 §15): chi non gestisce i
+// Una pagina per chunk, scaricata alla prima visita (ADR-0009 §16): chi non gestisce i
 // corsi non scarica mai le pagine di gestione.
 const Catalogo = lazy(() => import("./pagine/Catalogo").then((m) => ({ default: m.Catalogo })));
 const MieIscrizioni = lazy(() =>
