@@ -153,6 +153,8 @@ describe("ritorno dopo il login", () => {
     [{ ritorno: "/approvazioni?pagina=2#x" }, "/approvazioni?pagina=2#x"],
     [{ ritorno: "//esterno.example/x" }, "/"],
     [{ ritorno: "/\\esterno.example" }, "/"],
+    [{ ritorno: "/\t/esterno.example" }, "/"],
+    [{ ritorno: "/corsi/../iscrizioni" }, "/iscrizioni"],
     [{ ritorno: "https://esterno.example" }, "/"],
     [{ ritorno: 42 }, "/"],
     [undefined, "/"],

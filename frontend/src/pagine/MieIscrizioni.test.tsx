@@ -131,4 +131,22 @@ describe("Le mie iscrizioni", () => {
       screen.getByText("Mancano 2 giorni all'inizio: si annulla solo fino a 4 giorni prima"),
     ).toBeInTheDocument();
   });
+
+  it("mostra l'errore dell'elenco e riprova", async () => {
+    let chiamate = 0;
+    server.use(
+      http.get(`${API}/iscrizioni`, () => {
+        chiamate += 1;
+        return chiamate === 1
+          ? problema(503, { title: "Servizio non disponibile", detail: "Riprova tra poco" })
+          : HttpResponse.json(pagina([miaIscrizione(1)]));
+      }),
+    );
+    mostra(<MieIscrizioni />);
+
+    expect(await screen.findByText("Riprova tra poco")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Riprova" }));
+
+    expect(await screen.findByText("Corso 1")).toBeInTheDocument();
+  });
 });

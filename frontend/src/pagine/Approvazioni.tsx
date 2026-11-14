@@ -14,7 +14,7 @@ import { Paginazione } from "../componenti/Paginazione";
 import { Caricamento, Errore, Vuoto } from "../componenti/Stati";
 
 export const PER_PAGINA = 20;
-/** Come `Motivo` nel contratto: da 1 a 1000 caratteri, spazi esclusi. */
+/** Come `Motivo` nel contratto: da 1 a 1000 caratteri; il campo non ne accetta di più. */
 export const MOTIVO_MASSIMO = 1000;
 
 type Richiesta = Schemi["RichiestaDaApprovare"];
@@ -25,17 +25,7 @@ export function Approvazioni() {
     limite: PER_PAGINA,
     offset: (pagina - 1) * PER_PAGINA,
   });
-  const approvazione = useApprova();
   const [daRifiutare, setDaRifiutare] = useState<Richiesta | null>(null);
-
-  function approva(richiesta: Richiesta): void {
-    approvazione.mutate(richiesta.iscrizione_id, {
-      onSuccess: () => {
-        avvisaSuccesso(`Richiesta di ${richiesta.persona.nome} approvata.`);
-      },
-      onError: avvisaErrore,
-    });
-  }
 
   return (
     <Stack>
@@ -69,33 +59,12 @@ export function Approvazioni() {
                     <Table.Td>{formattaData(richiesta.data_inizio)}</Table.Td>
                     <Table.Td>{formattaIstante(richiesta.richiesta_il)}</Table.Td>
                     <Table.Td>
-                      <Group gap="xs" wrap="nowrap">
-                        <Button
-                          size="xs"
-                          variant="light"
-                          aria-label={`Approva la richiesta di ${richiesta.persona.nome} per ${richiesta.corso.titolo}`}
-                          loading={
-                            approvazione.isPending &&
-                            approvazione.variables === richiesta.iscrizione_id
-                          }
-                          onClick={() => {
-                            approva(richiesta);
-                          }}
-                        >
-                          Approva
-                        </Button>
-                        <Button
-                          size="xs"
-                          variant="light"
-                          color="red"
-                          aria-label={`Rifiuta la richiesta di ${richiesta.persona.nome} per ${richiesta.corso.titolo}`}
-                          onClick={() => {
-                            setDaRifiutare(richiesta);
-                          }}
-                        >
-                          Rifiuta
-                        </Button>
-                      </Group>
+                      <Decisione
+                        richiesta={richiesta}
+                        rifiuta={() => {
+                          setDaRifiutare(richiesta);
+                        }}
+                      />
                     </Table.Td>
                   </Table.Tr>
                 ))}
@@ -132,15 +101,40 @@ export function Approvazioni() {
   );
 }
 
+/** Pulsanti di una riga, con la propria mutazione: ogni approvazione ha il suo esito. */
+function Decisione({ richiesta, rifiuta }: { richiesta: Richiesta; rifiuta: () => void }) {
+  const approvazione = useApprova();
+  const di = `la richiesta di ${richiesta.persona.nome} per ${richiesta.corso.titolo}`;
+
+  function approva(): void {
+    approvazione.mutate(richiesta.iscrizione_id, {
+      onSuccess: () => {
+        avvisaSuccesso(`Richiesta di ${richiesta.persona.nome} approvata.`);
+      },
+      onError: avvisaErrore,
+    });
+  }
+
+  return (
+    <Group gap="xs" wrap="nowrap">
+      <Button
+        size="xs"
+        variant="light"
+        aria-label={`Approva ${di}`}
+        loading={approvazione.isPending}
+        onClick={approva}
+      >
+        Approva
+      </Button>
+      <Button size="xs" variant="light" color="red" aria-label={`Rifiuta ${di}`} onClick={rifiuta}>
+        Rifiuta
+      </Button>
+    </Group>
+  );
+}
+
 function validaMotivo(motivo: string): string | null {
-  const testo = motivo.trim();
-  if (testo === "") {
-    return "Scrivi il motivo: lo legge chi ha chiesto l'iscrizione.";
-  }
-  if (testo.length > MOTIVO_MASSIMO) {
-    return `Al massimo ${MOTIVO_MASSIMO} caratteri.`;
-  }
-  return null;
+  return motivo.trim() === "" ? "Scrivi il motivo: lo legge chi ha chiesto l'iscrizione." : null;
 }
 
 function FormRifiuto({ richiesta, chiudi }: { richiesta: Richiesta; chiudi: () => void }) {

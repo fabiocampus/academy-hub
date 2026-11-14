@@ -49,18 +49,26 @@ export function statoLogin(posizione: Pick<Location, "pathname" | "search" | "ha
 }
 
 /**
- * Il percorso salvato nello `state` del login, solo se è interno all'app: un indirizzo
- * assoluto o `//host` porterebbe fuori (open redirect). Altrimenti la radice.
+ * Il percorso salvato nello `state` del login, solo se resta sulla stessa origine: un
+ * indirizzo assoluto o `//host` porterebbe fuori (open redirect). Altrimenti la radice.
  */
-export function percorsoDiRitorno(stato: unknown): string {
+export function percorsoDiRitorno(stato: unknown, origine = window.location.origin): string {
   if (typeof stato !== "object" || stato === null || !("ritorno" in stato)) {
     return "/";
   }
   const { ritorno } = stato;
-  if (typeof ritorno !== "string" || !ritorno.startsWith("/") || /^\/[/\\]/.test(ritorno)) {
+  if (typeof ritorno !== "string" || !ritorno.startsWith("/")) {
     return "/";
   }
-  return ritorno;
+  // Normalizzato come lo farebbe il browser (`/<tab>/host` diventa `//host`): conta l'origine.
+  try {
+    const indirizzo = new URL(ritorno, origine);
+    return indirizzo.origin === origine
+      ? indirizzo.pathname + indirizzo.search + indirizzo.hash
+      : "/";
+  } catch {
+    return "/";
+  }
 }
 
 /**

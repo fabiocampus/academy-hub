@@ -164,4 +164,56 @@ describe("Approvazioni", () => {
       await within(finestra).findByText("String should have at most 1000 characters"),
     ).toBeInTheDocument();
   });
+
+  it("mostra il caricamento e poi l'errore dell'elenco, con «Riprova»", async () => {
+    let chiamate = 0;
+    server.use(
+      http.get(`${API}/richieste-da-approvare`, () => {
+        chiamate += 1;
+        return chiamate === 1
+          ? problema(500, { title: "Errore interno" })
+          : HttpResponse.json(pagina([richiestaDaApprovare(4)]));
+      }),
+    );
+    mostra(<Approvazioni />);
+
+    expect(screen.getByRole("status", { name: "Caricamento delle richieste" })).toBeInTheDocument();
+    expect(await screen.findByText("Errore interno")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Riprova" }));
+
+    expect(await screen.findByRole("button", { name: APPROVA })).toBeInTheDocument();
+  });
+
+  it("due approvazioni di fila hanno ciascuna il proprio esito", async () => {
+    conRichieste([richiestaDaApprovare(4), richiestaDaApprovare(5)]);
+    server.use(
+      http.post(`${API}/iscrizioni/:id/approvazione`, ({ params }) =>
+        params.id === "4"
+          ? problema(409, { title: "Conflitto con lo stato attuale", detail: "Già decisa" })
+          : HttpResponse.json(iscrizioneLetta(5, "Approvata")),
+      ),
+    );
+    mostra(<Approvazioni />);
+
+    await userEvent.click(await screen.findByRole("button", { name: APPROVA }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Approva la richiesta di Anna Dati per Corso 5" }),
+    );
+
+    expect(await screen.findByText("Già decisa")).toBeInTheDocument();
+    expect(await screen.findByText("Richiesta di Anna Dati approvata.")).toBeInTheDocument();
+  });
+
+  it("finestra e notifiche si chiudono con un pulsante che ha un nome", async () => {
+    conRichieste([richiestaDaApprovare(4)]);
+    mostra(<Approvazioni />);
+
+    await userEvent.click(await screen.findByRole("button", { name: RIFIUTA }));
+    const finestra = await screen.findByRole("dialog");
+    await userEvent.click(within(finestra).getByRole("button", { name: "Chiudi" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+  });
 });

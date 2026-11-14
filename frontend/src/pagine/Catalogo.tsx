@@ -9,7 +9,7 @@ import { avvisaErrore, avvisaSuccesso } from "../componenti/avvisi";
 import { formattaPeriodo } from "../componenti/formato";
 import { Paginazione } from "../componenti/Paginazione";
 import { Caricamento, Errore, Vuoto } from "../componenti/Stati";
-import { StatoIscrizione } from "../componenti/StatoIscrizione";
+import { STATI_ANNULLABILI, StatoIscrizione } from "../componenti/StatoIscrizione";
 
 export const PER_PAGINA = 20;
 
@@ -21,7 +21,7 @@ function postiLiberi(n: number): string {
  * Una chiave d'idempotenza per edizione, tenuta finché la richiesta non riesce: se la
  * risposta si perde e si clicca di nuovo, l'API riconosce la richiesta già fatta.
  */
-function useChiaviIdempotenza() {
+function useChiaviIdempotenza(): ChiaviIdempotenza {
   const chiavi = useRef(new Map<number, string>());
   return {
     per(edizioneId: number): string {
@@ -38,6 +38,59 @@ function useChiaviIdempotenza() {
   };
 }
 
+interface ChiaviIdempotenza {
+  per(edizioneId: number): string;
+  usata(edizioneId: number): void;
+}
+
+/**
+ * Ogni riga ha la sua mutazione: due clic su righe diverse hanno ciascuno il proprio
+ * esito e il proprio indicatore di attesa.
+ */
+function PulsanteIscriviti({
+  voce,
+  chiavi,
+}: {
+  voce: Schemi["VoceCatalogo"];
+  chiavi: ChiaviIdempotenza;
+}) {
+  const richiesta = useRichiediIscrizione();
+  const periodo = formattaPeriodo(voce.data_inizio, voce.data_fine);
+
+  function richiedi(dopoUnaChiusa = false): void {
+    richiesta.mutate(
+      { edizioneId: voce.edizione_id, chiave: chiavi.per(voce.edizione_id) },
+      {
+        onSuccess: (iscrizione) => {
+          chiavi.usata(voce.edizione_id);
+          if (!STATI_ANNULLABILI.has(iscrizione.stato) && !dopoUnaChiusa) {
+            // La chiave apparteneva a un'iscrizione già chiusa (annullata altrove):
+            // l'API l'ha restituita com'è (ADR-0006). Si riprova con una chiave nuova.
+            richiedi(true);
+            return;
+          }
+          avvisaSuccesso(`Richiesta inviata per «${voce.corso.titolo}».`);
+        },
+        onError: avvisaErrore,
+      },
+    );
+  }
+
+  return (
+    <Button
+      size="xs"
+      variant="light"
+      aria-label={`Iscriviti a ${voce.corso.titolo} dal ${periodo}`}
+      loading={richiesta.isPending}
+      onClick={() => {
+        richiedi();
+      }}
+    >
+      Iscriviti
+    </Button>
+  );
+}
+
 export function Catalogo() {
   const [titolo, setTitolo] = useState("");
   const [cercato] = useDebouncedValue(titolo.trim(), 300);
@@ -50,21 +103,7 @@ export function Catalogo() {
   const profilo = useProfilo();
   // Solo comodità: l'API rifiuta comunque la richiesta a chi non è dipendente (403).
   const puoRichiedere = profilo.data?.ruoli.includes("dipendente") ?? false;
-  const richiesta = useRichiediIscrizione();
   const chiavi = useChiaviIdempotenza();
-
-  function richiedi(voce: Schemi["VoceCatalogo"]): void {
-    richiesta.mutate(
-      { edizioneId: voce.edizione_id, chiave: chiavi.per(voce.edizione_id) },
-      {
-        onSuccess: () => {
-          chiavi.usata(voce.edizione_id);
-          avvisaSuccesso(`Richiesta inviata per «${voce.corso.titolo}».`);
-        },
-        onError: avvisaErrore,
-      },
-    );
-  }
 
   return (
     <Stack>
@@ -121,20 +160,7 @@ export function Catalogo() {
                       {voce.mia_iscrizione !== null ? (
                         <StatoIscrizione stato={voce.mia_iscrizione.stato} />
                       ) : puoRichiedere ? (
-                        <Button
-                          size="xs"
-                          variant="light"
-                          aria-label={`Iscriviti a ${voce.corso.titolo} dal ${formattaPeriodo(voce.data_inizio, voce.data_fine)}`}
-                          loading={
-                            richiesta.isPending &&
-                            richiesta.variables.edizioneId === voce.edizione_id
-                          }
-                          onClick={() => {
-                            richiedi(voce);
-                          }}
-                        >
-                          Iscriviti
-                        </Button>
+                        <PulsanteIscriviti voce={voce} chiavi={chiavi} />
                       ) : (
                         "—"
                       )}

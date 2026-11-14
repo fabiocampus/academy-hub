@@ -1,5 +1,5 @@
 /** US-04 dal catalogo: richiesta d'iscrizione idempotente (ADR-0006). */
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
@@ -101,5 +101,81 @@ describe("Richiesta d'iscrizione dal catalogo", () => {
 
     expect(await screen.findByText("Corso 1")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Iscriviti/ })).not.toBeInTheDocument();
+  });
+
+  it("due richieste su righe diverse hanno ciascuna il proprio esito", async () => {
+    conCatalogo([voceCatalogo(1), voceCatalogo(2)]);
+    const rispondi: (() => void)[] = [];
+    server.use(
+      http.post(`${API}/iscrizioni`, async ({ request }) => {
+        const { edizione_id } = (await request.json()) as { edizione_id: number };
+        // La prima risposta arriva dopo la seconda richiesta.
+        await new Promise<void>((fatto) => rispondi.push(fatto));
+        return edizione_id === 1
+          ? problema(409, { title: "Edizione già iniziata", detail: "Troppo tardi per la 1" })
+          : HttpResponse.json(iscrizioneLetta(2, "Richiesta"), { status: 201 });
+      }),
+    );
+    mostra(<Catalogo />);
+
+    await userEvent.click(await screen.findByRole("button", { name: ISCRIVITI }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Iscriviti a Corso 2 dal 10 mar 2027 – 11 mar 2027" }),
+    );
+    await waitFor(() => {
+      expect(rispondi).toHaveLength(2);
+    });
+    rispondi.forEach((fatto) => {
+      fatto();
+    });
+
+    expect(await screen.findByText("Richiesta inviata per «Corso 2».")).toBeInTheDocument();
+    expect(await screen.findByText("Troppo tardi per la 1")).toBeInTheDocument();
+  });
+
+  it("finiti i tentativi, un nuovo clic riusa la stessa chiave", { timeout: 15_000 }, async () => {
+    const stato = conCatalogo([voceCatalogo(1)]);
+    const chiavi: (string | null)[] = [];
+    server.use(
+      http.post(`${API}/iscrizioni`, ({ request }) => {
+        chiavi.push(request.headers.get("Idempotency-Key"));
+        if (chiavi.length <= 3) {
+          return problema(503, { title: "Servizio non disponibile" });
+        }
+        stato.elenco = [voceCatalogo(1, { mia_iscrizione: { stato: "Richiesta" } })];
+        return HttpResponse.json(iscrizioneLetta(1, "Richiesta"), { status: 201 });
+      }),
+    );
+    mostra(<Catalogo />);
+
+    await userEvent.click(await screen.findByRole("button", { name: ISCRIVITI }));
+    expect(
+      await screen.findByText("Servizio non disponibile", {}, { timeout: 6000 }),
+    ).toBeInTheDocument();
+    expect(chiavi).toHaveLength(3);
+    await userEvent.click(screen.getByRole("button", { name: ISCRIVITI }));
+
+    expect(await screen.findByText("Richiesta inviata per «Corso 1».")).toBeInTheDocument();
+    expect(new Set(chiavi).size).toBe(1);
+  });
+
+  it("se la chiave apparteneva a un'iscrizione già chiusa, riprova con una chiave nuova", async () => {
+    conCatalogo([voceCatalogo(1)]);
+    const chiavi: (string | null)[] = [];
+    server.use(
+      http.post(`${API}/iscrizioni`, ({ request }) => {
+        chiavi.push(request.headers.get("Idempotency-Key"));
+        // La prima chiave è quella di una richiesta poi annullata da un'altra scheda.
+        const stato = chiavi.length === 1 ? "Annullata" : "Richiesta";
+        return HttpResponse.json(iscrizioneLetta(1, stato), { status: 201 });
+      }),
+    );
+    mostra(<Catalogo />);
+
+    await userEvent.click(await screen.findByRole("button", { name: ISCRIVITI }));
+
+    expect(await screen.findByText("Richiesta inviata per «Corso 1».")).toBeInTheDocument();
+    expect(chiavi).toHaveLength(2);
+    expect(chiavi[1]).not.toBe(chiavi[0]);
   });
 });
