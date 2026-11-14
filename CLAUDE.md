@@ -8,6 +8,8 @@ Fase 5 (API a livelli), in tre PR (issue #49): errori RFC 9457, ETag/If-Match, c
 
 Fase 6 (identità e sicurezza, issue #36): identità da token OIDC di Keycloak in locale e da `X-Forwarded-Email` su Databricks Apps, ruoli dal database, persona trovata per email (ADR-0008). Seconda PR (issue #56): matrice di autorizzazione rotta × profilo (`backend/tests/test_autorizzazione.py`: una rotta nuova senza la sua riga fa fallire i test), pip-audit e CodeQL in CI, threat model STRIDE in `docs/threat-model.md`.
 
+Fase 7 (frontend, issue #59), in tre PR: A) base in `frontend/` (React, Vite, Mantine, React Query, client dal contratto, login OIDC con PKCE, catalogo; ADR-0009); B) mie iscrizioni, approvazioni, gestione edizioni; C) build servita da FastAPI, end-to-end con Playwright e axe.
+
 ## Ambiente locale
 
 Dalla radice del repository, senza altri passaggi (il `.env` è facoltativo, vedi `.env.example`):
@@ -17,6 +19,8 @@ docker compose up -d --build --wait   # db, migrazioni, demo, keycloak, otel-lgt
 python scripts/fumo_identita.py       # token veri da Keycloak e flusso richiesta -> approvazione -> conferma
 docker compose down                   # -v per cancellare anche i dati
 ```
+
+Frontend in sviluppo (Node 24, in `frontend/`): `npm ci`, poi `npm run dev` su http://localhost:5173 con il backend di compose dietro il proxy di Vite; si entra con un utente di prova di Keycloak.
 
 Porte su 127.0.0.1: backend 8000 (`/health`, `/docs`), Keycloak 8080 (console admin/admin; realm `academy` da `keycloak/realm-academy.json`, utenti di prova `dipendente`, `responsabile`, `dirigente`, `admin`, `docente`, `esterna` con password uguale al nome), Grafana 3000, PostgreSQL 5432, OTLP 4317/4318. In alternativa c'è il dev container (`.devcontainer/`).
 
@@ -43,6 +47,19 @@ uv run pre-commit run --all-files
 
 Dopo ogni modifica a un file `.py` del backend l'hook `.claude/hooks/dopo_modifica.py` lancia ruff e i test veloci (non quelli `integrazione`); se fallisce, correggi prima di proseguire. Prima della PR lancia anche `uv run pytest` completo.
 
+Dentro `frontend/`:
+
+```bash
+npm ci                       # dipendenze esatte da package-lock.json
+npm run dev                  # Vite su :5173, /api verso 127.0.0.1:8000
+npm run api:genera           # rigenera src/api/schema.d.ts dal contratto (dopo academy_hub.contratto)
+npm run lint                 # ESLint (typescript-eslint strict, hook di React)
+npm run formato              # Prettier in verifica (npm run formatta per correggere)
+npm run tipi                 # tsc
+npm test                     # Vitest + Testing Library + MSW
+npm run build                # build statica in dist/
+```
+
 ## Architettura
 
 - `backend/src/academy_hub/`: pacchetto Python. Livelli: router (FastAPI) → servizi (regole di business, autorizzazione) → repository (accesso ai dati). Niente regole nelle rotte, niente SQL fuori dai repository.
@@ -54,8 +71,9 @@ Dopo ogni modifica a un file `.py` del backend l'hook `.claude/hooks/dopo_modifi
   - `job.py`: job di sistema (scadenza all'inizio dell'edizione, rete di sicurezza della promozione), una transazione per edizione (ADR-0007).
 - `backend/contratto/`: contratto OpenAPI e impronte per versione; `tests/test_contratto.py` fallisce se l'API cambia senza aumentare la versione.
 - `backend/tests/`: test pytest. I test HTTP usano la fixture `client` (TestClient sull'app collegata al database di test, identità provvisoria `X-Persona-Id`) e `tests/api.py`; i test del token usano `tests/oidc.py` (chiave RSA di test). `dati.py` crea dati sintetici; `conftest.py` avvia PostgreSQL con la stessa immagine di docker compose e applica le migrazioni.
+- `frontend/src/`: `api/` (client `openapi-fetch` tipizzato da `schema.d.ts` generato, `ErroreApi` RFC 9457, hook React Query in `query.ts`), `accesso/` (OIDC o Databricks, secondo `GET /api/v1/configurazione`), `componenti/` (struttura con menu, stati di caricamento/errore/vuoto), `pagine/`, `test/` (MSW e render con i provider). I test stanno accanto ai file (`*.test.tsx`).
 - `backend/Dockerfile`: multi-stage con uv, runtime non root (uid 10001).
-- `.github/workflows/`: `ci.yml` (lint, typecheck, test, dipendenze con pip-audit su `uv.lock`, immagine + Trivy, compose, gitleaks), `codeql.yml` (CodeQL su Python e Actions) e `pr-issue.yml` (la PR deve collegare una issue). Sono status check obbligatori del ruleset su `main`. Sul repository sono attivi secret scanning con push protection, avvisi e aggiornamenti di sicurezza di Dependabot.
+- `.github/workflows/`: `ci.yml` (lint, typecheck, test, dipendenze con pip-audit su `uv.lock`, frontend, immagine + Trivy, compose, gitleaks), `codeql.yml` (CodeQL su Python, JavaScript/TypeScript e Actions) e `pr-issue.yml` (la PR deve collegare una issue). Sono status check obbligatori del ruleset su `main`. Sul repository sono attivi secret scanning con push protection, avvisi e aggiornamenti di sicurezza di Dependabot.
 
 ## Flusso di lavoro
 

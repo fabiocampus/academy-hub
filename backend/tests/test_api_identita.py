@@ -193,14 +193,20 @@ def test_health_senza_identita(client: TestClient) -> None:
     assert client.get("/health").status_code == 200
 
 
+# Pubbliche anche sotto il prefisso: il frontend legge come si accede prima del login
+# (ADR-0009). Restituisce solo emittente e client id OIDC, già visibili al browser.
+PUBBLICHE = {("GET", f"{PREFISSO}/configurazione")}
+
+
 def _rotte_api() -> list[tuple[str, str]]:
-    """Ogni operazione del contratto sotto il prefisso dell'API (cioè tutte tranne /health)."""
+    """Ogni operazione del contratto sotto il prefisso dell'API, tranne le pubbliche."""
     schema = crea_app(identita=ProviderFinto().oidc()).openapi()
     rotte = [
         (metodo.upper(), percorso)
         for percorso, operazioni in schema["paths"].items()
         if percorso.startswith(PREFISSO)
         for metodo in operazioni
+        if (metodo.upper(), percorso) not in PUBBLICHE
     ]
     assert rotte
     return sorted(rotte)
@@ -208,7 +214,7 @@ def _rotte_api() -> list[tuple[str, str]]:
 
 @pytest.mark.parametrize(("metodo", "percorso"), _rotte_api())
 def test_ogni_rotta_senza_identita_401(client: TestClient, metodo: str, percorso: str) -> None:
-    """US-16: senza identità valida ogni rotta, tranne /health, risponde 401."""
+    """US-16: senza identità valida ogni rotta risponde 401, tranne /health e PUBBLICHE."""
     concreto = re.sub(r"\{[^}]+\}", "1", percorso)
 
     risposta = client.request(metodo, concreto, headers={"If-Match": '"1"'})

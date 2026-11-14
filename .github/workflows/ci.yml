@@ -66,6 +66,34 @@ jobs:
       - run: uv export --locked --format requirements-txt --no-emit-project -o "$RUNNER_TEMP/requisiti.txt"
       - run: uv run pip-audit --strict --disable-pip --require-hashes -r "$RUNNER_TEMP/requisiti.txt"
 
+  frontend:
+    # React + TypeScript (frontend/): lint, formato, tipi, test, build, client allineato al
+    # contratto OpenAPI e vulnerabilità note nelle dipendenze bloccate in package-lock.json.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --ignore-scripts
+      - name: Client generato uguale al contratto
+        run: |
+          npm run api:genera
+          git diff --exit-code -- src/api/schema.d.ts
+      - run: npm run lint
+      - run: npm run formato
+      - run: npm run tipi
+      - run: npm test
+      - run: npm run build
+      - run: npm audit --audit-level=low
+
   immagine:
     # Build dell'immagine del backend e scansione con Trivy.
     # trivy-action fissata allo SHA di una release immutabile (dopo CVE-2026-33634).

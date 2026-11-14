@@ -10,6 +10,30 @@ updates:
     commit-message:
       prefix: "build(deps)"
 
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    # Una settimana di attesa: le versioni compromesse di solito vengono ritirate prima.
+    cooldown:
+      default-days: 7
+    groups:
+      dev:
+        dependency-type: development
+      mantine:
+        patterns: ["@mantine/*"]
+      react:
+        patterns: ["react", "react-dom", "@types/react", "@types/react-dom"]
+    ignore:
+      # openapi-typescript 7 accetta solo TypeScript 5 (peer dependency).
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+      # eslint-plugin-react-hooks e typescript-eslint seguono ESLint: si aggiorna a mano.
+      - dependency-name: eslint
+        update-types: ["version-update:semver-major"]
+    commit-message:
+      prefix: "build(deps)"
+
   - package-ecosystem: docker
     directory: /backend
     schedule:

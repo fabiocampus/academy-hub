@@ -11,7 +11,7 @@ from academy_hub import __version__
 from academy_hub.api import PREFISSO, VERSIONE_API
 from academy_hub.api.errori import registra_gestori
 from academy_hub.api.identita import ProviderIdentita, provider
-from academy_hub.api.rotte import catalogo, corsi, edizioni, iscrizioni
+from academy_hub.api.rotte import catalogo, corsi, edizioni, iscrizioni, profilo
 from academy_hub.config import impostazioni
 
 
@@ -35,6 +35,7 @@ def crea_app(motore: Engine | None = None, identita: ProviderIdentita | None = N
         edizioni.router,
         iscrizioni.router,
         iscrizioni.richieste,
+        profilo.router,
     ):
         app.include_router(router, prefix=PREFISSO)
 

@@ -190,6 +190,12 @@ MATRICE: dict[tuple[str, str], Riga] = {
         lambda m: Chiamata("GET", "/richieste-da-approvare"),
         TUTTI,
     ),
+    ("GET", "/io"): (lambda m: Chiamata("GET", "/io"), TUTTI),
+    # Pubblica: il frontend la legge prima del login.
+    ("GET", "/configurazione"): (
+        lambda m: Chiamata("GET", "/configurazione"),
+        TUTTI | {"non_registrata": 200, "anonimo": 200},
+    ),
 }
 
 # Altri casi di rotte già nella matrice, dove cambia chi può.
