@@ -43,7 +43,7 @@ Indici sulle ricerche frequenti previste dal backlog:
 |---|---|
 | Catalogo: edizioni future non cancellate (US-03) | `ix_edizioni_catalogo` su `data_inizio` `WHERE cancellata_il IS NULL` |
 | Le mie iscrizioni (US-05) | `ix_iscrizioni_persona_id`; la posizione in lista d'attesa con `ix_iscrizioni_lista_attesa` |
-| Richieste da decidere (US-07) | `ix_persone_team_id` per le persone dei team, poi `uq_iscrizioni_attiva` per le loro iscrizioni |
+| Richieste da decidere (US-07) | `ix_persone_team_id` per costruire la catena di tutte le persone, poi `uq_iscrizioni_attiva` per le iscrizioni di quelle del decisore |
 | Primo in lista d'attesa (US-09, R4) | `ix_iscrizioni_lista_attesa` su (`edizione_id`, `approvata_il`, `id`) `WHERE stato = 'InAttesa'`; `id` fa da spareggio a parità di momento di approvazione |
 | Iscrizioni di un'edizione per stato | `ix_iscrizioni_edizione_stato` |
 | Audit di un'iscrizione (US-11) | `ix_eventi_audit_iscrizione` su (`iscrizione_id`, `avvenuto_il`) |
@@ -52,7 +52,7 @@ Indici sulle ricerche frequenti previste dal backlog:
 | Job: edizioni aperte con posti liberi e lista d'attesa (US-09) | scansione delle edizioni (vedi sotto), poi `ix_iscrizioni_lista_attesa` |
 | Iscrizioni attive di un'edizione da annullare (US-17, US-18) | `ix_iscrizioni_edizione_stato` |
 
-`backend/sql/analisi_indici.sql` riempie il database locale con dati sintetici (50 team su tre livelli, 5 000 persone, 1 000 edizioni, 50 000 iscrizioni, circa 93 000 eventi di audit) ed esegue `EXPLAIN ANALYZE` sulle ricerche. Per l'API e il job usa l'SQL che generano i repository, catturato dal driver. Risultati del 2026-11-14:
+`backend/sql/analisi_indici.sql` riempie il database locale con dati sintetici (50 team su tre livelli, 5 000 persone, 1 000 edizioni, 50 000 iscrizioni, circa 93 000 eventi di audit) ed esegue `EXPLAIN ANALYZE` sulle ricerche. Per l'API e il job usa l'SQL che generano i repository, catturato dal driver. Risultati del 2026-11-14, a cache calda (la prima esecuzione dopo il caricamento costa da due a cinque volte tanto):
 
 | Ricerca | Piano | Tempo |
 |---|---|---|
