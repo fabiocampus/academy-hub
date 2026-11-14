@@ -4,14 +4,14 @@ Prototipo di studio: iscrizioni ai corsi di un'Academy aziendale (parte transazi
 
 ## Stato
 
-Fase 3 (container). Il backend espone solo `/health`: dominio, database e API arrivano dalle fasi 4 e 5.
+Fase 4 (database e dominio). Ci sono schema, migrazioni e la conferma del posto; il backend espone ancora solo `/health`: le API arrivano nella fase 5.
 
 ## Ambiente locale
 
 Dalla radice del repository, senza altri passaggi (il `.env` è facoltativo, vedi `.env.example`):
 
 ```bash
-docker compose up -d --build --wait   # db, keycloak, otel-lgtm, backend
+docker compose up -d --build --wait   # db, migrazioni, keycloak, otel-lgtm, backend
 docker compose down                   # -v per cancellare anche i dati
 ```
 
@@ -25,7 +25,9 @@ Tutti dentro `backend/` (Python 3.11, come Databricks Apps, fissato in `backend/
 
 ```bash
 uv sync                      # crea .venv e installa le dipendenze
-uv run pytest                # test
+uv run pytest                # tutti i test (quelli `integrazione` avviano PostgreSQL con Testcontainers: serve Docker)
+uv run pytest -m "not integrazione"   # solo i test veloci, senza Docker
+uv run python -m academy_hub.db.migrazioni   # migra il PostgreSQL locale (o ACADEMY_DATABASE_URL)
 uv run ruff check --fix      # lint
 uv run ruff format           # formattazione
 uv run pyright               # controllo dei tipi (strict)
@@ -33,12 +35,16 @@ uv run pre-commit install    # una volta per clone: hook pre-commit (ruff, gitle
 uv run pre-commit run --all-files
 ```
 
-Dopo ogni modifica a un file `.py` del backend l'hook `.claude/hooks/dopo_modifica.py` lancia ruff e i test; se fallisce, correggi prima di proseguire.
+Dopo ogni modifica a un file `.py` del backend l'hook `.claude/hooks/dopo_modifica.py` lancia ruff e i test veloci (non quelli `integrazione`); se fallisce, correggi prima di proseguire. Prima della PR lancia anche `uv run pytest` completo.
 
 ## Architettura
 
 - `backend/src/academy_hub/`: pacchetto Python. Livelli: router (FastAPI) → servizi (regole di business, autorizzazione) → repository (accesso ai dati). Niente regole nelle rotte, niente SQL fuori dai repository.
-- `backend/tests/`: test pytest.
+  - `dominio/`: stati dell'iscrizione e transizioni (R7), ruoli; Python puro, senza database.
+  - `db/`: modelli SQLAlchemy (`modelli.py`) e migrazioni Alembic (`schema/versions/`). Lo schema cambia solo con una migrazione. Vedi `docs/database.md`.
+  - `repository/`: le query, con i lock `FOR UPDATE`. Ordine dei lock: prima l'iscrizione, poi l'edizione (ADR-0004).
+  - `servizi/`: le regole. Ogni cambio di stato di un'iscrizione passa da un solo punto che verifica la transizione e scrive l'audit (R6).
+- `backend/tests/`: test pytest. `dati.py` crea dati sintetici; `conftest.py` avvia PostgreSQL con la stessa immagine di docker compose e applica le migrazioni.
 - `backend/Dockerfile`: multi-stage con uv, runtime non root (uid 10001).
 - `.github/workflows/`: `ci.yml` (lint, typecheck, test, immagine + Trivy, compose, gitleaks) e `pr-issue.yml` (la PR deve collegare una issue). Sono status check obbligatori del ruleset su `main`.
 
