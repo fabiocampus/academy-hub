@@ -30,3 +30,12 @@ const giornoIso = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome" });
 export function oggiARoma(adesso: Date = new Date()): string {
   return giornoIso.format(adesso);
 }
+
+/** Un id dall'indirizzo (`/gestione/corsi/7`): intero positivo, altrimenti `null`. */
+export function idDaPercorso(valore: string | undefined): number | null {
+  if (valore === undefined || !/^[1-9]\d*$/.test(valore)) {
+    return null;
+  }
+  const id = Number(valore);
+  return Number.isSafeInteger(id) ? id : null;
+}

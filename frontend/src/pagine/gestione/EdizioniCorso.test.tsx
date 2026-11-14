@@ -15,6 +15,7 @@ import {
   server,
   voceEdizione,
 } from "../../test/server";
+import { contaLettureCatalogo, SpiaCatalogo } from "../../test/catalogo";
 import { mostra } from "../../test/render";
 import { EdizioniCorso } from "./EdizioniCorso";
 
@@ -32,14 +33,14 @@ function pagina7(): void {
 function conEdizioni(
   iniziali: Voce[],
   corso: Schemi["CorsoLetto"] = corsoLetto(7, { titolo: "SQL" }),
-): { elenco: Voce[] } {
-  const stato = { elenco: iniziali };
+): { elenco: Voce[]; versione: number } {
+  const stato = { elenco: iniziali, versione: 2 };
   server.use(
     http.get(`${API}/corsi/7`, () => conEtag(corso, 1)),
     http.get(`${API}/corsi/7/edizioni`, () => HttpResponse.json(pagina(stato.elenco))),
     http.get<{ id: string }, never, Voce | Problema>(`${API}/edizioni/:id`, ({ params }) => {
       const voce = stato.elenco.find((v) => String(v.id) === params.id);
-      return voce === undefined ? problema(404) : conEtag(voce, 2);
+      return voce === undefined ? problema(404) : conEtag(voce, stato.versione);
     }),
   );
   return stato;
@@ -182,6 +183,81 @@ describe("Edizioni del corso", () => {
     expect(chiamate).toEqual([{ ifMatch: '"2"', corpo: { docente_id: null } }]);
   });
 
+  it("con un 412 sulla modifica «Ricarica i dati» riparte dalla versione nuova", async () => {
+    const stato = conEdizioni([voceEdizione(1, { capienza: 10 })]);
+    const etag: (string | null)[] = [];
+    server.use(
+      http.patch(`${API}/edizioni/:id`, ({ request }) => {
+        etag.push(request.headers.get("If-Match"));
+        if (etag.length === 1) {
+          stato.elenco = [voceEdizione(1, { capienza: 15 })];
+          stato.versione = 3;
+          return problema(412, {
+            type: "/problemi/versione-non-corrispondente",
+            title: "La risorsa è stata modificata da qualcun altro",
+          });
+        }
+        return HttpResponse.json(edizioneLetta(1, { capienza: 20 }));
+      }),
+    );
+    pagina7();
+
+    await userEvent.click(await screen.findByRole("button", { name: /Modifica l'edizione/ }));
+    const finestra = await screen.findByRole("dialog");
+    const capienza = await within(finestra).findByRole("textbox", { name: /Capienza/ });
+    await userEvent.clear(capienza);
+    await userEvent.type(capienza, "20");
+    await userEvent.click(within(finestra).getByRole("button", { name: "Salva" }));
+
+    const avviso = await within(finestra).findByRole("alert");
+    expect(
+      within(avviso).getByText("La risorsa è stata modificata da qualcun altro"),
+    ).toBeInTheDocument();
+    expect(within(finestra).getByRole("textbox", { name: /Capienza/ })).toHaveValue("20");
+
+    await userEvent.click(within(avviso).getByRole("button", { name: "Ricarica i dati" }));
+    await waitFor(() => {
+      expect(within(finestra).getByRole("textbox", { name: /Capienza/ })).toHaveValue("15");
+    });
+    const nuova = within(finestra).getByRole("textbox", { name: /Capienza/ });
+    await userEvent.clear(nuova);
+    await userEvent.type(nuova, "20");
+    await userEvent.click(within(finestra).getByRole("button", { name: "Salva" }));
+
+    expect(await screen.findByText(/^Edizione .* modificata\.$/)).toBeInTheDocument();
+    expect(etag).toEqual(['"2"', '"3"']);
+  });
+
+  it("un 422 su docente_id va sul campo «Docente»", async () => {
+    conEdizioni([]);
+    server.use(
+      http.post(`${API}/edizioni`, () =>
+        problema(422, {
+          type: "/problemi/dati-non-validi",
+          title: "Dati non validi",
+          errori: [{ campo: "docente_id", messaggio: "La persona non è un docente" }],
+        }),
+      ),
+    );
+    pagina7();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Nuova edizione" }));
+    const finestra = await screen.findByRole("dialog");
+    await userEvent.type(within(finestra).getByLabelText(/Inizio/), "2099-03-10");
+    await userEvent.type(within(finestra).getByLabelText(/Fine/), "2099-03-11");
+    await userEvent.type(within(finestra).getByRole("textbox", { name: /Capienza/ }), "12");
+    await userEvent.click(within(finestra).getByLabelText("Docente"));
+    await userEvent.click(
+      await screen.findByRole("option", { name: "Dora Docente", hidden: true }),
+    );
+    await userEvent.click(within(finestra).getByRole("button", { name: "Pianifica" }));
+
+    expect(await within(finestra).findByText("La persona non è un docente")).toBeInTheDocument();
+    expect(within(finestra).getByLabelText("Docente")).toHaveAccessibleDescription(
+      "La persona non è un docente",
+    );
+  });
+
   it("la cancellazione chiede conferma; un 409 si vede con il dettaglio", async () => {
     conEdizioni([voceEdizione(1)]);
     server.use(
@@ -215,7 +291,19 @@ describe("Edizioni del corso", () => {
         return HttpResponse.json(edizioneLetta(1, { cancellata_il: "2027-01-05T09:30:00Z" }));
       }),
     );
-    pagina7();
+    const catalogo = contaLettureCatalogo();
+    mostra(
+      <>
+        <Routes>
+          <Route path="/gestione/corsi/:corsoId" element={<EdizioniCorso />} />
+        </Routes>
+        <SpiaCatalogo />
+      </>,
+      { percorso: "/gestione/corsi/7" },
+    );
+    await waitFor(() => {
+      expect(catalogo.letture).toBe(1);
+    });
 
     await userEvent.click(await screen.findByRole("button", { name: /Cancella l'edizione/ }));
     const finestra = await screen.findByRole("dialog");
@@ -223,5 +311,22 @@ describe("Edizioni del corso", () => {
 
     expect(await screen.findByText(/^Edizione .* cancellata\.$/)).toBeInTheDocument();
     expect(await screen.findByText("Cancellata")).toBeInTheDocument();
+    // L'edizione cancellata esce dal catalogo.
+    await waitFor(() => {
+      expect(catalogo.letture).toBe(2);
+    });
+  });
+
+  it("con un id non numerico nell'indirizzo non chiama l'API", async () => {
+    // Nessun handler per /corsi/abc: una chiamata farebbe fallire il test.
+    mostra(
+      <Routes>
+        <Route path="/gestione/corsi/:corsoId" element={<EdizioniCorso />} />
+      </Routes>,
+      { percorso: "/gestione/corsi/abc" },
+    );
+
+    expect(await screen.findByText("Pagina non trovata.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Edizioni del corso" })).toBeInTheDocument();
   });
 });

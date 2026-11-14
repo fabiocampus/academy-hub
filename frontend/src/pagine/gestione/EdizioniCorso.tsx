@@ -7,7 +7,7 @@ import type { Schemi } from "../../api/client";
 import { useCancellaEdizione, useCorso, useDocenti, useEdizioniDelCorso } from "../../api/gestione";
 import { avvisaErrore, avvisaSuccesso } from "../../componenti/avvisi";
 import { Conferma } from "../../componenti/Conferma";
-import { formattaPeriodo, oggiARoma } from "../../componenti/formato";
+import { formattaPeriodo, idDaPercorso, oggiARoma } from "../../componenti/formato";
 import { Paginazione } from "../../componenti/Paginazione";
 import { Caricamento, Errore, Vuoto } from "../../componenti/Stati";
 import { ModificaEdizione, NuovaEdizione } from "./FormEdizione";
@@ -44,7 +44,22 @@ function StatoEdizione({ voce, oggi }: { voce: Voce; oggi: string }) {
 }
 
 export function EdizioniCorso() {
-  const corsoId = Number(useParams().corsoId);
+  const corsoId = idDaPercorso(useParams().corsoId);
+  if (corsoId === null) {
+    return (
+      <Stack>
+        <Anchor component={Link} to="/gestione" size="sm">
+          ← Tutti i corsi
+        </Anchor>
+        <Title order={1}>Edizioni del corso</Title>
+        <Vuoto>Pagina non trovata.</Vuoto>
+      </Stack>
+    );
+  }
+  return <Edizioni corsoId={corsoId} />;
+}
+
+function Edizioni({ corsoId }: { corsoId: number }) {
   const corso = useCorso(corsoId);
   const [pagina, setPagina] = useState(1);
   const edizioni = useEdizioniDelCorso(corsoId, {
@@ -64,6 +79,7 @@ export function EdizioniCorso() {
       <Anchor component={Link} to="/gestione" size="sm">
         ← Tutti i corsi
       </Anchor>
+      {!corso.isSuccess && <Title order={1}>Edizioni del corso</Title>}
       {corso.isPending && <Caricamento etichetta="Caricamento del corso" />}
       {corso.isError && <Errore errore={corso.error} riprova={() => void corso.refetch()} />}
       {corso.isSuccess && (

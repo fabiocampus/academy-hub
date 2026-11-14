@@ -8,7 +8,7 @@ import { useCreaEdizione, useDocenti, useEdizione, useModificaEdizione } from ".
 import { avvisaSuccesso } from "../../componenti/avvisi";
 import { formattaPeriodo } from "../../componenti/formato";
 import { Caricamento, Errore } from "../../componenti/Stati";
-import { campiNonValidi, ErroreForm } from "./ErroreForm";
+import { campiNonValidi, ErroreForm, statoLettura } from "./ErroreForm";
 
 /** Come `Capienza` nel contratto. */
 export const CAPIENZA_MASSIMA = 10_000;
@@ -182,10 +182,11 @@ export function NuovaEdizione({ corsoId, chiudi }: { corsoId: number; chiudi: ()
 export function ModificaEdizione({ id, chiudi }: { id: number; chiudi: () => void }) {
   const edizione = useEdizione(id);
   const [giro, setGiro] = useState(0);
-  if (edizione.isPending) {
+  const lettura = statoLettura(edizione);
+  if (lettura === "caricamento") {
     return <Caricamento etichetta="Caricamento dell'edizione" />;
   }
-  if (edizione.isError) {
+  if (lettura === "errore" || edizione.data === undefined) {
     return <Errore errore={edizione.error} riprova={() => void edizione.refetch()} />;
   }
   return (

@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { Route, Routes } from "react-router";
@@ -16,6 +16,7 @@ import {
   server,
   voceIscrizioneEdizione,
 } from "../../test/server";
+import { contaLettureCatalogo, SpiaCatalogo } from "../../test/catalogo";
 import { mostra } from "../../test/render";
 import { IscrizioniEdizione } from "./IscrizioniEdizione";
 
@@ -61,8 +62,12 @@ describe("Iscrizioni dell'edizione", () => {
 
     pagina3();
 
-    expect(await screen.findByRole("heading", { name: "SQL" })).toBeInTheDocument();
-    expect(screen.getByText(/1\/2 posti confermati/)).toBeInTheDocument();
+    // Edizione e titolo del corso arrivano da due letture in sequenza.
+    expect(await screen.findByText(/1\/2 posti confermati/)).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "SQL" }, { timeout: 3000 }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("2 iscrizioni")).toBeInTheDocument();
     const righe = await screen.findAllByRole("row");
     expect(righe).toHaveLength(3);
     const bruno = within(righe[2] as HTMLElement);
@@ -93,7 +98,19 @@ describe("Iscrizioni dell'edizione", () => {
         return HttpResponse.json(iscrizioneLetta(4, "Confermata"));
       }),
     );
-    pagina3();
+    const catalogo = contaLettureCatalogo();
+    mostra(
+      <>
+        <Routes>
+          <Route path="/gestione/edizioni/:edizioneId" element={<IscrizioniEdizione />} />
+        </Routes>
+        <SpiaCatalogo />
+      </>,
+      { percorso: "/gestione/edizioni/3" },
+    );
+    await waitFor(() => {
+      expect(catalogo.letture).toBe(1);
+    });
 
     await userEvent.click(
       await screen.findByRole("button", { name: "Conferma l'iscrizione di Anna Dati" }),
@@ -101,6 +118,11 @@ describe("Iscrizioni dell'edizione", () => {
 
     expect(await screen.findByText("Iscrizione di Anna Dati confermata.")).toBeInTheDocument();
     expect(await screen.findByText("Confermata")).toBeInTheDocument();
+    expect(screen.getByText("1 iscrizione")).toBeInTheDocument();
+    // I posti liberi dell'edizione cambiano anche nel catalogo.
+    await waitFor(() => {
+      expect(catalogo.letture).toBe(2);
+    });
   });
 
   it("senza posti l'iscrizione va in lista d'attesa e lo dice", async () => {
@@ -149,5 +171,21 @@ describe("Iscrizioni dell'edizione", () => {
     pagina3();
 
     expect(await screen.findAllByText("Risorsa inesistente")).toHaveLength(2);
+    expect(screen.getByRole("heading", { name: "Iscrizioni dell'edizione" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "← Tutti i corsi" })).toHaveAttribute(
+      "href",
+      "/gestione",
+    );
+  });
+
+  it("con un id non numerico nell'indirizzo non chiama l'API", async () => {
+    mostra(
+      <Routes>
+        <Route path="/gestione/edizioni/:edizioneId" element={<IscrizioniEdizione />} />
+      </Routes>,
+      { percorso: "/gestione/edizioni/3x" },
+    );
+
+    expect(await screen.findByText("Pagina non trovata.")).toBeInTheDocument();
   });
 });

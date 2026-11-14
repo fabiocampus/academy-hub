@@ -11,7 +11,7 @@ import {
   useIscrizioniDellEdizione,
 } from "../../api/gestione";
 import { avvisaErrore, avvisaSuccesso } from "../../componenti/avvisi";
-import { formattaIstante, formattaPeriodo } from "../../componenti/formato";
+import { formattaIstante, formattaPeriodo, idDaPercorso } from "../../componenti/formato";
 import { Paginazione } from "../../componenti/Paginazione";
 import { Caricamento, Errore, Vuoto } from "../../componenti/Stati";
 import { StatoIscrizione } from "../../componenti/StatoIscrizione";
@@ -22,7 +22,26 @@ type Voce = Schemi["VoceIscrizioneEdizione"];
 type Filtro = "tutte" | "da-confermare";
 
 export function IscrizioniEdizione() {
-  const edizioneId = Number(useParams().edizioneId);
+  const edizioneId = idDaPercorso(useParams().edizioneId);
+  if (edizioneId === null) {
+    return <PaginaNonTrovata />;
+  }
+  return <Iscrizioni edizioneId={edizioneId} />;
+}
+
+function PaginaNonTrovata() {
+  return (
+    <Stack>
+      <Anchor component={Link} to="/gestione" size="sm">
+        ← Tutti i corsi
+      </Anchor>
+      <Title order={1}>Iscrizioni dell&apos;edizione</Title>
+      <Vuoto>Pagina non trovata.</Vuoto>
+    </Stack>
+  );
+}
+
+function Iscrizioni({ edizioneId }: { edizioneId: number }) {
   const edizione = useEdizione(edizioneId);
   const [filtro, setFiltro] = useState<Filtro>("tutte");
   const [pagina, setPagina] = useState(1);
@@ -34,6 +53,14 @@ export function IscrizioniEdizione() {
 
   return (
     <Stack>
+      {!edizione.isSuccess && (
+        <>
+          <Anchor component={Link} to="/gestione" size="sm">
+            ← Tutti i corsi
+          </Anchor>
+          <Title order={1}>Iscrizioni dell&apos;edizione</Title>
+        </>
+      )}
       {edizione.isPending && <Caricamento etichetta="Caricamento dell'edizione" />}
       {edizione.isError && (
         <Errore errore={edizione.error} riprova={() => void edizione.refetch()} />
@@ -103,7 +130,11 @@ export function IscrizioniEdizione() {
             pagina={pagina}
             cambia={setPagina}
             di="delle iscrizioni"
-            conteggio={`${String(iscrizioni.data.totale)} iscrizioni`}
+            conteggio={
+              iscrizioni.data.totale === 1
+                ? "1 iscrizione"
+                : `${String(iscrizioni.data.totale)} iscrizioni`
+            }
           />
         </>
       )}

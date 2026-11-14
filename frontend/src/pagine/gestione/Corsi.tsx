@@ -21,7 +21,7 @@ import { avvisaSuccesso } from "../../componenti/avvisi";
 import { Conferma } from "../../componenti/Conferma";
 import { Paginazione } from "../../componenti/Paginazione";
 import { Caricamento, Errore, Vuoto } from "../../componenti/Stati";
-import { ErroreForm } from "./ErroreForm";
+import { ErroreForm, statoLettura } from "./ErroreForm";
 import { ModificaCorso, NuovoCorso } from "./FormCorso";
 
 export const PER_PAGINA = 20;
@@ -190,9 +190,10 @@ function ConfermaArchiviazione({ corso, chiudi }: { corso: Corso; chiudi: () => 
   const letto = useCorso(corso.id);
   const archiviazione = useArchiviaCorso();
   const [errore, setErrore] = useState<unknown>(null);
+  const lettura = statoLettura(letto);
 
   function archivia(): void {
-    if (letto.data === undefined) {
+    if (lettura !== "pronta" || letto.data === undefined) {
       return;
     }
     setErrore(null);
@@ -214,11 +215,17 @@ function ConfermaArchiviazione({ corso, chiudi }: { corso: Corso; chiudi: () => 
       titolo="Archiviare il corso?"
       azione="Archivia il corso"
       inCorso={archiviazione.isPending}
-      pronta={letto.isSuccess}
+      pronta={lettura === "pronta" && !letto.isFetching}
       conferma={archivia}
       chiudi={chiudi}
     >
-      <ErroreForm errore={errore ?? (letto.isError ? letto.error : null)} />
+      <ErroreForm
+        errore={errore ?? (lettura === "errore" ? letto.error : null)}
+        ricarica={() => {
+          setErrore(null);
+          void letto.refetch();
+        }}
+      />
       <Text>
         «{corso.titolo}» e le sue edizioni escono dal catalogo e non se ne potranno pianificare
         altre. Le edizioni e le iscrizioni già fatte restano.

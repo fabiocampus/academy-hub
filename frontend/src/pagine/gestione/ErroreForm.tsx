@@ -16,6 +16,26 @@ export function versioneSuperata(errore: unknown): boolean {
   return errore instanceof ErroreApi && errore.stato === 412;
 }
 
+/**
+ * Stato della lettura con ETag che apre una modifica. «pronta» solo dopo una lettura
+ * fatta da questa apertura: una copia rimasta in cache porterebbe un ETag vecchio.
+ * Con i dati già letti, un errore di una rilettura in background (per esempio dopo un
+ * 412) non toglie il form: i valori scritti restano.
+ */
+export function statoLettura(lettura: {
+  data: unknown;
+  isError: boolean;
+  isFetchedAfterMount: boolean;
+}): "caricamento" | "errore" | "pronta" {
+  if (!lettura.isFetchedAfterMount) {
+    return "caricamento";
+  }
+  if (lettura.data === undefined) {
+    return lettura.isError ? "errore" : "caricamento";
+  }
+  return "pronta";
+}
+
 export function ErroreForm({ errore, ricarica }: { errore: unknown; ricarica?: () => void }) {
   if (errore === null) {
     return null;

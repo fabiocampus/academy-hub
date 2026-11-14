@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Problema, Schemi } from "../../api/client";
 import { API, conEtag, corsoLetto, pagina, problema, server } from "../../test/server";
+import { contaLettureCatalogo, SpiaCatalogo } from "../../test/catalogo";
 import { mostra } from "../../test/render";
 import { Corsi } from "./Corsi";
 
@@ -79,7 +80,16 @@ describe("Gestione corsi", () => {
         return HttpResponse.json(creato, { status: 201 });
       }),
     );
-    mostra(<Corsi />);
+    const catalogo = contaLettureCatalogo();
+    mostra(
+      <>
+        <Corsi />
+        <SpiaCatalogo />
+      </>,
+    );
+    await waitFor(() => {
+      expect(catalogo.letture).toBe(1);
+    });
 
     await userEvent.click(await screen.findByRole("button", { name: "Nuovo corso" }));
     const finestra = await screen.findByRole("dialog");
@@ -92,6 +102,10 @@ describe("Gestione corsi", () => {
     expect(await screen.findByRole("link", { name: "SQL" })).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+    // Il corso nuovo può avere edizioni a catalogo: anche il catalogo si rilegge.
+    await waitFor(() => {
+      expect(catalogo.letture).toBe(2);
     });
   });
 
@@ -136,6 +150,41 @@ describe("Gestione corsi", () => {
 
     expect(await screen.findByText("Corso «Python avanzato» modificato.")).toBeInTheDocument();
     expect(chiamate).toEqual([{ ifMatch: '"3"', corpo: { titolo: "Python avanzato" } }]);
+  });
+
+  it("riaprendo la modifica rilegge il corso e manda l'ETag nuovo, non quello in cache", async () => {
+    const stato = conCorsi([corsoLetto(1, { titolo: "Python" })], 1);
+    const etag: (string | null)[] = [];
+    server.use(
+      http.patch(`${API}/corsi/:id`, ({ request }) => {
+        etag.push(request.headers.get("If-Match"));
+        return HttpResponse.json(corsoLetto(1, { titolo: "Python 3" }));
+      }),
+    );
+    mostra(<Corsi />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Modifica Python" }));
+    const prima = await screen.findByRole("dialog");
+    await within(prima).findByRole("textbox", { name: /Titolo/ });
+    await userEvent.click(within(prima).getByRole("button", { name: "Indietro" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+    // Intanto qualcun altro modifica il corso.
+    stato.elenco = [corsoLetto(1, { titolo: "Python 3" })];
+    stato.versione = 5;
+
+    await userEvent.click(await screen.findByRole("button", { name: "Modifica Python" }));
+    const finestra = await screen.findByRole("dialog");
+    const titolo = await within(finestra).findByRole("textbox", { name: /Titolo/ });
+    expect(titolo).toHaveValue("Python 3");
+    const durata = within(finestra).getByRole("textbox", { name: /Durata/ });
+    await userEvent.clear(durata);
+    await userEvent.type(durata, "12");
+    await userEvent.click(within(finestra).getByRole("button", { name: "Salva" }));
+
+    expect(await screen.findByText("Corso «Python 3» modificato.")).toBeInTheDocument();
+    expect(etag).toEqual(['"5"']);
   });
 
   it("con un 412 mostra il problema e «Ricarica i dati» riparte dalla versione nuova", async () => {
@@ -214,6 +263,46 @@ describe("Gestione corsi", () => {
     expect(await screen.findByText("Corso «Python» archiviato.")).toBeInTheDocument();
     expect(etag).toEqual(['"4"']);
     expect(await screen.findByText("Archiviato")).toBeInTheDocument();
+  });
+
+  it("un 412 sull'archiviazione si risolve con «Ricarica i dati»", async () => {
+    const stato = conCorsi([corsoLetto(1, { titolo: "Python" })], 1);
+    const etag: (string | null)[] = [];
+    server.use(
+      http.post(`${API}/corsi/:id/archiviazione`, ({ request }) => {
+        etag.push(request.headers.get("If-Match"));
+        if (etag.length === 1) {
+          stato.versione = 2;
+          return problema(412, {
+            type: "/problemi/versione-non-corrispondente",
+            title: "La risorsa è stata modificata da qualcun altro",
+          });
+        }
+        return HttpResponse.json(
+          corsoLetto(1, { titolo: "Python", archiviato_il: "2027-01-05T09:30:00Z" }),
+        );
+      }),
+    );
+    mostra(<Corsi />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Archivia Python" }));
+    const finestra = await screen.findByRole("dialog", { name: "Archiviare il corso?" });
+    const conferma = within(finestra).getByRole("button", { name: "Archivia il corso" });
+    await waitFor(() => {
+      expect(conferma).toBeEnabled();
+    });
+    await userEvent.click(conferma);
+
+    const avviso = await within(finestra).findByRole("alert");
+    await userEvent.click(within(avviso).getByRole("button", { name: "Ricarica i dati" }));
+    expect(within(finestra).queryByRole("alert")).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(conferma).toBeEnabled();
+    });
+    await userEvent.click(conferma);
+
+    expect(await screen.findByText("Corso «Python» archiviato.")).toBeInTheDocument();
+    expect(etag).toEqual(['"1"', '"2"']);
   });
 
   it("anche con il pulsante visibile, l'API può rifiutare: si vede il 403", async () => {

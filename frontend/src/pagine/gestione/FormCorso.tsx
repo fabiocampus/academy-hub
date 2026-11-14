@@ -7,7 +7,7 @@ import type { ConVersione, Schemi } from "../../api/client";
 import { useCorso, useCreaCorso, useModificaCorso } from "../../api/gestione";
 import { avvisaSuccesso } from "../../componenti/avvisi";
 import { Caricamento, Errore } from "../../componenti/Stati";
-import { campiNonValidi, ErroreForm } from "./ErroreForm";
+import { campiNonValidi, ErroreForm, statoLettura } from "./ErroreForm";
 
 /** Come `Titolo` e `OrePositive` nel contratto. */
 export const TITOLO_MASSIMO = 200;
@@ -131,10 +131,11 @@ export function NuovoCorso({ chiudi }: { chiudi: () => void }) {
 export function ModificaCorso({ id, chiudi }: { id: number; chiudi: () => void }) {
   const corso = useCorso(id);
   const [giro, setGiro] = useState(0);
-  if (corso.isPending) {
+  const lettura = statoLettura(corso);
+  if (lettura === "caricamento") {
     return <Caricamento etichetta="Caricamento del corso" />;
   }
-  if (corso.isError) {
+  if (lettura === "errore" || corso.data === undefined) {
     return <Errore errore={corso.error} riprova={() => void corso.refetch()} />;
   }
   return (
