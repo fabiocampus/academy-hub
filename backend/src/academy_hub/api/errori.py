@@ -202,7 +202,8 @@ async def _versione_superata(richiesta: Request, errore: Exception) -> JSONRespo
 
 async def _imprevisto(richiesta: Request, errore: Exception) -> JSONResponse:
     # Il dettaglio resta nel log: nel corpo potrebbe esporre dati interni.
-    log.error("Errore imprevisto su %s %s", richiesta.method, richiesta.url.path, exc_info=errore)
+    # Una riga sola: il traceback lo registra il server, a cui Starlette rilancia l'errore.
+    log.error("Errore imprevisto su %s %s: %r", richiesta.method, richiesta.url.path, errore)
     return problema(richiesta, 500, "about:blank", HTTPStatus(500).phrase)
 
 

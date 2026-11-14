@@ -1,7 +1,7 @@
 """Schemi Pydantic di richieste e risposte: la forma pubblica del contratto OpenAPI."""
 
 from datetime import date, datetime
-from typing import Annotated
+from typing import Annotated, TypeVar
 
 from pydantic import (
     BaseModel,
@@ -13,6 +13,8 @@ from pydantic import (
 )
 
 from academy_hub.dominio.stati import StatoIscrizione
+
+T = TypeVar("T")
 
 Titolo = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 OrePositive = Annotated[int, Field(gt=0, le=1000)]
@@ -37,6 +39,13 @@ class CorsoLetto(BaseModel):
     archiviato_il: datetime | None
 
 
+def _non_null(valore: T | None) -> T:
+    """Un campo assente resta invariato; `null` esplicito non ha senso dove serve un valore."""
+    if valore is None:
+        raise ValueError("non può essere null")
+    return valore
+
+
 class ModificaCorso(BaseModel):
     """Solo i campi presenti vengono modificati."""
 
@@ -45,6 +54,8 @@ class ModificaCorso(BaseModel):
     titolo: Titolo | None = None
     descrizione: str | None = None
     durata_ore: OrePositive | None = None
+
+    _senza_null = field_validator("titolo", "descrizione", "durata_ore")(_non_null)
 
 
 class NuovaEdizione(BaseModel):
@@ -76,6 +87,8 @@ class ModificaEdizione(BaseModel):
     docente_id: int | None = Field(
         default=None, description="Assente: invariato; null: toglie il docente"
     )
+
+    _senza_null = field_validator("data_inizio", "data_fine", "capienza")(_non_null)
 
 
 class EdizioneLetta(BaseModel):

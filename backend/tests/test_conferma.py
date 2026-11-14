@@ -9,9 +9,10 @@ from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
 
 from academy_hub.db.modelli import Edizione, Iscrizione
+from academy_hub.dominio.errori import EdizioneCancellata
 from academy_hub.dominio.stati import StatoIscrizione, TransizioneNonConsentita
 from academy_hub.repository.iscrizioni import IscrizioneNonTrovata, eventi_audit
-from academy_hub.servizi.iscrizioni import EdizioneCancellata, conferma_posto
+from academy_hub.servizi.iscrizioni import conferma_posto
 
 from .dati import crea_edizione, crea_iscrizione, crea_persona
 

@@ -11,13 +11,18 @@ from sqlalchemy.orm import Session
 
 from academy_hub.db.modelli import Corso, Edizione
 from academy_hub.dominio.attore import Attore
-from academy_hub.dominio.errori import Conflitto, DatiNonValidi, NonTrovato, verifica_versione
+from academy_hub.dominio.errori import (
+    Conflitto,
+    DatiNonValidi,
+    EdizioneCancellata,
+    NonTrovato,
+    verifica_versione,
+)
 from academy_hub.dominio.ruoli import Ruolo
 from academy_hub.dominio.tempo import oggi
 from academy_hub.repository import catalogo as repository
 from academy_hub.repository import iscrizioni, persone
 from academy_hub.repository.catalogo import VoceCatalogo
-from academy_hub.servizi.iscrizioni import EdizioneCancellata
 
 
 class Invariato(Enum):

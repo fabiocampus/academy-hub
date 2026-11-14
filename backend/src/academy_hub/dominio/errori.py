@@ -39,6 +39,15 @@ class Conflitto(ErroreDominio):
     titolo = "Conflitto con lo stato attuale"
 
 
+class EdizioneCancellata(Conflitto):
+    tipo = "edizione-cancellata"
+    titolo = "Edizione cancellata"
+
+    def __init__(self, edizione_id: int) -> None:
+        self.edizione_id = edizione_id
+        super().__init__(f"Edizione {edizione_id} cancellata")
+
+
 class DatiNonValidi(ErroreDominio):
     """Dati incoerenti che si scoprono solo confrontandoli con quelli salvati."""
 

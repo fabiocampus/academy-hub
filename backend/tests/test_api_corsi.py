@@ -200,3 +200,16 @@ def test_archiviazione_di_un_corso_inesistente_404(client: TestClient, db: Engin
     risposta = client.post("/api/v1/corsi/999/archiviazione", headers={**admin, "If-Match": '"1"'})
 
     assert risposta.status_code == 404
+
+
+@pytest.mark.parametrize("campo", ["titolo", "descrizione", "durata_ore"])
+def test_null_nella_modifica_del_corso_422(client: TestClient, db: Engine, campo: str) -> None:
+    admin = persona(db, "Admin", Ruolo.ADMIN_ACADEMY)
+    corso_id, versione = crea(client, admin)
+
+    risposta = client.patch(
+        f"/api/v1/corsi/{corso_id}", json={campo: None}, headers={**admin, "If-Match": versione}
+    )
+
+    assert risposta.status_code == 422
+    assert [e["campo"] for e in risposta.json()["errori"]] == [campo]

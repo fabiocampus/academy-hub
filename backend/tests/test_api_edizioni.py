@@ -272,3 +272,14 @@ def test_edizione_inesistente_404(client: TestClient, db: Engine) -> None:
     )
 
     assert (letta.status_code, modificata.status_code) == (404, 404)
+
+
+@pytest.mark.parametrize("campo", ["data_inizio", "data_fine", "capienza"])
+def test_null_su_un_campo_obbligatorio_422(client: TestClient, db: Engine, campo: str) -> None:
+    """Solo `docente_id` si può svuotare: null altrove è un errore, non «invariato»."""
+    admin, edizione_id = pianifica(client, db, posti_confermati=0)
+
+    risposta = modifica(client, admin, edizione_id, **{campo: None})
+
+    assert risposta.status_code == 422
+    assert [e["campo"] for e in risposta.json()["errori"]] == [campo]
