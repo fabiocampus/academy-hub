@@ -36,7 +36,7 @@ Asset da proteggere: l'esito delle richieste (chi va al corso), i posti delle ed
 | D2 | Ruoli e team solo dal database, mai dal token o dagli header | `api/dipendenze.py`, ADR-0008 |
 | D3 | Identità `provvisoria` (`X-Persona-Id`) e `databricks` rifiutate dalla configurazione fuori dall'ambiente giusto | `config.py` |
 | D4 | Autorizzazione nei servizi, prima di leggere lo stato: chi non può decidere non scopre lo stato (R2 prima di R7) | `servizi/`, `dominio/organigramma.py` |
-| D5 | Matrice rotta × profilo eseguita in CI; una rotta senza riga fa fallire i test | `tests/test_autorizzazione.py` |
+| D5 | Matrice rotta × profilo eseguita in CI, con profili dello stesso ruolo dentro e fuori dal rapporto con l'iscrizione (titolare, responsabile diretto); una rotta senza riga fa fallire i test | `tests/test_autorizzazione.py` |
 | D6 | Transizioni ammesse in un solo punto, con audit nella stessa transazione | `servizi/iscrizioni.py`, R6, R7 |
 | D7 | Audit append-only: un trigger blocca `UPDATE`, `DELETE`, `TRUNCATE` | migrazione 0001, `docs/database.md` |
 | D8 | Lock in ordine fisso (edizione, poi iscrizioni), posti contati sotto lock, vincoli `CHECK` | ADR-0004 |
@@ -57,7 +57,8 @@ Stato: **mitigata** (una difesa la copre), **accettata** (rischio residuo consap
 | Token falsificato o firmato con `alg: none` / HS256 con la chiave pubblica | tutti | D1 | mitigata |
 | Token di un altro realm o per un altro servizio | tutti | D1 (`iss`, `aud`) | mitigata |
 | Email non verificata usata per agganciare la persona di un altro | tutti | D1 (`email_verified`) | mitigata |
-| `X-Persona-Id` o `X-Forwarded-Email` mandati a mano | tutti | D3 | mitigata in locale e con `oidc`; su Databricks l'App è raggiungibile solo dal proxy, da verificare nella fase 8 |
+| `X-Persona-Id` o `X-Forwarded-Email` mandati a mano | tutti | D3 | mitigata fuori da `locale` e con `oidc`; in locale `provvisoria` permette di impersonare chiunque (voluto, per i test). Su Databricks l'App è raggiungibile solo dal proxy, da verificare nella fase 8 |
+| Deploy senza `ACADEMY_AMBIENTE`: vale `locale`, quindi `provvisoria` passa la validazione | tutti | D3 dipende da `ACADEMY_AMBIENTE` impostato | aperta (#58): nella fase 8 il deploy su Databricks lo imposta e un controllo all'avvio lo rende obbligatorio fuori dai test |
 | Token rubato riusato fino alla scadenza | tutti | durata breve del token di Keycloak | accettata: niente binding (DPoP, mTLS) in un prototipo |
 | Utente rinominato nel provider che prende l'email di un ex collega | tutti | email unica in `persone`; il cambio va fatto a mano | accettata (ADR-0008) |
 
@@ -105,7 +106,7 @@ Stato: **mitigata** (una difesa la copre), **accettata** (rischio residuo consap
 | Minaccia | Passo | Difesa | Stato |
 |---|---|---|---|
 | Ruoli inseriti nel token (`realm_access`) | tutti | D2: ignorati | mitigata |
-| Rotta nuova dimenticata senza controllo | tutti | D5 | mitigata |
+| Rotta nuova dimenticata senza controllo | tutti | D5 | mitigata per ruolo, titolare e responsabile diretto sulle rotte di oggi; per una rotta nuova con un controllo sull'oggetto diverso serve aggiungere il profilo che lo mette alla prova |
 | `admin_academy` che decide al posto del responsabile | approvazione | D4: decide solo il responsabile diretto; l'admin solo per le richieste dal vertice | mitigata |
 | Dipendenza vulnerabile (Python, immagine, azioni) | — | D12 | mitigata per le vulnerabilità note |
 | Codice vulnerabile o workflow iniettabile | — | D12 (CodeQL `security-extended`, permessi minimi nei workflow) | mitigata in parte |

@@ -52,12 +52,19 @@ jobs:
   dipendenze:
     # Vulnerabilità note (PyPI Advisory DB e OSV) nelle versioni bloccate in uv.lock,
     # dipendenze di sviluppo comprese. Niente installazione: si controllano gli hash.
+    # pip-audit stesso è in uv.lock (gruppo dev), con le sue dipendenze e i loro hash.
+    # Le CVE nuove su un lock che non cambia le segnalano gli avvisi di Dependabot.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
+        with:
+          enable-cache: true
+      - run: uv sync --locked
       - run: uv export --locked --format requirements-txt --no-emit-project -o "$RUNNER_TEMP/requisiti.txt"
-      - run: uvx pip-audit==2.10.1 --strict --disable-pip --require-hashes -r "$RUNNER_TEMP/requisiti.txt"
+      - run: uv run pip-audit --strict --disable-pip --require-hashes -r "$RUNNER_TEMP/requisiti.txt"
 
   immagine:
     # Build dell'immagine del backend e scansione con Trivy.

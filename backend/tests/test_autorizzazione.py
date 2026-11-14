@@ -2,20 +2,29 @@
 
 Le identità passano dal token OIDC, come in docker compose: «non registrata» è un token
 valido di un'email che non è nel database, «anonimo» non manda niente. Ogni persona ha
-un solo ruolo, così la riga mostra che cosa concede quel ruolo e nient'altro.
+un solo ruolo, così la riga mostra che cosa concede quel ruolo e nient'altro. Per i
+controlli sull'oggetto (titolare, responsabile diretto) ci sono un altro dipendente e un
+altro responsabile, con lo stesso ruolo ma fuori dal rapporto con l'iscrizione.
 
 Il mondo di partenza:
 
 ```
-Vertice (nessun responsabile)
-└── Dati (resp. Rossa): Anna
+Vertice (nessun responsabile): Vera, Admin, Dora
+├── Dati (resp. Rossa): Anna
+└── Web  (resp. Verdi): Carla
 ```
 
 Anna ha una Richiesta (edizione A) e un'Approvata (edizione B); l'edizione C è libera.
+Vera ha una Richiesta (edizione A): la decide l'amministrazione Academy.
 Il responsabile non è un ruolo che apre rotte: decide chi è `responsabile_id` del team
 del richiedente (R2); l'amministratore non decide al posto suo.
 
-`test_ogni_rotta_ha_la_sua_riga` fallisce se si aggiunge una rotta senza la riga.
+La matrice controlla gli stati, non il contenuto degli elenchi: quali iscrizioni e quali
+richieste vede ciascuno lo verificano `test_api_iscrizioni.py` e `test_api_approvazione.py`.
+
+`test_ogni_rotta_ha_la_sua_riga` fallisce se si aggiunge una rotta senza la riga. Le
+rotte vengono dallo schema OpenAPI: una rotta con `include_in_schema=False` sfuggirebbe,
+quindi non se ne usano.
 """
 
 from collections.abc import Callable, Iterator
@@ -40,12 +49,24 @@ from .oidc import ProviderFinto
 R = Ruolo
 S = StatoIscrizione
 
-PROFILI = ("dipendente", "responsabile", "admin_academy", "docente", "non_registrata", "anonimo")
+PROFILI = (
+    "dipendente",
+    "altro_dipendente",
+    "responsabile",
+    "altro_responsabile",
+    "admin_academy",
+    "docente",
+    "non_registrata",
+    "anonimo",
+)
+# profilo -> (nome, ruolo, team)
 _PERSONE = {
-    "dipendente": ("Anna", R.DIPENDENTE),
-    "responsabile": ("Rossa", R.RESPONSABILE),
-    "admin_academy": ("Admin", R.ADMIN_ACADEMY),
-    "docente": ("Dora", R.DOCENTE),
+    "dipendente": ("Anna", R.DIPENDENTE, "Dati"),
+    "altro_dipendente": ("Carla", R.DIPENDENTE, "Web"),
+    "responsabile": ("Rossa", R.RESPONSABILE, "Dati"),
+    "altro_responsabile": ("Verdi", R.RESPONSABILE, "Web"),
+    "admin_academy": ("Admin", R.ADMIN_ACADEMY, "Vertice"),
+    "docente": ("Dora", R.DOCENTE, "Vertice"),
 }
 
 
@@ -55,6 +76,7 @@ class Mondo:
     edizione_libera: int
     richiesta: int
     approvata: int
+    richiesta_vertice: int
 
 
 @dataclass(frozen=True)
@@ -70,11 +92,25 @@ Riga = tuple[Callable[[Mondo], Chiamata], dict[str, int]]
 _IF_MATCH = {"If-Match": '"1"'}
 
 
-def _attesi(dip: int, resp: int, admin: int, doc: int) -> dict[str, int]:
-    """Stati attesi delle persone registrate; il resto dell'API è chiuso agli sconosciuti."""
+def _attesi(
+    dip: int,
+    resp: int,
+    admin: int,
+    doc: int,
+    *,
+    altro_dip: int | None = None,
+    altro_resp: int | None = None,
+) -> dict[str, int]:
+    """Stati attesi delle persone registrate; il resto dell'API è chiuso agli sconosciuti.
+
+    Senza indicazioni l'altro dipendente e l'altro responsabile valgono come i primi:
+    cambiano solo dove conta il rapporto con l'iscrizione.
+    """
     return {
         "dipendente": dip,
+        "altro_dipendente": dip if altro_dip is None else altro_dip,
         "responsabile": resp,
+        "altro_responsabile": resp if altro_resp is None else altro_resp,
         "admin_academy": admin,
         "docente": doc,
         "non_registrata": 403,
@@ -132,15 +168,15 @@ MATRICE: dict[tuple[str, str], Riga] = {
     ("GET", "/iscrizioni"): (lambda m: Chiamata("GET", "/iscrizioni"), TUTTI),
     ("GET", "/iscrizioni/{iscrizione_id}"): (
         lambda m: Chiamata("GET", f"/iscrizioni/{m.richiesta}"),
-        _attesi(200, 403, 200, 403),
+        _attesi(200, 403, 200, 403, altro_dip=403),
     ),
     ("POST", "/iscrizioni/{iscrizione_id}/approvazione"): (
         lambda m: Chiamata("POST", f"/iscrizioni/{m.richiesta}/approvazione"),
-        _attesi(403, 200, 403, 403),
+        _attesi(403, 200, 403, 403, altro_resp=403),
     ),
     ("POST", "/iscrizioni/{iscrizione_id}/rifiuto"): (
         lambda m: Chiamata("POST", f"/iscrizioni/{m.richiesta}/rifiuto", {"motivo": "No"}),
-        _attesi(403, 200, 403, 403),
+        _attesi(403, 200, 403, 403, altro_resp=403),
     ),
     ("POST", "/iscrizioni/{iscrizione_id}/conferma"): (
         lambda m: Chiamata("POST", f"/iscrizioni/{m.approvata}/conferma"),
@@ -148,13 +184,27 @@ MATRICE: dict[tuple[str, str], Riga] = {
     ),
     ("POST", "/iscrizioni/{iscrizione_id}/annullamento"): (
         lambda m: Chiamata("POST", f"/iscrizioni/{m.richiesta}/annullamento"),
-        _attesi(200, 403, 403, 403),
+        _attesi(200, 403, 403, 403, altro_dip=403),
     ),
     ("GET", "/richieste-da-approvare"): (
         lambda m: Chiamata("GET", "/richieste-da-approvare"),
         TUTTI,
     ),
 }
+
+# Altri casi di rotte già nella matrice, dove cambia chi può.
+VARIANTI: dict[str, Riga] = {
+    "approvazione di una richiesta dal vertice": (
+        lambda m: Chiamata("POST", f"/iscrizioni/{m.richiesta_vertice}/approvazione"),
+        SOLO_ADMIN,
+    ),
+    "rifiuto di una richiesta dal vertice": (
+        lambda m: Chiamata("POST", f"/iscrizioni/{m.richiesta_vertice}/rifiuto", {"motivo": "No"}),
+        SOLO_ADMIN,
+    ),
+}
+
+CASI: dict[str, Riga] = {f"{m} {p}": riga for (m, p), riga in MATRICE.items()} | VARIANTI
 
 # Fuori dal prefisso dell'API, aperta a tutti: la usano i controlli di salute.
 PUBBLICHE: dict[tuple[str, str], Callable[[Mondo], Chiamata]] = {
@@ -179,7 +229,7 @@ def test_ogni_rotta_ha_la_sua_riga() -> None:
 
 
 def test_ogni_riga_copre_ogni_profilo() -> None:
-    for _, attesi in MATRICE.values():
+    for _, attesi in CASI.values():
         assert set(attesi) == set(PROFILI)
 
 
@@ -198,24 +248,26 @@ def client(db: Engine, provider: ProviderFinto) -> Iterator[TestClient]:
 def mondo(db: Engine) -> Mondo:
     with Session(db) as sessione:
         vertice = crea_team(sessione, "Vertice")
-        dati = crea_team(sessione, "Dati", vertice)
-        persone: dict[str, Persona] = {
-            profilo: crea_persona(
-                sessione,
-                nome,
-                dati if profilo in {"dipendente", "responsabile"} else vertice,
-                (ruolo,),
-            )
-            for profilo, (nome, ruolo) in _PERSONE.items()
+        team = {
+            "Vertice": vertice,
+            "Dati": crea_team(sessione, "Dati", vertice),
+            "Web": crea_team(sessione, "Web", vertice),
         }
-        dati.responsabile_id = persone["responsabile"].id
+        persone: dict[str, Persona] = {
+            profilo: crea_persona(sessione, nome, team[nome_team], (ruolo,))
+            for profilo, (nome, ruolo, nome_team) in _PERSONE.items()
+        }
+        team["Dati"].responsabile_id = persone["responsabile"].id
+        team["Web"].responsabile_id = persone["altro_responsabile"].id
         anna = persone["dipendente"]
+        vera = crea_persona(sessione, "Vera", vertice, (R.DIPENDENTE,))
         a, b, c = (crea_edizione(sessione) for _ in range(3))
         richiesta = crea_iscrizione(sessione, anna, a, S.RICHIESTA)
         approvata = crea_iscrizione(sessione, anna, b, S.APPROVATA)
+        richiesta_vertice = crea_iscrizione(sessione, vera, a, S.RICHIESTA)
         sessione.commit()
         corso = sessione.get_one(Edizione, c.id).corso_id
-        return Mondo(corso, c.id, richiesta.id, approvata.id)
+        return Mondo(corso, c.id, richiesta.id, approvata.id, richiesta_vertice.id)
 
 
 def _identita(provider: ProviderFinto, profilo: str) -> dict[str, str]:
@@ -223,7 +275,7 @@ def _identita(provider: ProviderFinto, profilo: str) -> dict[str, str]:
         return {}
     if profilo == "non_registrata":
         return provider.intestazioni("sconosciuta@esempio.test")
-    nome, _ = _PERSONE[profilo]
+    nome, _, _ = _PERSONE[profilo]
     return provider.intestazioni(f"{nome.lower()}@esempio.test")
 
 
@@ -240,21 +292,17 @@ def _esegui(
 
 @pytest.mark.integrazione
 @pytest.mark.parametrize(
-    ("rotta", "profilo"),
-    [
-        pytest.param(rotta, profilo, id=f"{rotta[0]} {rotta[1]} {profilo}")
-        for rotta in MATRICE
-        for profilo in PROFILI
-    ],
+    ("caso", "profilo"),
+    [pytest.param(caso, profilo, id=f"{caso} {profilo}") for caso in CASI for profilo in PROFILI],
 )
 def test_matrice(
     client: TestClient,
     provider: ProviderFinto,
     mondo: Mondo,
-    rotta: tuple[str, str],
+    caso: str,
     profilo: str,
 ) -> None:
-    chiamata, attesi = MATRICE[rotta]
+    chiamata, attesi = CASI[caso]
 
     risposta = _esegui(client, provider, profilo, chiamata(mondo), PREFISSO)
 
