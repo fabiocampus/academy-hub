@@ -42,7 +42,7 @@ Dopo ogni modifica a un file `.py` del backend l'hook `.claude/hooks/dopo_modifi
 - `backend/src/academy_hub/`: pacchetto Python. Livelli: router (FastAPI) → servizi (regole di business, autorizzazione) → repository (accesso ai dati). Niente regole nelle rotte, niente SQL fuori dai repository.
   - `dominio/`: stati dell'iscrizione e transizioni (R7), ruoli; Python puro, senza database.
   - `db/`: modelli SQLAlchemy (`modelli.py`) e migrazioni Alembic (`schema/versions/`). Lo schema cambia solo con una migrazione. Vedi `docs/database.md`.
-  - `repository/`: le query, con i lock `FOR UPDATE`. Ordine dei lock: prima l'iscrizione, poi l'edizione (ADR-0004).
+  - `repository/`: le query, con i lock `FOR UPDATE`. Ordine dei lock: prima l'edizione, poi le sue iscrizioni (ADR-0004).
   - `servizi/`: le regole. Ogni cambio di stato di un'iscrizione passa da un solo punto che verifica la transizione e scrive l'audit (R6).
 - `backend/tests/`: test pytest. `dati.py` crea dati sintetici; `conftest.py` avvia PostgreSQL con la stessa immagine di docker compose e applica le migrazioni.
 - `backend/Dockerfile`: multi-stage con uv, runtime non root (uid 10001).

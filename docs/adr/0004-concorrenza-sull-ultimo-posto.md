@@ -12,11 +12,12 @@ Il problema si presenta su ogni ingresso in `Confermata`: la conferma dell'Acade
 ## Decisione
 
 1. **Contatore nell'edizione.** `edizioni.posti_confermati` conta le iscrizioni `Confermata`. Lo aggiorna solo il servizio, mai una query sparsa.
-2. **Lock pessimistico.** Chi cambia il contatore prima blocca l'edizione con `SELECT … FOR UPDATE` (`repository.iscrizioni.blocca_edizione`). Le conferme sulla stessa edizione si mettono in fila; chi arriva dopo legge il contatore aggiornato e mette l'iscrizione `InAttesa`.
-3. **Ordine dei lock.** In tutto il codice si blocca prima l'iscrizione e poi la sua edizione, così due transazioni non si bloccano a vicenda (deadlock).
-4. **Vincolo di sicurezza.** `CHECK (posti_confermati BETWEEN 0 AND capienza)`: se un giorno il codice dimenticasse il lock e aggiornasse il contatore con `posti_confermati + 1`, il database rifiuterebbe comunque il posto in più.
+2. **Lock pessimistico.** Chi cambia il contatore prima blocca l'edizione con `SELECT … FOR NO KEY UPDATE` (`repository.iscrizioni.blocca_edizione`). Le conferme sulla stessa edizione si mettono in fila; chi arriva dopo legge il contatore aggiornato e mette l'iscrizione `InAttesa`. Usiamo `FOR NO KEY UPDATE` e non `FOR UPDATE` perché non entra in conflitto con il `FOR KEY SHARE` delle chiavi esterne: mentre una conferma è in corso si possono ancora inserire iscrizioni sulla stessa edizione ed eventi di audit.
+3. **Ordine dei lock.** In tutto il codice si blocca prima l'edizione e poi le sue iscrizioni, così due transazioni non si bloccano a vicenda (deadlock). È l'ordine naturale dei flussi che partono dall'edizione: promozione dalla lista d'attesa (US-09) e cancellazione (D10). La conferma legge `edizione_id` senza lock (non cambia mai), blocca l'edizione, poi l'iscrizione, e solo allora verifica lo stato.
+4. **Conferma solo da `Approvata`.** `InAttesa → Confermata` è consentita dalla macchina a stati, ma spetta alla promozione del sistema, che sceglie il primo in ordine di approvazione (R4): l'Academy non può scavalcare la lista. La promozione, sotto il lock dell'edizione, non userà `SKIP LOCKED`: saltare un'iscrizione bloccata violerebbe R4. Con l'ordine dei lock al punto 3 l'attesa non diventa un deadlock.
+5. **Vincolo di sicurezza.** `CHECK (posti_confermati BETWEEN 0 AND capienza)`: se un giorno il codice dimenticasse il lock e aggiornasse il contatore con `posti_confermati + 1`, il database rifiuterebbe comunque il posto in più.
 
-Il test `test_r3_conferme_simultanee_sull_ultimo_posto_ne_passa_una_sola` lancia 2 e 10 conferme insieme sull'ultimo posto. Ne passa sempre una sola. Togliendo i `FOR UPDATE`, falliscono entrambi i casi in modo ripetibile.
+Il test `test_r3_conferme_simultanee_sull_ultimo_posto_ne_passa_una_sola` lancia 2 e 10 conferme insieme sull'ultimo posto. Ne passa sempre una sola. Togliendo i lock, falliscono entrambi i casi in modo ripetibile.
 
 ## Conseguenze
 

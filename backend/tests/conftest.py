@@ -55,9 +55,14 @@ def motore(postgres: PostgresContainer) -> Iterator[Engine]:
 
 @pytest.fixture
 def db(motore: Engine) -> Iterator[Engine]:
-    """Svuota le tabelle dopo ogni test: i test di concorrenza usano più connessioni."""
+    """Svuota le tabelle dopo ogni test: i test di concorrenza usano più connessioni.
+
+    `session_replication_role = replica` spegne i trigger (anche quello che protegge
+    l'audit dal TRUNCATE) solo in questa transazione; richiede un superutente.
+    """
     yield motore
     with motore.begin() as connessione:
+        connessione.execute(text("SET LOCAL session_replication_role = replica"))
         tabelle = connessione.execute(
             text(
                 "SELECT string_agg(format('%I', tablename), ', ') FROM pg_tables "

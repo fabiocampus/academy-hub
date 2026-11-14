@@ -16,6 +16,8 @@ uv run alembic check                                 # modelli e migrazioni alli
 
 `test_migrazioni.py` esegue `upgrade head`, `alembic check`, `downgrade base` e di nuovo `upgrade head` su un database vuoto. Autogenerate non vede trigger e funzioni: vanno scritti a mano nella migrazione, con il loro `downgrade`.
 
+I test svuotano le tabelle con `SET LOCAL session_replication_role = replica`, che spegne i trigger solo in quella transazione: in un database vero l'audit non si svuota.
+
 ## Tabelle
 
 | Tabella | Contenuto | Vincoli principali |
@@ -25,7 +27,7 @@ uv run alembic check                                 # modelli e migrazioni alli
 | `corsi` | Titolo, descrizione, durata in ore | durata > 0 |
 | `edizioni` | Date, capienza, docente, `posti_confermati`, `cancellata_il` | capienza > 0; fine ≥ inizio; `posti_confermati` fra 0 e capienza (R3) |
 | `iscrizioni` | Persona, edizione, stato, momenti di richiesta e approvazione | stato fra quelli del glossario; `UNIQUE` parziale sulle attive (R1); data di approvazione obbligatoria dopo l'approvazione |
-| `eventi_audit` | Chi, quando, stato di partenza e di arrivo, motivo | solo aggiunta: un trigger rifiuta `UPDATE` e `DELETE` (R6); `autore_id` nullo = sistema |
+| `eventi_audit` | Chi, quando, stato di partenza e di arrivo, motivo | solo aggiunta: i trigger rifiutano `UPDATE`, `DELETE` e `TRUNCATE` (R6); `autore_id` nullo = sistema |
 
 Le edizioni non si cancellano: `cancellata_il` le ritira dal catalogo (D10). Gli stati sono testo con un `CHECK`, non un tipo `ENUM` di PostgreSQL: aggiungere uno stato è una migrazione che cambia un vincolo, senza `ALTER TYPE`.
 
@@ -39,7 +41,7 @@ Indici sulle ricerche frequenti previste dal backlog:
 |---|---|
 | Catalogo: edizioni future non cancellate (US-03) | `ix_edizioni_catalogo` su `data_inizio` `WHERE cancellata_il IS NULL` |
 | Le mie iscrizioni (US-05) | `ix_iscrizioni_persona_id` |
-| Primo in lista d'attesa (US-09, R4) | `ix_iscrizioni_lista_attesa` su (`edizione_id`, `approvata_il`) `WHERE stato = 'InAttesa'` |
+| Primo in lista d'attesa (US-09, R4) | `ix_iscrizioni_lista_attesa` su (`edizione_id`, `approvata_il`, `id`) `WHERE stato = 'InAttesa'`; `id` fa da spareggio a parità di momento di approvazione |
 | Iscrizioni di un'edizione per stato | `ix_iscrizioni_edizione_stato` |
 | Audit di un'iscrizione (US-11) | `ix_eventi_audit_iscrizione` su (`iscrizione_id`, `avvenuto_il`) |
 
@@ -51,5 +53,7 @@ Indici sulle ricerche frequenti previste dal backlog:
 | Le mie iscrizioni | Bitmap Index Scan su `ix_iscrizioni_persona_id` | 0,6 ms |
 | Primo in lista d'attesa | Index Scan su `ix_iscrizioni_lista_attesa`, si ferma alla prima riga | 0,09 ms |
 | Audit di un'iscrizione | Index Scan su `ix_eventi_audit_iscrizione` | 0,2 ms |
+
+Indici ancora assenti, da valutare con le ricerche della fase 5: `edizioni.docente_id` e `eventi_audit.autore_id`.
 
 Il caso istruttivo è la lista d'attesa. Togliendo i due indici su `edizione_id`, PostgreSQL ripiega sull'indice parziale `uq_iscrizioni_attiva`: legge tutte le 29 iscrizioni attive dell'edizione, ne scarta 23 con un filtro e le ordina. Il tempo sale a circa 1 ms, dieci volte tanto. L'indice parziale con `approvata_il` restituisce invece la prima riga già in ordine.

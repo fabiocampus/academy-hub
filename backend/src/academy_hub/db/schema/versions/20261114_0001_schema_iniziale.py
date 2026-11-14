@@ -153,7 +153,7 @@ def upgrade() -> None:
     op.create_index(
         "ix_iscrizioni_lista_attesa",
         "iscrizioni",
-        ["edizione_id", "approvata_il"],
+        ["edizione_id", "approvata_il", "id"],
         unique=False,
         postgresql_where=sa.text("stato = 'InAttesa'"),
     )
@@ -251,9 +251,17 @@ def upgrade() -> None:
         FOR EACH ROW EXECUTE FUNCTION eventi_audit_immutabili()
         """
     )
+    op.execute(
+        """
+        CREATE TRIGGER eventi_audit_non_svuotabili
+        BEFORE TRUNCATE ON eventi_audit
+        FOR EACH STATEMENT EXECUTE FUNCTION eventi_audit_immutabili()
+        """
+    )
 
 
 def downgrade() -> None:
+    op.execute("DROP TRIGGER eventi_audit_non_svuotabili ON eventi_audit")
     op.execute("DROP TRIGGER eventi_audit_immutabili ON eventi_audit")
     op.execute("DROP FUNCTION eventi_audit_immutabili()")
     op.drop_constraint(op.f("fk_team_responsabile_id_persone"), "team", type_="foreignkey")

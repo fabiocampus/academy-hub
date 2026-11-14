@@ -6,7 +6,7 @@ devono restare allineati (lo verifica `alembic check` nei test).
 Vincoli nel database, come rete di sicurezza anche se il codice sbaglia:
 - R1: indice `UNIQUE` parziale su (persona, edizione) per le iscrizioni attive;
 - R3: `posti_confermati` fra 0 e `capienza`, aggiornato solo con l'edizione bloccata;
-- R6: `eventi_audit` è immutabile (trigger nella migrazione iniziale).
+- R6: `eventi_audit` è immutabile: trigger su UPDATE, DELETE e TRUNCATE (migrazione iniziale).
 """
 
 from datetime import date, datetime
@@ -156,11 +156,12 @@ class Iscrizione(Base):
             unique=True,
             postgresql_where=text(f"stato IN ({ATTIVI})"),
         ),
-        # R4: lista d'attesa di un'edizione in ordine di approvazione.
+        # R4: lista d'attesa di un'edizione in ordine di approvazione (id come spareggio).
         Index(
             "ix_iscrizioni_lista_attesa",
             "edizione_id",
             "approvata_il",
+            "id",
             postgresql_where=text("stato = 'InAttesa'"),
         ),
         Index("ix_iscrizioni_edizione_stato", "edizione_id", "stato"),

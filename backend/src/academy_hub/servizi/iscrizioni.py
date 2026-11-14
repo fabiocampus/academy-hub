@@ -3,8 +3,18 @@
 from sqlalchemy.orm import Session
 
 from academy_hub.db.modelli import Iscrizione
-from academy_hub.dominio.stati import StatoIscrizione, verifica_transizione
+from academy_hub.dominio.stati import (
+    StatoIscrizione,
+    TransizioneNonConsentita,
+    verifica_transizione,
+)
 from academy_hub.repository import iscrizioni as repository
+
+
+class EdizioneCancellata(Exception):
+    def __init__(self, edizione_id: int) -> None:
+        self.edizione_id = edizione_id
+        super().__init__(f"Edizione {edizione_id} cancellata")
 
 
 def _cambia_stato(
@@ -25,10 +35,14 @@ def conferma_posto(sessione: Session, iscrizione_id: int, autore_id: int) -> Sta
 
     Il lock sull'edizione serializza le conferme simultanee: chi arriva dopo legge
     `posti_confermati` aggiornato (R3). Il CHECK sulla capienza resta come ultima difesa.
+    Solo da `Approvata`: `InAttesa → Confermata` spetta alla promozione, in ordine (R4).
     """
+    edizione = repository.blocca_edizione(sessione, repository.edizione_di(sessione, iscrizione_id))
     iscrizione = repository.blocca_iscrizione(sessione, iscrizione_id)
-    verifica_transizione(iscrizione.stato, StatoIscrizione.CONFERMATA)
-    edizione = repository.blocca_edizione(sessione, iscrizione.edizione_id)
+    if iscrizione.stato is not StatoIscrizione.APPROVATA:
+        raise TransizioneNonConsentita(iscrizione.stato, StatoIscrizione.CONFERMATA)
+    if edizione.cancellata_il is not None:
+        raise EdizioneCancellata(edizione.id)
 
     if edizione.posti_confermati < edizione.capienza:
         edizione.posti_confermati += 1

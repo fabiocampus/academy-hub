@@ -2,7 +2,11 @@
 -- SOLO sul PostgreSQL locale di docker compose: CANCELLA tutti i dati.
 --   docker compose exec -T db psql -U academy -d academy -q < backend/sql/analisi_indici.sql
 
+-- Il trigger R6 vieta di svuotare l'audit: lo spegne solo questa transazione (superutente).
+BEGIN;
+SET LOCAL session_replication_role = replica;
 TRUNCATE team, persone, corsi, edizioni, iscrizioni, eventi_audit RESTART IDENTITY CASCADE;
+COMMIT;
 
 -- Dati sintetici: 50 team, 5 000 persone, 1 000 edizioni (10% cancellate),
 -- 50 000 iscrizioni (ogni persona su 10 edizioni, stati misti), ~93 000 eventi di audit.
@@ -40,7 +44,7 @@ EXPLAIN (ANALYZE, COSTS OFF, TIMING OFF)
 \echo '== Primo in lista d''attesa (R4)'
 EXPLAIN (ANALYZE, COSTS OFF, TIMING OFF)
   SELECT id FROM iscrizioni WHERE edizione_id = 500 AND stato = 'InAttesa'
-  ORDER BY approvata_il LIMIT 1 FOR UPDATE SKIP LOCKED;
+  ORDER BY approvata_il, id LIMIT 1 FOR NO KEY UPDATE;
 
 \echo '== Audit di un''iscrizione'
 EXPLAIN (ANALYZE, COSTS OFF, TIMING OFF)
@@ -52,5 +56,5 @@ DROP INDEX ix_iscrizioni_lista_attesa;
 DROP INDEX ix_iscrizioni_edizione_stato;
 EXPLAIN (ANALYZE, COSTS OFF, TIMING OFF)
   SELECT id FROM iscrizioni WHERE edizione_id = 500 AND stato = 'InAttesa'
-  ORDER BY approvata_il LIMIT 1 FOR UPDATE SKIP LOCKED;
+  ORDER BY approvata_il, id LIMIT 1 FOR NO KEY UPDATE;
 ROLLBACK;

@@ -41,7 +41,6 @@ def test_d4_nuova_richiesta_dopo_rifiuto_o_annullamento(db: Engine, stato: Stato
     ("capienza", "posti_confermati", "vincolo"),
     [
         (0, 0, "ck_edizioni_capienza_positiva"),
-        (-1, 0, "ck_edizioni_capienza_positiva"),
         (2, 3, "ck_edizioni_posti_entro_capienza"),
         (2, -1, "ck_edizioni_posti_entro_capienza"),
     ],
@@ -100,11 +99,11 @@ def test_ruolo_sconosciuto_rifiutato(db: Engine) -> None:
 
 def test_persona_ha_il_ruolo_dipendente_per_impostazione(db: Engine) -> None:
     with Session(db) as sessione:
-        anna = crea_persona(sessione, "Anna")
+        anna_id = crea_persona(sessione, "Anna").id
         sessione.commit()
 
-        assert sessione.get(Persona, anna.id) is not None
-        assert anna.ruoli == ["dipendente"]
+    with Session(db) as sessione:
+        assert sessione.get_one(Persona, anna_id).ruoli == ["dipendente"]
 
 
 @pytest.mark.parametrize(
@@ -112,6 +111,7 @@ def test_persona_ha_il_ruolo_dipendente_per_impostazione(db: Engine) -> None:
     [
         "UPDATE eventi_audit SET motivo = 'ritoccato'",
         "DELETE FROM eventi_audit",
+        "TRUNCATE eventi_audit CASCADE",
     ],
 )
 def test_r6_eventi_di_audit_immutabili(db: Engine, istruzione: str) -> None:

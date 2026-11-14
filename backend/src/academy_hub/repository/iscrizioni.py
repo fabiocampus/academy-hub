@@ -13,15 +13,27 @@ class IscrizioneNonTrovata(LookupError):
         super().__init__(f"Iscrizione {iscrizione_id} inesistente")
 
 
-def blocca_iscrizione(sessione: Session, iscrizione_id: int) -> Iscrizione:
-    """`SELECT … FOR UPDATE` sull'iscrizione, con i valori freschi dal database.
+# Lock di riga: `FOR NO KEY UPDATE` (key_share=True) serializza chi modifica la riga ma
+# non blocca chi inserisce righe che la referenziano con una chiave esterna.
+# Ordine dei lock in tutto il codice: prima l'edizione, poi le sue iscrizioni (ADR-0004).
 
-    Ordine dei lock in tutto il codice: prima l'iscrizione, poi la sua edizione.
-    """
+
+def edizione_di(sessione: Session, iscrizione_id: int) -> int:
+    """Edizione di un'iscrizione, senza lock: `edizione_id` non cambia mai."""
+    edizione_id = sessione.scalar(
+        select(Iscrizione.edizione_id).where(Iscrizione.id == iscrizione_id)
+    )
+    if edizione_id is None:
+        raise IscrizioneNonTrovata(iscrizione_id)
+    return edizione_id
+
+
+def blocca_iscrizione(sessione: Session, iscrizione_id: int) -> Iscrizione:
+    """Lock sull'iscrizione, con i valori freschi dal database."""
     iscrizione = sessione.scalar(
         select(Iscrizione)
         .where(Iscrizione.id == iscrizione_id)
-        .with_for_update()
+        .with_for_update(key_share=True)
         .execution_options(populate_existing=True)
     )
     if iscrizione is None:
@@ -30,11 +42,11 @@ def blocca_iscrizione(sessione: Session, iscrizione_id: int) -> Iscrizione:
 
 
 def blocca_edizione(sessione: Session, edizione_id: int) -> Edizione:
-    """`SELECT … FOR UPDATE` sull'edizione: serializza chi tocca `posti_confermati` (R3)."""
+    """Lock sull'edizione: serializza chi tocca `posti_confermati` (R3)."""
     return sessione.scalars(
         select(Edizione)
         .where(Edizione.id == edizione_id)
-        .with_for_update()
+        .with_for_update(key_share=True)
         .execution_options(populate_existing=True)
     ).one()
 
