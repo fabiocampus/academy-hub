@@ -1,4 +1,4 @@
-"""Regole di corsi, edizioni e catalogo (US-01, US-02, US-03).
+"""Regole di corsi, edizioni e catalogo (US-01, US-02, US-03, US-18).
 
 Come negli altri servizi, la transazione la apre e la chiude il chiamante.
 """
@@ -15,14 +15,17 @@ from academy_hub.dominio.errori import (
     Conflitto,
     DatiNonValidi,
     EdizioneCancellata,
+    EdizioneIniziata,
     NonTrovato,
     verifica_versione,
 )
 from academy_hub.dominio.ruoli import Ruolo
+from academy_hub.dominio.stati import STATI_ATTIVI
 from academy_hub.dominio.tempo import oggi
 from academy_hub.repository import catalogo as repository
 from academy_hub.repository import iscrizioni, persone
 from academy_hub.repository.catalogo import VoceCatalogo
+from academy_hub.servizi import iscrizioni as servizio_iscrizioni
 
 
 class Invariato(Enum):
@@ -146,7 +149,8 @@ def modifica_edizione(
 ) -> Edizione:
     """Modifica i campi passati; `docente_id=None` toglie il docente.
 
-    Il lock sull'edizione rende affidabile il confronto con `posti_confermati` (R3)."""
+    Il lock sull'edizione rende affidabile il confronto con `posti_confermati` (R3).
+    I posti nuovi di un aumento di capienza passano subito alla lista d'attesa (R4)."""
     attore.richiedi(Ruolo.ADMIN_ACADEMY)
     edizione = iscrizioni.blocca_edizione(sessione, edizione_id)
     verifica_versione(versione_attesa, edizione.versione)
@@ -162,12 +166,38 @@ def modifica_edizione(
         )
     if docente_id is not INVARIATO:
         _verifica_docente(sessione, docente_id)
-    # TODO(US-02, terza PR della fase 5): un aumento di capienza promuove dalla lista d'attesa.
     edizione.data_inizio, edizione.data_fine = inizio, fine
     if capienza is not None:
         edizione.capienza = capienza
     if docente_id is not INVARIATO:
         edizione.docente_id = docente_id
+    servizio_iscrizioni.promuovi_dalla_lista(sessione, edizione)
+    sessione.flush()
+    return edizione
+
+
+def cancella_edizione(sessione: Session, attore: Attore, edizione_id: int) -> Edizione:
+    """Cancellazione logica di un'edizione non iniziata (US-18, D10).
+
+    Sotto il lock dell'edizione ogni iscrizione attiva diventa `Annullata`, anche dentro
+    la scadenza di R5. Le richieste nuove prendono l'edizione in `FOR SHARE` (ADR-0006):
+    o finiscono prima e vengono annullate qui, o partono dopo e trovano l'edizione
+    cancellata. Cancellare due volte non cambia nulla.
+    """
+    attore.richiedi(Ruolo.ADMIN_ACADEMY)
+    edizione = iscrizioni.blocca_edizione(sessione, edizione_id)
+    if edizione.cancellata_il is not None:
+        return edizione
+    if edizione.data_inizio <= oggi():
+        raise EdizioneIniziata(edizione.id)
+    servizio_iscrizioni.annulla_attive(
+        sessione,
+        edizione,
+        STATI_ATTIVI,
+        servizio_iscrizioni.MOTIVO_EDIZIONE_CANCELLATA,
+        attore.persona_id,
+    )
+    edizione.cancellata_il = iscrizioni.adesso(sessione)
     sessione.flush()
     return edizione
 

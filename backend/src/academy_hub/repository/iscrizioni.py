@@ -1,7 +1,8 @@
 """Accesso ai dati di iscrizioni, edizioni ed eventi di audit. Unico posto con le query."""
 
+from collections.abc import Collection
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from typing import cast
 
 from sqlalchemy import case, func, select, tuple_
@@ -9,7 +10,7 @@ from sqlalchemy.orm import Session, aliased
 
 from academy_hub.db.modelli import Corso, Edizione, EventoAudit, Iscrizione, Persona, Team
 from academy_hub.dominio.errori import NonTrovato
-from academy_hub.dominio.stati import STATI_ATTIVI, StatoIscrizione
+from academy_hub.dominio.stati import STATI_ATTIVI, STATI_PENDENTI, StatoIscrizione
 from academy_hub.repository.persone import antenati
 
 
@@ -79,6 +80,86 @@ def blocca_edizione_in_lettura(sessione: Session, edizione_id: int) -> Edizione:
     if edizione is None:
         raise NonTrovato("Edizione", edizione_id)
     return edizione
+
+
+def blocca_iscrizioni(
+    sessione: Session, edizione_id: int, stati: Collection[StatoIscrizione]
+) -> list[Iscrizione]:
+    """Lock sulle iscrizioni dell'edizione negli stati dati, in ordine di id.
+
+    Da chiamare con l'edizione già bloccata (cancellazione, scadenza): chi aggiunge o
+    cambia un'iscrizione attiva passa prima dall'edizione, quindi l'elenco è completo.
+    """
+    return list(
+        sessione.scalars(
+            select(Iscrizione)
+            .where(Iscrizione.edizione_id == edizione_id, Iscrizione.stato.in_(stati))
+            .order_by(Iscrizione.id)
+            .with_for_update(key_share=True)
+            .execution_options(populate_existing=True)
+        )
+    )
+
+
+def blocca_prima_in_attesa(sessione: Session, edizione_id: int) -> Iscrizione | None:
+    """R4: la prima della lista d'attesa, per approvazione e poi id (`ix_iscrizioni_lista_attesa`).
+
+    Da chiamare con l'edizione già bloccata: ogni cambio di una `InAttesa` blocca prima
+    l'edizione, quindi la riga scelta non può cambiare sotto il lock. Niente `SKIP LOCKED`:
+    saltare una riga bloccata scavalcherebbe la lista (ADR-0004, punto 4).
+    """
+    return sessione.scalar(
+        select(Iscrizione)
+        .where(
+            Iscrizione.edizione_id == edizione_id,
+            Iscrizione.stato == StatoIscrizione.IN_ATTESA,
+        )
+        .order_by(Iscrizione.approvata_il, Iscrizione.id)
+        .limit(1)
+        .with_for_update(key_share=True)
+        .execution_options(populate_existing=True)
+    )
+
+
+def edizioni_iniziate_con_pendenti(sessione: Session, oggi: date) -> list[int]:
+    """Edizioni iniziate (entro `oggi`) con iscrizioni ancora pendenti (US-17, D8)."""
+    return list(
+        sessione.scalars(
+            select(Edizione.id)
+            .where(
+                Edizione.data_inizio <= oggi,
+                select(Iscrizione.id)
+                .where(
+                    Iscrizione.edizione_id == Edizione.id,
+                    Iscrizione.stato.in_(STATI_PENDENTI),
+                )
+                .exists(),
+            )
+            .order_by(Edizione.id)
+        )
+    )
+
+
+def edizioni_con_posti_e_lista(sessione: Session, oggi: date) -> list[int]:
+    """Edizioni aperte con posti liberi e lista d'attesa: la promozione inline non le lascia,
+    il job le ripara (US-09, ADR-0007)."""
+    return list(
+        sessione.scalars(
+            select(Edizione.id)
+            .where(
+                Edizione.data_inizio > oggi,
+                Edizione.cancellata_il.is_(None),
+                Edizione.posti_confermati < Edizione.capienza,
+                select(Iscrizione.id)
+                .where(
+                    Iscrizione.edizione_id == Edizione.id,
+                    Iscrizione.stato == StatoIscrizione.IN_ATTESA,
+                )
+                .exists(),
+            )
+            .order_by(Edizione.id)
+        )
+    )
 
 
 def iscrizione_per_chiave(sessione: Session, persona_id: int, chiave: str) -> Iscrizione | None:

@@ -1,8 +1,10 @@
-"""Regole di business delle iscrizioni (US-04..US-11). La transazione la apre e la chiude
-il chiamante.
+"""Regole di business delle iscrizioni (US-04..US-11, US-09, US-17). La transazione la apre
+e la chiude il chiamante.
 
 Lock, sempre in quest'ordine (ADR-0004, ADR-0006): edizione, poi persona o iscrizione.
 """
+
+from collections.abc import Collection
 
 from sqlalchemy.orm import Session
 
@@ -19,6 +21,7 @@ from academy_hub.dominio.errori import (
 from academy_hub.dominio.organigramma import verifica_decisore
 from academy_hub.dominio.ruoli import Ruolo
 from academy_hub.dominio.stati import (
+    STATI_PENDENTI,
     StatoIscrizione,
     TransizioneNonConsentita,
     verifica_transizione,
@@ -29,6 +32,10 @@ from academy_hub.repository import iscrizioni as repository
 from academy_hub.repository.iscrizioni import RichiestaDaDecidere, VoceMiaIscrizione
 
 S = StatoIscrizione
+
+# Motivi degli annullamenti in blocco, scritti nell'audit (D8, D10).
+MOTIVO_EDIZIONE_INIZIATA = "edizione-iniziata"
+MOTIVO_EDIZIONE_CANCELLATA = "edizione-cancellata"
 
 
 class IscrizioneDuplicata(Conflitto):
@@ -88,6 +95,72 @@ def _verifica_aperta(edizione: Edizione) -> None:
         raise EdizioneCancellata(edizione.id)
     if edizione.data_inizio <= oggi():
         raise EdizioneIniziata(edizione.id)
+
+
+# --- US-09 · Promozione dalla lista d'attesa ---------------------------------------
+
+
+def promuovi_dalla_lista(sessione: Session, edizione: Edizione) -> int:
+    """Riempie i posti liberi con la lista d'attesa, in ordine di approvazione (R4).
+
+    `edizione` va passata già bloccata. Autore il sistema; nessuna promozione a edizione
+    iniziata o cancellata (D2). Restituisce quante iscrizioni ha promosso. La chiamano,
+    nella stessa transazione, l'annullamento, la conferma, l'aumento di capienza e il
+    job di rete di sicurezza (ADR-0007).
+    """
+    if edizione.cancellata_il is not None or edizione.data_inizio <= oggi():
+        return 0
+    promosse = 0
+    while edizione.posti_confermati < edizione.capienza:
+        prima = repository.blocca_prima_in_attesa(sessione, edizione.id)
+        if prima is None:
+            break
+        _cambia_stato(sessione, prima, S.CONFERMATA, None, edizione=edizione)
+        promosse += 1
+    return promosse
+
+
+def annulla_attive(
+    sessione: Session,
+    edizione: Edizione,
+    stati: Collection[StatoIscrizione],
+    motivo: str,
+    autore_id: int | None,
+) -> int:
+    """Annulla in blocco le iscrizioni dell'edizione negli `stati` dati, ignorando R5.
+
+    `edizione` va passata già bloccata. Per la cancellazione (D10) e la scadenza (D8).
+    """
+    trovate = repository.blocca_iscrizioni(sessione, edizione.id, stati)
+    for trovata in trovate:
+        _cambia_stato(sessione, trovata, S.ANNULLATA, autore_id, motivo, edizione=edizione)
+    return len(trovate)
+
+
+# --- Job di sistema (US-17, rete di sicurezza di US-09) -----------------------------
+
+
+def edizioni_da_chiudere(sessione: Session) -> list[int]:
+    return repository.edizioni_iniziate_con_pendenti(sessione, oggi())
+
+
+def chiudi_edizione_iniziata(sessione: Session, edizione_id: int) -> int:
+    """D8: all'inizio dell'edizione le iscrizioni pendenti diventano Annullata (sistema).
+
+    Idempotente: una seconda esecuzione non trova più pendenti e non scrive audit.
+    """
+    edizione = repository.blocca_edizione(sessione, edizione_id)
+    if edizione.data_inizio > oggi():
+        return 0
+    return annulla_attive(sessione, edizione, STATI_PENDENTI, MOTIVO_EDIZIONE_INIZIATA, None)
+
+
+def edizioni_da_promuovere(sessione: Session) -> list[int]:
+    return repository.edizioni_con_posti_e_lista(sessione, oggi())
+
+
+def promuovi_edizione(sessione: Session, edizione_id: int) -> int:
+    return promuovi_dalla_lista(sessione, repository.blocca_edizione(sessione, edizione_id))
 
 
 # --- US-04 · Chiedere l'iscrizione -------------------------------------------------
@@ -199,6 +272,8 @@ def conferma_posto(sessione: Session, attore: Attore, iscrizione_id: int) -> Isc
     Il lock sull'edizione serializza le conferme simultanee: chi arriva dopo legge
     `posti_confermati` aggiornato (R3). Il CHECK sulla capienza resta come ultima difesa.
     Solo da `Approvata`: `InAttesa → Confermata` spetta alla promozione, in ordine (R4).
+    Per lo stesso motivo, se ci sono posti liberi e lista d'attesa (stato che la promozione
+    inline non lascia, ma il job ripara solo al suo giro), prima passa la lista.
     """
     attore.richiedi(Ruolo.ADMIN_ACADEMY)
     edizione = repository.blocca_edizione(sessione, repository.edizione_di(sessione, iscrizione_id))
@@ -206,6 +281,7 @@ def conferma_posto(sessione: Session, attore: Attore, iscrizione_id: int) -> Isc
     if iscrizione.stato is not S.APPROVATA:
         raise TransizioneNonConsentita(iscrizione.stato, S.CONFERMATA)
     _verifica_aperta(edizione)
+    promuovi_dalla_lista(sessione, edizione)
 
     nuovo = S.CONFERMATA if edizione.posti_confermati < edizione.capienza else S.IN_ATTESA
     _cambia_stato(sessione, iscrizione, nuovo, attore.persona_id, edizione=edizione)
@@ -221,7 +297,8 @@ def annulla(
     """Il titolare annulla la propria iscrizione attiva.
 
     `Confermata` solo se mancano più di `scadenza_giorni` giorni di calendario all'inizio
-    (R5, D11): il valore arriva dalla configurazione dell'ambiente.
+    (R5, D11): il valore arriva dalla configurazione dell'ambiente. Il posto liberato passa
+    subito al primo in lista d'attesa, nella stessa transazione (R4).
     """
     # Titolare verificato prima dei lock: chi non può annullare non mette in fila le
     # conferme dell'edizione. La persona di un'iscrizione non cambia mai.
@@ -238,5 +315,5 @@ def annulla(
                 f"{scadenza_giorni + 1} giorni prima"
             )
     _cambia_stato(sessione, iscrizione, S.ANNULLATA, attore.persona_id, edizione=edizione)
-    # TODO(US-09, terza PR della fase 5): un posto liberato passa al primo in lista d'attesa.
+    promuovi_dalla_lista(sessione, edizione)
     return iscrizione

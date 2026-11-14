@@ -47,6 +47,9 @@ Indici sulle ricerche frequenti previste dal backlog:
 | Iscrizioni di un'edizione per stato | `ix_iscrizioni_edizione_stato` |
 | Audit di un'iscrizione (US-11) | `ix_eventi_audit_iscrizione` su (`iscrizione_id`, `avvenuto_il`) |
 | Ripetizione di una richiesta (US-04) | `uq_iscrizioni_chiave_idempotenza` su (`persona_id`, `chiave_idempotenza`) `WHERE chiave_idempotenza IS NOT NULL` |
+| Job: edizioni iniziate con iscrizioni pendenti (US-17) | `ix_edizioni_catalogo` per l'intervallo di date, poi `ix_iscrizioni_edizione_stato` per l'esistenza delle pendenti |
+| Job: edizioni aperte con posti liberi e lista d'attesa (US-09) | `ix_edizioni_catalogo`, poi `ix_iscrizioni_lista_attesa` |
+| Iscrizioni attive di un'edizione da annullare (US-17, US-18) | `ix_iscrizioni_edizione_stato` |
 
 `backend/sql/analisi_indici.sql` riempie il database locale con dati sintetici (5 000 persone, 1 000 edizioni, 50 000 iscrizioni, circa 93 000 eventi di audit) ed esegue `EXPLAIN ANALYZE` sulle ricerche. Risultati del 2026-11-14:
 

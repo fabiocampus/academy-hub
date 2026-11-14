@@ -79,5 +79,20 @@ services:
       otel-lgtm:
         condition: service_started
 
+  # Job di sistema (ADR-0007): scadenza all'inizio dell'edizione e rete di sicurezza della
+  # promozione dalla lista d'attesa, una passata ogni ACADEMY_JOB_OGNI_SECONDI.
+  job:
+    build: ./backend
+    command: ["python", "-m", "academy_hub.job", "--ogni", "${ACADEMY_JOB_OGNI_SECONDI:-300}"]
+    environment:
+      ACADEMY_LIVELLO_LOG: ${ACADEMY_LIVELLO_LOG:-INFO}
+      ACADEMY_DATABASE_URL: *url-db
+    # L'healthcheck dell'immagine interroga /health del backend: qui non c'è.
+    healthcheck:
+      disable: true
+    depends_on:
+      migrazioni:
+        condition: service_completed_successfully
+
 volumes:
   dati-db:

@@ -28,6 +28,8 @@ STATI_ATTIVI = frozenset(
         StatoIscrizione.CONFERMATA,
     }
 )
+# Attive ma senza posto: all'inizio dell'edizione diventano Annullata (D8).
+STATI_PENDENTI = STATI_ATTIVI - {StatoIscrizione.CONFERMATA}
 
 _S = StatoIscrizione
 TRANSIZIONI: dict[StatoIscrizione, frozenset[StatoIscrizione]] = {
