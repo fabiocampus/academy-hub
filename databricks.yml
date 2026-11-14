@@ -44,13 +44,51 @@ variables:
       come copia di production, con lo schema dell'App di prod che il service principal
       di collaudo non può usare: ogni target non-prod ha quindi uno schema suo.
     default: academy
+  catalogo:
+    description: Catalogo Unity Catalog del target (ADR-0011).
+  warehouse_id:
+    description: >-
+      SQL warehouse con cui l'App legge i report, con l'identità dell'utente. Cercato per
+      nome: l'id è del workspace e non sta nel repository.
+    lookup:
+      warehouse: Serverless Starter Warehouse
 
 resources:
+  # Parte analitica (ADR-0011): un catalogo per ambiente con i livelli medallion. Leggere
+  # gold è concesso agli utenti; il service principal dell'App non ha grant: i report li
+  # legge con il token dell'utente, così decidono i suoi permessi.
+  catalogs:
+    academy:
+      name: ${var.catalogo}
+      comment: Academy Hub, parte analitica (dati sintetici)
+      grants:
+        - principal: account users
+          privileges: [USE_CATALOG]
+  schemas:
+    bronze:
+      catalog_name: ${resources.catalogs.academy.name}
+      name: bronze
+      comment: Dati grezzi, come arrivano dalle sorgenti
+    silver:
+      catalog_name: ${resources.catalogs.academy.name}
+      name: silver
+      comment: Dati puliti e validati
+    gold:
+      catalog_name: ${resources.catalogs.academy.name}
+      name: gold
+      comment: Aggregati per i report
+      grants:
+        - principal: account users
+          privileges: [USE_SCHEMA, SELECT]
+
   apps:
     academy_hub:
       name: academy-hub-${bundle.target}
       description: Iscrizioni ai corsi dell'Academy (prototipo di studio, dati sintetici)
       source_code_path: ./build/app
+      # On-behalf-of-user: il proxy passa all'App il token dell'utente con questo scope
+      # (X-Forwarded-Access-Token), usato solo per le query dei report.
+      user_api_scopes: [sql]
       config:
         command: ["python", "-m", "academy_hub.avvio"]
         env:
@@ -70,6 +108,10 @@ resources:
             value: frontend
           - name: ACADEMY_ADMIN_EMAIL
             value: ${var.admin_email}
+          - name: ACADEMY_REPORT_WAREHOUSE_ID
+            value_from: warehouse
+          - name: ACADEMY_REPORT_CATALOGO
+            value: ${resources.catalogs.academy.name}
       # La risorsa postgres dell'App sta nei target: il branch è un riferimento
       # all'endpoint del target, così il bundle crea prima Lakebase e poi l'App.
 
@@ -81,6 +123,7 @@ targets:
       ambiente: collaudo
       branch_lakebase: collaudo
       schema_database: academy_collaudo
+      catalogo: academy_collaudo
     resources:
       postgres_branches:
         collaudo:
@@ -105,13 +148,34 @@ targets:
                 branch: ${resources.postgres_endpoints.collaudo.parent}
                 database: ${resources.postgres_endpoints.collaudo.parent}/databases/databricks-postgres
                 permission: CAN_CONNECT_AND_CREATE
+            - name: warehouse
+              description: SQL warehouse dei report (query con l'identità dell'utente)
+              sql_warehouse:
+                id: ${var.warehouse_id}
+                permission: CAN_USE
 
   prod:
     mode: production
     variables:
       ambiente: produzione
       branch_lakebase: production
+      catalogo: academy_prod
     resources:
+      # In prod né il catalogo né i suoi schemi (con le tabelle) si cancellano dal bundle.
+      catalogs:
+        academy:
+          lifecycle:
+            prevent_destroy: true
+      schemas:
+        bronze:
+          lifecycle:
+            prevent_destroy: true
+        silver:
+          lifecycle:
+            prevent_destroy: true
+        gold:
+          lifecycle:
+            prevent_destroy: true
       postgres_projects:
         academy_hub:
           project_id: ${var.progetto_lakebase}
@@ -139,3 +203,8 @@ targets:
                 branch: ${resources.postgres_endpoints.production.parent}
                 database: ${resources.postgres_endpoints.production.parent}/databases/databricks-postgres
                 permission: CAN_CONNECT_AND_CREATE
+            - name: warehouse
+              description: SQL warehouse dei report (query con l'identità dell'utente)
+              sql_warehouse:
+                id: ${var.warehouse_id}
+                permission: CAN_USE

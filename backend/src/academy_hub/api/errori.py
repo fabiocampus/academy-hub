@@ -24,6 +24,7 @@ from academy_hub.dominio.errori import (
     ErroreDominio,
     NonAutenticato,
     NonTrovato,
+    ReportNonDisponibile,
     VersioneNonCorrispondente,
 )
 
@@ -39,6 +40,7 @@ STATO_HTTP: dict[type[ErroreDominio], int] = {
     VersioneNonCorrispondente: 412,
     DatiNonValidi: 422,
     IdentitaNonDisponibile: 503,
+    ReportNonDisponibile: 503,
 }
 
 

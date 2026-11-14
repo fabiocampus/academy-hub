@@ -277,3 +277,25 @@ class ConfigurazioneClient(BaseModel):
 
     identita: Literal["oidc", "databricks", "provvisoria"]
     oidc: ConfigurazioneOidc | None
+
+
+class RigaReportIscrizioni(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    corso_id: int
+    titolo: str
+    edizioni: int
+    confermate: int = Field(description="Iscrizioni Confermate nelle edizioni del corso")
+    in_attesa: int = Field(description="Iscrizioni InAttesa nelle edizioni del corso")
+
+
+class ReportIscrizioni(BaseModel):
+    """Dallo schema gold di Unity Catalog, letto con l'identità dell'utente (ADR-0011)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    letto_come: str | None = Field(
+        description="Identità con cui Databricks ha eseguito la query (current_user()); "
+        "null se il report è vuoto"
+    )
+    righe: list[RigaReportIscrizioni]

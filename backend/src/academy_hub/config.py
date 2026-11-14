@@ -4,7 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal, Self
 
-from pydantic import Field, model_validator
+from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Ambiente = Literal["locale", "collaudo", "produzione"]
@@ -47,12 +47,28 @@ class Impostazioni(BaseSettings):
     oidc_client_web: str = "academy-web"
     # R5: un'iscrizione Confermata si annulla solo se mancano più di N giorni all'inizio.
     scadenza_annullamento_giorni: int = Field(default=3, ge=0, le=365)
+    # Report da Unity Catalog con l'identità dell'utente (ADR-0011): warehouse e catalogo
+    # insieme, o nessuno dei due (niente report, come in locale). L'host del workspace è
+    # quello che Databricks Apps imposta in DATABRICKS_HOST.
+    report_warehouse_id: str | None = Field(default=None, pattern=r"^[0-9a-f]{1,64}$")
+    report_catalogo: str | None = Field(default=None, pattern=r"^[a-z_][a-z0-9_]{0,254}$")
+    databricks_host: str | None = Field(
+        default=None, validation_alias=AliasChoices("DATABRICKS_HOST", "databricks_host")
+    )
     # Build statica del frontend (frontend/dist) da servire insieme all'API; senza, solo API.
     frontend_dir: Path | None = None
 
     @property
     def jwks_url(self) -> str:
         return self.oidc_jwks_url or f"{self.oidc_emittente}/protocol/openid-connect/certs"
+
+    @model_validator(mode="after")
+    def _report_completo(self) -> Self:
+        if (self.report_warehouse_id is None) != (self.report_catalogo is None):
+            raise ValueError(
+                "report: ACADEMY_REPORT_WAREHOUSE_ID e ACADEMY_REPORT_CATALOGO vanno insieme"
+            )
+        return self
 
     @model_validator(mode="after")
     def _identita_coerente_con_ambiente(self) -> Self:

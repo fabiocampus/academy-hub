@@ -14,17 +14,20 @@ from academy_hub.api import PREFISSO, VERSIONE_API
 from academy_hub.api.errori import registra_gestori
 from academy_hub.api.identita import ProviderIdentita, provider
 from academy_hub.api.rotte import catalogo, corsi, edizioni, iscrizioni, profilo
+from academy_hub.api.rotte import report as rotte_report
 from academy_hub.config import impostazioni
 from academy_hub.db.motore import crea_motore
 from academy_hub.frontend import monta_frontend, origine
+from academy_hub.report import LettoreReport, lettore_report
 
 
 def crea_app(
     motore: Engine | None = None,
     identita: ProviderIdentita | None = None,
     frontend: Path | None = None,
+    report: LettoreReport | None = None,
 ) -> FastAPI:
-    """App FastAPI. `motore`, `identita` e `frontend` servono ai test; altrimenti nascono
+    """App FastAPI. `motore`, `identita`, `frontend` e `report` servono ai test; altrimenti nascono
     dalla configurazione. Con una build del frontend l'app serve anche la SPA.
 
     Il motore non apre connessioni: l'app parte (e genera l'OpenAPI) anche
@@ -37,6 +40,7 @@ def crea_app(
     )
     app.state.motore = motore or crea_motore(impostazioni(), pool_pre_ping=True)
     app.state.identita = identita or provider(impostazioni())
+    app.state.report = report or lettore_report(impostazioni())
     registra_gestori(app)
     for router in (
         catalogo.router,
@@ -45,6 +49,7 @@ def crea_app(
         iscrizioni.router,
         iscrizioni.richieste,
         profilo.router,
+        rotte_report.router,
     ):
         app.include_router(router, prefix=PREFISSO)
 
