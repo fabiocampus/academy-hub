@@ -31,6 +31,13 @@ In produzione la build statica del frontend è servita dallo stesso processo Fas
 
 La versione di Python del progetto è allineata a quella dell'ambiente di Databricks Apps. La verifichiamo nella fase 3 e la fissiamo in `.python-version`.
 
+**Verifica (2026-11-14, fase 3).** La pagina *system environment* di Databricks Apps indica Ubuntu 22.04, Python 3.11 e uv 0.13.5; non elenca librerie preinstallate da cui dipendere. Di conseguenza:
+
+- `backend/.python-version` = `3.11`, `requires-python = ">=3.11,<3.12"`, immagine Docker `python:3.11.x-slim`;
+- le dipendenze sono fissate in `backend/uv.lock`, che l'App installerà con uv: non usiamo le librerie preinstallate della piattaforma;
+- l'App ascolta sulla porta che la piattaforma passa in `UVICORN_PORT`/`UVICORN_HOST` (da `DATABRICKS_APP_PORT`); in locale le stesse variabili le fissa il Dockerfile;
+- PostgreSQL locale alla versione 17, la stessa che useremo su Lakebase (da riverificare nella fase 8).
+
 ## Conseguenze
 
 - **Positive:** un solo linguaggio lato server per App, job e pipeline; PostgreSQL uguale in locale e su Lakebase; il contratto OpenAPI tiene allineati backend e frontend; lo stack corrisponde ai moduli del corso.

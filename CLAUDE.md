@@ -4,7 +4,20 @@ Prototipo di studio: iscrizioni ai corsi di un'Academy aziendale (parte transazi
 
 ## Stato
 
-Fase 2 (qualità e CI). Il backend è solo uno scheletro: dominio, database e API arrivano dalle fasi 4 e 5.
+Fase 3 (container). Il backend espone solo `/health`: dominio, database e API arrivano dalle fasi 4 e 5.
+
+## Ambiente locale
+
+Dalla radice del repository, senza altri passaggi (il `.env` è facoltativo, vedi `.env.example`):
+
+```bash
+docker compose up -d --build --wait   # db, keycloak, otel-lgtm, backend
+docker compose down                   # -v per cancellare anche i dati
+```
+
+Porte su 127.0.0.1: backend 8000 (`/health`, `/docs`), Keycloak 8080 (admin/admin), Grafana 3000, PostgreSQL 5432, OTLP 4317/4318. In alternativa c'è il dev container (`.devcontainer/`).
+
+La configurazione arriva solo da variabili d'ambiente: quelle del backend hanno prefisso `ACADEMY_` (`backend/src/academy_hub/config.py`).
 
 ## Comandi
 
@@ -26,7 +39,8 @@ Dopo ogni modifica a un file `.py` del backend l'hook `.claude/hooks/dopo_modifi
 
 - `backend/src/academy_hub/`: pacchetto Python. Livelli: router (FastAPI) → servizi (regole di business, autorizzazione) → repository (accesso ai dati). Niente regole nelle rotte, niente SQL fuori dai repository.
 - `backend/tests/`: test pytest.
-- `.github/workflows/`: `ci.yml` (lint, typecheck, test, gitleaks) e `pr-issue.yml` (la PR deve collegare una issue). Sono status check obbligatori del ruleset su `main`.
+- `backend/Dockerfile`: multi-stage con uv, runtime non root (uid 10001).
+- `.github/workflows/`: `ci.yml` (lint, typecheck, test, immagine + Trivy, compose, gitleaks) e `pr-issue.yml` (la PR deve collegare una issue). Sono status check obbligatori del ruleset su `main`.
 
 ## Flusso di lavoro
 
