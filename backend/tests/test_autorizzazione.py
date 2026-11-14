@@ -42,6 +42,7 @@ from academy_hub.db.modelli import Edizione, Persona
 from academy_hub.dominio.ruoli import Ruolo
 from academy_hub.dominio.stati import StatoIscrizione
 from academy_hub.main import crea_app
+from academy_hub.report import ReportIscrizioniPerCorso
 
 from .dati import crea_edizione, crea_iscrizione, crea_persona, crea_team
 from .oidc import ProviderFinto
@@ -202,6 +203,11 @@ MATRICE: dict[tuple[str, str], Riga] = {
         TUTTI,
     ),
     ("GET", "/io"): (lambda m: Chiamata("GET", "/io"), TUTTI),
+    # Basta essere registrati: chi legge la tabella lo decide Unity Catalog (ADR-0011).
+    ("GET", "/report/iscrizioni-per-corso"): (
+        lambda m: Chiamata("GET", "/report/iscrizioni-per-corso"),
+        TUTTI,
+    ),
     # Pubblica: il frontend la legge prima del login.
     ("GET", "/configurazione"): (
         lambda m: Chiamata("GET", "/configurazione"),
@@ -257,7 +263,13 @@ def provider() -> ProviderFinto:
 
 @pytest.fixture
 def client(db: Engine, provider: ProviderFinto) -> Iterator[TestClient]:
-    with TestClient(crea_app(motore=db, identita=provider.oidc())) as client:
+    report = ReportIscrizioniPerCorso(letto_come=None, righe=[])
+
+    class Lettore:
+        def iscrizioni_per_corso(self, token_utente: str | None) -> ReportIscrizioniPerCorso:
+            return report
+
+    with TestClient(crea_app(motore=db, identita=provider.oidc(), report=Lettore())) as client:
         yield client
 
 

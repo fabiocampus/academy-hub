@@ -1,7 +1,7 @@
 # Threat model del flusso di approvazione
 
 - **Metodo:** STRIDE per elemento del flusso, sul sistema com'è alla fine della fase 6 (issue #56); aggiornato con il frontend servito dallo stesso processo (fase 7, issue #66).
-- **Perimetro:** richiesta, approvazione o rifiuto, conferma, annullamento, job di sistema. Fuori perimetro: la parte analitica su Databricks (fase 8 e seguenti), Keycloak stesso. Del frontend (fase 7) ci sono le minacce sull'accesso e sul browser (XSS, clickjacking, file serviti).
+- **Perimetro:** richiesta, approvazione o rifiuto, conferma, annullamento, job di sistema. Della parte analitica su Databricks c'è solo la lettura dei report con l'identità dell'utente (ADR-0011); fuori perimetro le pipeline (fase 11) e Keycloak stesso. Del frontend (fase 7) ci sono le minacce sull'accesso e sul browser (XSS, clickjacking, file serviti).
 - **Da rivedere:** quando cambia il provider d'identità, prima del primo deploy su Databricks Apps.
 
 ## Il sistema
@@ -45,6 +45,7 @@ Asset da proteggere: l'esito delle richieste (chi va al corso), i posti delle ed
 | D11 | Input con limiti (lunghezze, paginazione al massimo 100, `extra="forbid"`) | `api/schemi.py` |
 | D12 | Catena di fornitura: azioni fissate per SHA, immagini per digest, Dependabot, `pip-audit` su `uv.lock`, Trivy sull'immagine, CodeQL (Python e Actions), gitleaks e secret scanning con push protection | `.github/` |
 | D13 | Container non root, porte di compose solo su `127.0.0.1` | `backend/Dockerfile`, `docker-compose.yml` |
+| D15 | Report letti con il token dell'utente (on-behalf-of-user, scope `sql`): decide Unity Catalog; il service principal dell'App non ha grant su Unity Catalog; catalogo e schema come parametri, query fissa; token mai nei log; `Cache-Control: no-store` | `academy_hub/report.py`, `databricks.yml`, ADR-0011 |
 | D14 | HTML dell'app con `Content-Security-Policy` (script solo dalla stessa origine, nessun `object`, `base-uri` e `form-action` limitati, `frame-ancestors 'none'`, rete solo verso l'app e l'emittente OIDC), `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`; file serviti solo da dentro la build, `/api` mai coperto dal fallback | `academy_hub/frontend.py`, ADR-0009 §14 |
 
 ## Minacce
@@ -93,6 +94,8 @@ Stato: **mitigata** (una difesa la copre), **accettata** (rischio residuo consap
 | Scoprire che un'iscrizione esiste: per un id altrui la risposta è 403, non 404, e gli id sono sequenziali | lettura, decisioni, annullamento | — | accettata: rivela solo l'esistenza di un numero, non chi né dove |
 | Elenco delle richieste altrui | US-07 | la query applica la stessa regola del decisore, verificata da un test | mitigata |
 | Dettagli interni negli errori | tutti | D10 | mitigata |
+| Report letti con i permessi dell'App invece che con quelli dell'utente | report | D15: il service principal non ha grant su Unity Catalog, la query usa il token dell'utente (`letto_come` lo mostra) | mitigata; il rifiuto per un altro utente è provato solo nei test (Free Edition ha un utente) |
+| Token dell'utente (`X-Forwarded-Access-Token`) nei log o riusato dall'App | report | D15: mai registrato, usato solo per la query fissa del report, in memoria per la richiesta | mitigata |
 | Segreti nel repository pubblico | — | D12 (gitleaks in pre-commit e in CI, push protection), solo dati sintetici | mitigata |
 | `GET /configurazione` è pubblica e rivela emittente OIDC e client id del frontend | accesso | solo dati già visibili nella pagina di login; il client è pubblico (PKCE, nessun segreto) | accettata (fase 7, ADR-0009) |
 | Access token rubato dal browser con uno script iniettato (XSS): con l'HTML sulla stessa origine dell'API uno script vale una sessione intera | tutti | React fa l'escape del testo, nessun HTML grezzo; D14 (CSP: niente script inline o di altre origini, dati mandati solo all'app o all'emittente); token in `sessionStorage`, non in `localStorage`; durata breve del token di Keycloak | mitigata; resta `style-src 'unsafe-inline'` per gli stili di Mantine (iniezione di CSS, non di script) |

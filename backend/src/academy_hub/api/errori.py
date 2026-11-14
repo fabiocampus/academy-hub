@@ -26,6 +26,7 @@ from academy_hub.dominio.errori import (
     NonTrovato,
     VersioneNonCorrispondente,
 )
+from academy_hub.report import ReportNonDisponibile
 
 TIPO_MEDIA = "application/problem+json"
 
@@ -39,6 +40,7 @@ STATO_HTTP: dict[type[ErroreDominio], int] = {
     VersioneNonCorrispondente: 412,
     DatiNonValidi: 422,
     IdentitaNonDisponibile: 503,
+    ReportNonDisponibile: 503,
 }
 
 
