@@ -22,11 +22,20 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.8.2@sha256:c68e286cacd87b942ac1939a0a1481461109d6acd3a57dc496969a319a76bbf0
-    command: ["start-dev"]
+    # Realm "academy" (client OIDC e utenti di prova, ADR-0008) importato al primo avvio;
+    # se esiste già resta com'è: per ripartire dal file, docker compose down.
+    command: ["start-dev", "--import-realm"]
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
       KC_HEALTH_ENABLED: "true"
+      # L'emittente dei token è sempre l'URL visto dal browser, anche quando il token
+      # lo chiede qualcuno dentro la rete di compose; il backend legge le chiavi da
+      # http://keycloak:8080 (backchannel dinamico).
+      KC_HOSTNAME: http://localhost:${KEYCLOAK_PORT:-8080}
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+    volumes:
+      - ./keycloak/realm-academy.json:/opt/keycloak/data/import/realm-academy.json:ro
     ports:
       - "127.0.0.1:${KEYCLOAK_PORT:-8080}:8080"
     healthcheck:
@@ -59,12 +68,28 @@ services:
       db:
         condition: service_healthy
 
+  # Persone degli utenti di prova di Keycloak e un piccolo catalogo; non fa nulla se
+  # i dati ci sono già (academy_hub.db.demo).
+  demo:
+    build: ./backend
+    command: ["python", "-m", "academy_hub.db.demo"]
+    environment:
+      ACADEMY_AMBIENTE: ${ACADEMY_AMBIENTE:-locale}
+      ACADEMY_DATABASE_URL: *url-db
+    healthcheck:
+      disable: true
+    depends_on:
+      migrazioni:
+        condition: service_completed_successfully
+
   backend:
     build: ./backend
     environment:
       ACADEMY_AMBIENTE: ${ACADEMY_AMBIENTE:-locale}
-      # Header X-Persona-Id al posto del token, solo in locale fino alla fase 6 (ADR-0005)
-      ACADEMY_IDENTITA_PROVVISORIA: ${ACADEMY_IDENTITA_PROVVISORIA:-true}
+      # Identità dal token di Keycloak (ADR-0008)
+      ACADEMY_IDENTITA: ${ACADEMY_IDENTITA:-oidc}
+      ACADEMY_OIDC_EMITTENTE: http://localhost:${KEYCLOAK_PORT:-8080}/realms/academy
+      ACADEMY_OIDC_JWKS_URL: http://keycloak:8080/realms/academy/protocol/openid-connect/certs
       ACADEMY_LIVELLO_LOG: ${ACADEMY_LIVELLO_LOG:-INFO}
       ACADEMY_SCADENZA_ANNULLAMENTO_GIORNI: ${ACADEMY_SCADENZA_ANNULLAMENTO_GIORNI:-3}
       ACADEMY_DATABASE_URL: *url-db
@@ -72,7 +97,7 @@ services:
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
     depends_on:
-      migrazioni:
+      demo:
         condition: service_completed_successfully
       keycloak:
         condition: service_healthy

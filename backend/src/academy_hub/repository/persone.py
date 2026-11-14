@@ -1,6 +1,6 @@
 """Accesso ai dati delle persone e dell'organigramma."""
 
-from sqlalchemy import CTE, Integer, literal, select
+from sqlalchemy import CTE, ColumnElement, Integer, literal, select
 from sqlalchemy.orm import Session, aliased
 
 from academy_hub.db.modelli import Persona, Team
@@ -13,12 +13,21 @@ PROFONDITA_MASSIMA = 50
 
 
 def attore(sessione: Session, persona_id: int) -> Attore | None:
+    return _attore(sessione, Persona.id == persona_id)
+
+
+def attore_per_email(sessione: Session, email: str) -> Attore | None:
+    """Persona con quell'email (minuscola: vincolo `email_minuscola`)."""
+    return _attore(sessione, Persona.email == email)
+
+
+def _attore(sessione: Session, condizione: ColumnElement[bool]) -> Attore | None:
     riga = sessione.execute(
-        select(Persona.team_id, Persona.ruoli).where(Persona.id == persona_id)
+        select(Persona.id, Persona.team_id, Persona.ruoli).where(condizione)
     ).one_or_none()
     if riga is None:
         return None
-    return Attore(persona_id, riga.team_id, frozenset(Ruolo(r) for r in riga.ruoli))
+    return Attore(riga.id, riga.team_id, frozenset(Ruolo(r) for r in riga.ruoli))
 
 
 def blocca_persona(sessione: Session, persona_id: int) -> None:

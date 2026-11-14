@@ -96,6 +96,7 @@ class Persona(Base):
             f"cardinality(ruoli) > 0 AND ruoli <@ ARRAY[{RUOLI}]::varchar[]",
             name="ruoli_validi",
         ),
+        CheckConstraint("email = lower(email)", name="email_minuscola"),
     )
 
     id: Mapped[int] = mapped_column(Identity(), primary_key=True)

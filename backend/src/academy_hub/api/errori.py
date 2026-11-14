@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm.exc import StaleDataError
 from starlette.exceptions import HTTPException
 
+from academy_hub.api.identita import IdentitaNonDisponibile
 from academy_hub.dominio.errori import (
     AzioneNonConsentita,
     Conflitto,
@@ -37,6 +38,7 @@ STATO_HTTP: dict[type[ErroreDominio], int] = {
     Conflitto: 409,
     VersioneNonCorrispondente: 412,
     DatiNonValidi: 422,
+    IdentitaNonDisponibile: 503,
 }
 
 
@@ -157,14 +159,14 @@ async def _errore_dominio(richiesta: Request, errore: Exception) -> JSONResponse
         if isinstance(errore, DatiNonValidi)
         else None
     )
-    return problema(
-        richiesta,
-        stato_http(errore),
-        f"/problemi/{errore.tipo}",
-        errore.titolo,
-        str(errore) or None,
-        errori,
+    stato = stato_http(errore)
+    risposta = problema(
+        richiesta, stato, f"/problemi/{errore.tipo}", errore.titolo, str(errore) or None, errori
     )
+    if stato == 401:
+        # RFC 9110: un 401 dice come autenticarsi (RFC 6750 per i token Bearer).
+        risposta.headers["WWW-Authenticate"] = 'Bearer realm="academy-hub"'
+    return risposta
 
 
 async def _validazione(richiesta: Request, errore: Exception) -> JSONResponse:

@@ -22,6 +22,13 @@ class AzioneNonConsentita(ErroreDominio):
     titolo = "Azione non consentita al tuo ruolo"
 
 
+class PersonaNonRegistrata(AzioneNonConsentita):
+    """Identità valida, ma nessuna persona con quell'email: non abilitata all'applicazione."""
+
+    tipo = "persona-non-registrata"
+    titolo = "Persona non registrata nell'Academy"
+
+
 class NonTrovato(ErroreDominio, LookupError):
     tipo = "non-trovato"
     titolo = "Risorsa inesistente"

@@ -10,12 +10,13 @@ from sqlalchemy import Engine, create_engine
 from academy_hub import __version__
 from academy_hub.api import PREFISSO, VERSIONE_API
 from academy_hub.api.errori import registra_gestori
+from academy_hub.api.identita import ProviderIdentita, provider
 from academy_hub.api.rotte import catalogo, corsi, edizioni, iscrizioni
 from academy_hub.config import impostazioni
 
 
-def crea_app(motore: Engine | None = None) -> FastAPI:
-    """App FastAPI. `motore` serve ai test; altrimenti nasce da `ACADEMY_DATABASE_URL`.
+def crea_app(motore: Engine | None = None, identita: ProviderIdentita | None = None) -> FastAPI:
+    """App FastAPI. `motore` e `identita` servono ai test; altrimenti nascono dalla configurazione.
 
     `create_engine` non apre connessioni: l'app parte (e genera l'OpenAPI) anche
     senza database.
@@ -26,6 +27,7 @@ def crea_app(motore: Engine | None = None) -> FastAPI:
         description="Iscrizioni ai corsi dell'Academy. Errori in formato RFC 9457.",
     )
     app.state.motore = motore or create_engine(impostazioni().database_url, pool_pre_ping=True)
+    app.state.identita = identita or provider(impostazioni())
     registra_gestori(app)
     for router in (
         catalogo.router,

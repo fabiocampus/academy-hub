@@ -10,7 +10,7 @@ Termini usati in codice, test, issue e documentazione. Nel codice i nomi restano
 | **Corso archiviato** | Corso ritirato dal catalogo: non riceve nuove edizioni, ma le sue edizioni restano nei report. | Edizione cancellata |
 | **Edizione** | Un'istanza datata di un corso: data di inizio e fine, capienza, eventuale docente. Le iscrizioni si fanno sulle edizioni. | Corso |
 | **Capienza** | Numero massimo di iscrizioni `Confermata` per un'edizione. | Numero di richieste |
-| **Persona** | Un dipendente con nome, email e team. Ha un ruolo applicativo. | Utente di Keycloak o di Databricks (l'identità tecnica) |
+| **Persona** | Un dipendente con nome, email e team. Ha un ruolo applicativo. L'email (minuscola) la collega all'identità tecnica (ADR-0008). | Utente di Keycloak o di Databricks (l'identità tecnica) |
 | **Team** | Gruppo di persone con un solo responsabile. I team formano una gerarchia: ogni team, tranne quello al vertice, ha un team padre. | — |
 | **Responsabile diretto** | Per un dipendente: il responsabile del suo team. Per un responsabile: il responsabile del team padre; al vertice, l'amministratore Academy. Conta quello in carica al momento della decisione. In generale: il primo della catena dei responsabili diverso dal richiedente. | Amministratore Academy |
 | **Catena dei responsabili** | I responsabili dal team di una persona fino al vertice dell'organigramma; un team senza responsabile si salta. Da qui si ricava il responsabile diretto (`dominio/organigramma.py`). | — |
