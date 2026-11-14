@@ -15,6 +15,7 @@ import logging
 import signal
 import sys
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from types import FrameType
 
@@ -31,6 +32,31 @@ log = logging.getLogger("academy_hub.job")
 class Esito:
     annullate: int = 0
     promosse: int = 0
+    fallite: int = 0
+
+
+def _per_edizione(
+    sessione: Session,
+    trova: Callable[[Session], list[int]],
+    lavora: Callable[[Session, int], int],
+) -> tuple[int, int]:
+    """Applica `lavora` a ogni edizione trovata, una transazione per edizione.
+
+    Un errore su un'edizione si registra e non ferma le altre: altrimenti, con la query
+    sempre nello stesso ordine, un'edizione difettosa bloccherebbe per sempre le seguenti.
+    Restituisce (iscrizioni cambiate, edizioni fallite).
+    """
+    with sessione.begin():
+        edizioni = trova(sessione)
+    cambiate = fallite = 0
+    for edizione_id in edizioni:
+        try:
+            with sessione.begin():
+                cambiate += lavora(sessione, edizione_id)
+        except Exception:
+            fallite += 1
+            log.exception("Job: edizione %d non lavorata", edizione_id)
+    return cambiate, fallite
 
 
 def esegui(motore: Engine) -> Esito:
@@ -39,19 +65,14 @@ def esegui(motore: Engine) -> Esito:
     Idempotente: lavora solo su iscrizioni ancora pendenti o su posti ancora liberi,
     quindi una seconda passata non trova nulla e non scrive audit.
     """
-    annullate = promosse = 0
     with Session(motore) as sessione:
-        with sessione.begin():
-            da_chiudere = iscrizioni.edizioni_da_chiudere(sessione)
-        for edizione_id in da_chiudere:
-            with sessione.begin():
-                annullate += iscrizioni.chiudi_edizione_iniziata(sessione, edizione_id)
-        with sessione.begin():
-            da_promuovere = iscrizioni.edizioni_da_promuovere(sessione)
-        for edizione_id in da_promuovere:
-            with sessione.begin():
-                promosse += iscrizioni.promuovi_edizione(sessione, edizione_id)
-    return Esito(annullate, promosse)
+        annullate, fallite_chiusura = _per_edizione(
+            sessione, iscrizioni.edizioni_da_chiudere, iscrizioni.chiudi_edizione_iniziata
+        )
+        promosse, fallite_promozione = _per_edizione(
+            sessione, iscrizioni.edizioni_da_promuovere, iscrizioni.promuovi_edizione
+        )
+    return Esito(annullate, promosse, fallite_chiusura + fallite_promozione)
 
 
 def _secondi(valore: str) -> int:
@@ -66,9 +87,15 @@ def _ferma(_segnale: int, _frame: FrameType | None) -> None:
     raise KeyboardInterrupt
 
 
-def _passata(motore: Engine) -> None:
+def _passata(motore: Engine) -> Esito:
     esito = esegui(motore)
-    log.info("Passata del job: %d annullate, %d promosse", esito.annullate, esito.promosse)
+    log.info(
+        "Passata del job: %d annullate, %d promosse, %d edizioni fallite",
+        esito.annullate,
+        esito.promosse,
+        esito.fallite,
+    )
+    return esito
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -85,8 +112,8 @@ def main(argv: list[str] | None = None) -> int:
     motore = create_engine(config.database_url, pool_pre_ping=True)
     try:
         if ogni is None:
-            _passata(motore)
-            return 0
+            # Uscita diversa da 0 se qualcosa è fallito: lo scheduler lo deve vedere.
+            return 1 if _passata(motore).fallite else 0
         signal.signal(signal.SIGTERM, _ferma)
         while True:
             try:

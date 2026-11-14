@@ -108,6 +108,7 @@ def promuovi_dalla_lista(sessione: Session, edizione: Edizione) -> int:
     nella stessa transazione, l'annullamento, la conferma, l'aumento di capienza e il
     job di rete di sicurezza (ADR-0007).
     """
+    # Difensivo sulla cancellazione: un'edizione cancellata non ha più InAttesa (D10).
     if edizione.cancellata_il is not None or edizione.data_inizio <= oggi():
         return 0
     promosse = 0

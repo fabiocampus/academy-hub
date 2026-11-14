@@ -87,8 +87,12 @@ def blocca_iscrizioni(
 ) -> list[Iscrizione]:
     """Lock sulle iscrizioni dell'edizione negli stati dati, in ordine di id.
 
-    Da chiamare con l'edizione già bloccata (cancellazione, scadenza): chi aggiunge o
-    cambia un'iscrizione attiva passa prima dall'edizione, quindi l'elenco è completo.
+    Da chiamare con l'edizione già bloccata (cancellazione, scadenza). Le richieste nuove
+    prendono l'edizione in `FOR SHARE`, quindi l'elenco è completo. Approvazione e rifiuto
+    (`_decidi`) bloccano invece solo l'iscrizione: qui il `FOR NO KEY UPDATE` aspetta la
+    loro fine e, in READ COMMITTED, ricontrolla il WHERE sulla riga nuova. Una `Approvata`
+    resta nell'elenco, una `Rifiutata` ne esce. Niente LIMIT, quindi nessuna riga persa;
+    niente deadlock, perché `_decidi` non chiede l'edizione.
     """
     return list(
         sessione.scalars(

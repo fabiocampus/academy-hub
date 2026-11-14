@@ -1,6 +1,7 @@
 """Job di sistema: scadenza all'inizio dell'edizione (US-17) e rete di sicurezza della
 promozione (US-09). Chiamato direttamente, come lo lancia `python -m academy_hub.job`."""
 
+import logging
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -13,6 +14,7 @@ from academy_hub.db.modelli import Edizione, EventoAudit, Iscrizione
 from academy_hub.dominio.stati import StatoIscrizione
 from academy_hub.dominio.tempo import oggi
 from academy_hub.repository.iscrizioni import eventi_audit
+from academy_hub.servizi import iscrizioni
 
 from .api import edizione, iscrizione, persona
 
@@ -69,6 +71,40 @@ def test_d8_all_inizio_le_iscrizioni_pendenti_diventano_annullate(db: Engine, gi
         assert sessione.get_one(Iscrizione, confermata).stato is S.CONFERMATA
         assert eventi_audit(sessione, confermata) == []
         assert sessione.get_one(Edizione, edizione_id).posti_confermati == 1
+
+
+def test_sotto_lock_ricontrolla_la_data(db: Engine) -> None:
+    """L'amministratore può spostare l'inizio fra la ricerca del job e il lock."""
+    edizione_id = edizione(db, inizio=oggi() + timedelta(days=5))
+    richiesta = nuova(db, edizione_id, S.RICHIESTA)
+
+    with Session(db) as sessione, sessione.begin():
+        assert iscrizioni.chiudi_edizione_iniziata(sessione, edizione_id) == 0
+
+    assert stato(db, richiesta) is S.RICHIESTA
+
+
+def test_un_edizione_che_fallisce_non_ferma_le_altre(
+    db: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    difettosa = edizione(db, inizio=oggi())
+    sana = edizione(db, inizio=oggi())
+    nella_difettosa = nuova(db, difettosa, S.RICHIESTA, 1)
+    nella_sana = nuova(db, sana, S.RICHIESTA, 2)
+    originale = iscrizioni.chiudi_edizione_iniziata
+
+    def chiudi(sessione: Session, edizione_id: int) -> int:
+        if edizione_id == difettosa:
+            raise RuntimeError("edizione difettosa")
+        return originale(sessione, edizione_id)
+
+    monkeypatch.setattr(iscrizioni, "chiudi_edizione_iniziata", chiudi)
+
+    esito = job.esegui(db)
+
+    assert (esito.annullate, esito.fallite) == (1, 1)
+    assert stato(db, nella_difettosa) is S.RICHIESTA
+    assert stato(db, nella_sana) is S.ANNULLATA
 
 
 def test_le_edizioni_non_iniziate_restano_come_sono(db: Engine) -> None:
@@ -142,6 +178,47 @@ def test_main_esegue_una_volta_sul_database_configurato(
     assert stato(db, richiesta) is S.ANNULLATA
 
 
+def test_main_esce_con_1_se_un_edizione_fallisce(monkeypatch: pytest.MonkeyPatch) -> None:
+    def esegui(_motore: Engine) -> job.Esito:
+        return job.Esito(fallite=1)
+
+    monkeypatch.setattr(job, "esegui", esegui)
+
+    assert job.main([]) == 1
+
+
 def test_ogni_deve_essere_positivo() -> None:
     with pytest.raises(SystemExit):
         job.main(["--ogni", "0"])
+
+
+def test_con_ogni_un_errore_non_ferma_il_ciclo(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Prima passata in errore, seconda riuscita, poi l'arresto (SIGTERM o Ctrl+C)."""
+    passate: list[str] = []
+
+    def esegui(_motore: Engine) -> job.Esito:
+        passate.append("passata")
+        if len(passate) == 1:
+            raise RuntimeError("database irraggiungibile")
+        return job.Esito()
+
+    def dormi(_secondi: float) -> None:
+        if len(passate) == 2:
+            raise KeyboardInterrupt
+
+    caplog.set_level(logging.INFO, logger="academy_hub.job")
+    monkeypatch.setattr(job, "esegui", esegui)
+    monkeypatch.setattr(job.time, "sleep", dormi)
+
+    def segnale(*_argomenti: object) -> None:
+        return None
+
+    monkeypatch.setattr(job.signal, "signal", segnale)
+
+    assert job.main(["--ogni", "60"]) == 0
+
+    assert len(passate) == 2
+    assert "riprovo al prossimo giro" in caplog.text
+    assert "Job fermato" in caplog.text

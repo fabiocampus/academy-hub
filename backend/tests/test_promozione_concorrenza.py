@@ -12,7 +12,7 @@ from academy_hub.dominio.ruoli import Ruolo
 from academy_hub.dominio.stati import STATI_ATTIVI, StatoIscrizione
 from academy_hub.servizi import catalogo, iscrizioni
 
-from .api import edizione, iscrizione, persona
+from .api import edizione, iscrizione, organigramma, persona
 from .concorrenza import attore, insieme
 
 pytestmark = pytest.mark.integrazione
@@ -78,6 +78,31 @@ def test_r4_annullamento_e_conferma_simultanei_il_posto_va_alla_lista(db: Engine
 
     assert stati(db, [in_lista, approvata]) == [S.CONFERMATA, S.IN_ATTESA]
     assert posti(db, edizione_id) == 1
+
+
+@pytest.mark.parametrize("decisione", ["approva", "rifiuta"])
+def test_d10_cancellazione_e_decisione_simultanee_nessuna_iscrizione_resta_attiva(
+    db: Engine, decisione: str
+) -> None:
+    """La decisione blocca solo l'iscrizione: la cancellazione la aspetta e ricontrolla lo
+    stato (READ COMMITTED). Approvata → annullata; Rifiutata → saltata."""
+    org = organigramma(db)
+    edizione_id = edizione(db)
+    richiesta = iscrizione(db, org.ids["Anna"], edizione_id, S.RICHIESTA)
+    rossa, admin = attore(db, org.ids["Rossa"]), attore(db, org.ids["Admin"])
+
+    def decidi(s: Session) -> StatoIscrizione:
+        if decisione == "approva":
+            return iscrizioni.approva(s, rossa, richiesta).stato
+        return iscrizioni.rifiuta(s, rossa, richiesta, "Budget").stato
+
+    insieme(db, [lambda s: catalogo.cancella_edizione(s, admin, edizione_id).id, decidi])
+
+    with Session(db) as sessione:
+        finale = sessione.get_one(Iscrizione, richiesta).stato
+        assert finale in {S.ANNULLATA, S.RIFIUTATA}
+        assert sessione.get_one(Edizione, edizione_id).cancellata_il is not None
+        assert sessione.get_one(Edizione, edizione_id).posti_confermati == 0
 
 
 def test_d10_cancellazione_e_richiesta_simultanee_nessuna_iscrizione_resta_attiva(
