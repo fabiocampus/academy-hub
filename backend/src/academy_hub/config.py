@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import Literal, Self
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Ambiente = Literal["locale", "collaudo", "produzione"]
@@ -20,6 +20,8 @@ class Impostazioni(BaseSettings):
     # Header `X-Persona-Id` al posto del token (fase 5, ADR-0005): permette di
     # impersonare chiunque, quindi va acceso esplicitamente e solo in locale.
     identita_provvisoria: bool = False
+    # R5: un'iscrizione Confermata si annulla solo se mancano più di N giorni all'inizio.
+    scadenza_annullamento_giorni: int = Field(default=3, ge=0, le=365)
 
     @model_validator(mode="after")
     def _identita_provvisoria_solo_in_locale(self) -> Self:

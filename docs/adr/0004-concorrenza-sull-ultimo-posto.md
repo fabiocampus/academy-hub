@@ -22,7 +22,7 @@ Il test `test_r3_conferme_simultanee_sull_ultimo_posto_ne_passa_una_sola` lancia
 ## Conseguenze
 
 - **Positive:** semplice da leggere e da testare; la serializzazione è limitata alla singola edizione, quindi le conferme su edizioni diverse non si aspettano; il vincolo nel database copre anche gli errori futuri.
-- **Negative:** il contatore è un dato derivato e va tenuto coerente: ogni uscita da `Confermata` verso `Annullata` deve decrementarlo (da implementare con US-10 e US-18). Un'edizione molto contesa serializza le conferme, accettabile con capienze da aula.
+- **Negative:** il contatore è un dato derivato e va tenuto coerente: ogni uscita da `Confermata` verso `Annullata` deve decrementarlo. Lo fa `_cambia_stato` in `servizi/iscrizioni.py`, l'unico punto dei cambi di stato, che per entrare in `Confermata` o uscirne pretende l'edizione già bloccata. Un'edizione molto contesa serializza le conferme, accettabile con capienze da aula.
 
 ## Alternative considerate
 

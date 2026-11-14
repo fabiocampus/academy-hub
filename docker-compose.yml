@@ -66,6 +66,7 @@ services:
       # Header X-Persona-Id al posto del token, solo in locale fino alla fase 6 (ADR-0005)
       ACADEMY_IDENTITA_PROVVISORIA: ${ACADEMY_IDENTITA_PROVVISORIA:-true}
       ACADEMY_LIVELLO_LOG: ${ACADEMY_LIVELLO_LOG:-INFO}
+      ACADEMY_SCADENZA_ANNULLAMENTO_GIORNI: ${ACADEMY_SCADENZA_ANNULLAMENTO_GIORNI:-3}
       ACADEMY_DATABASE_URL: *url-db
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-lgtm:4318
     ports:

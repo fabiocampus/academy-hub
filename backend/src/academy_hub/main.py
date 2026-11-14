@@ -10,7 +10,7 @@ from sqlalchemy import Engine, create_engine
 from academy_hub import __version__
 from academy_hub.api import PREFISSO, VERSIONE_API
 from academy_hub.api.errori import registra_gestori
-from academy_hub.api.rotte import catalogo, corsi, edizioni
+from academy_hub.api.rotte import catalogo, corsi, edizioni, iscrizioni
 from academy_hub.config import impostazioni
 
 
@@ -27,8 +27,14 @@ def crea_app(motore: Engine | None = None) -> FastAPI:
     )
     app.state.motore = motore or create_engine(impostazioni().database_url, pool_pre_ping=True)
     registra_gestori(app)
-    for modulo in (catalogo, corsi, edizioni):
-        app.include_router(modulo.router, prefix=PREFISSO)
+    for router in (
+        catalogo.router,
+        corsi.router,
+        edizioni.router,
+        iscrizioni.router,
+        iscrizioni.richieste,
+    ):
+        app.include_router(router, prefix=PREFISSO)
 
     @app.get("/health", tags=["sistema"], operation_id="health")
     def health() -> dict[str, str]:  # pyright: ignore[reportUnusedFunction]

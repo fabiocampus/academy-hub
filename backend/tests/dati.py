@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from academy_hub.db.modelli import Corso, Edizione, Iscrizione, Persona, Team
 from academy_hub.dominio.ruoli import Ruolo
 from academy_hub.dominio.stati import StatoIscrizione
+from academy_hub.dominio.tempo import oggi
 
 
 def crea_persona(
@@ -30,11 +31,24 @@ def crea_persona(
     return persona
 
 
-def crea_edizione(sessione: Session, capienza: int = 10, posti_confermati: int = 0) -> Edizione:
+def crea_team(sessione: Session, nome: str, padre: Team | None = None) -> Team:
+    team = Team(nome=nome, team_padre_id=None if padre is None else padre.id)
+    sessione.add(team)
+    sessione.flush()
+    return team
+
+
+def crea_edizione(
+    sessione: Session,
+    capienza: int = 10,
+    posti_confermati: int = 0,
+    inizio: date | None = None,
+) -> Edizione:
+    """Edizione di un corso nuovo; per difetto inizia fra 30 giorni (calendario di Roma)."""
     corso = Corso(titolo="SQL per analisti", durata_ore=8)
     sessione.add(corso)
     sessione.flush()
-    inizio = date.today() + timedelta(days=30)
+    inizio = oggi() + timedelta(days=30) if inizio is None else inizio
     edizione = Edizione(
         corso_id=corso.id,
         data_inizio=inizio,
@@ -52,13 +66,15 @@ def crea_iscrizione(
     persona: Persona,
     edizione: Edizione,
     stato: StatoIscrizione = StatoIscrizione.RICHIESTA,
+    approvata_il: datetime | None = None,
 ) -> Iscrizione:
+    """Iscrizione già nello stato dato, senza audit (dato di partenza dei test)."""
     approvata = stato not in {StatoIscrizione.RICHIESTA, StatoIscrizione.RIFIUTATA}
     iscrizione = Iscrizione(
         persona_id=persona.id,
         edizione_id=edizione.id,
         stato=stato,
-        approvata_il=datetime.now(UTC) if approvata else None,
+        approvata_il=(approvata_il or datetime.now(UTC)) if approvata else None,
     )
     sessione.add(iscrizione)
     sessione.flush()

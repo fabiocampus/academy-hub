@@ -174,6 +174,14 @@ class Iscrizione(Base):
             postgresql_where=text("stato = 'InAttesa'"),
         ),
         Index("ix_iscrizioni_edizione_stato", "edizione_id", "stato"),
+        # Idempotenza della richiesta (US-04, ADR-0006): una chiave per persona.
+        Index(
+            "uq_iscrizioni_chiave_idempotenza",
+            "persona_id",
+            "chiave_idempotenza",
+            unique=True,
+            postgresql_where=text("chiave_idempotenza IS NOT NULL"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(Identity(), primary_key=True)
@@ -187,6 +195,8 @@ class Iscrizione(Base):
     aggiornata_il: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+    # Header `Idempotency-Key` della richiesta che l'ha creata, se c'era.
+    chiave_idempotenza: Mapped[str | None] = mapped_column(String(64))
 
 
 class EventoAudit(Base):
