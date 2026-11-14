@@ -4,7 +4,7 @@ Prototipo di studio: iscrizioni ai corsi di un'Academy aziendale (parte transazi
 
 ## Stato
 
-Fase 4 (database e dominio). Ci sono schema, migrazioni e la conferma del posto; il backend espone ancora solo `/health`: le API arrivano nella fase 5.
+Fase 5 (API a livelli), in tre PR (issue #49). Fatta la prima: errori RFC 9457, ETag/If-Match, contratto OpenAPI versionato, corsi, edizioni e catalogo. Restano il flusso delle iscrizioni e i job (promozione, scadenza, cancellazione). L'identità è ancora provvisoria (header `X-Persona-Id`, solo in locale con `ACADEMY_IDENTITA_PROVVISORIA=true`) fino alla fase 6. Convenzioni in `docs/adr/0005-convenzioni-dell-api.md`.
 
 ## Ambiente locale
 
@@ -28,6 +28,7 @@ uv sync                      # crea .venv e installa le dipendenze
 uv run pytest                # tutti i test (quelli `integrazione` avviano PostgreSQL con Testcontainers: serve Docker)
 uv run pytest -m "not integrazione"   # solo i test veloci, senza Docker
 uv run python -m academy_hub.db.migrazioni   # migra il PostgreSQL locale (o ACADEMY_DATABASE_URL)
+uv run python -m academy_hub.contratto        # rigenera backend/contratto/ dopo un cambio dell'API (aumenta VERSIONE_API)
 uv run ruff check --fix      # lint
 uv run ruff format           # formattazione
 uv run pyright               # controllo dei tipi (strict)
@@ -40,11 +41,13 @@ Dopo ogni modifica a un file `.py` del backend l'hook `.claude/hooks/dopo_modifi
 ## Architettura
 
 - `backend/src/academy_hub/`: pacchetto Python. Livelli: router (FastAPI) → servizi (regole di business, autorizzazione) → repository (accesso ai dati). Niente regole nelle rotte, niente SQL fuori dai repository.
-  - `dominio/`: stati dell'iscrizione e transizioni (R7), ruoli; Python puro, senza database.
+  - `api/`: rotte FastAPI (`rotte/`), schemi Pydantic, errori RFC 9457, dipendenze (transazione per richiesta, attore, `If-Match`). `VERSIONE_API` in `api/__init__.py`.
+  - `dominio/`: stati dell'iscrizione e transizioni (R7), ruoli, attore, errori di dominio con il loro `tipo`, calendario di Roma; Python puro, senza database.
   - `db/`: modelli SQLAlchemy (`modelli.py`) e migrazioni Alembic (`schema/versions/`). Lo schema cambia solo con una migrazione. Vedi `docs/database.md`.
   - `repository/`: le query, con i lock `FOR UPDATE`. Ordine dei lock: prima l'edizione, poi le sue iscrizioni (ADR-0004).
   - `servizi/`: le regole. Ogni cambio di stato di un'iscrizione passa da un solo punto che verifica la transizione e scrive l'audit (R6).
-- `backend/tests/`: test pytest. `dati.py` crea dati sintetici; `conftest.py` avvia PostgreSQL con la stessa immagine di docker compose e applica le migrazioni.
+- `backend/contratto/`: contratto OpenAPI e impronte per versione; `tests/test_contratto.py` fallisce se l'API cambia senza aumentare la versione.
+- `backend/tests/`: test pytest. I test HTTP usano la fixture `client` (TestClient sull'app collegata al database di test) e `tests/api.py`. `dati.py` crea dati sintetici; `conftest.py` avvia PostgreSQL con la stessa immagine di docker compose e applica le migrazioni.
 - `backend/Dockerfile`: multi-stage con uv, runtime non root (uid 10001).
 - `.github/workflows/`: `ci.yml` (lint, typecheck, test, immagine + Trivy, compose, gitleaks) e `pr-issue.yml` (la PR deve collegare una issue). Sono status check obbligatori del ruleset su `main`.
 

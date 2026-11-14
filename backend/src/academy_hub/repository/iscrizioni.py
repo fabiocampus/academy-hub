@@ -4,13 +4,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from academy_hub.db.modelli import Edizione, EventoAudit, Iscrizione
+from academy_hub.dominio.errori import NonTrovato
 from academy_hub.dominio.stati import StatoIscrizione
 
 
-class IscrizioneNonTrovata(LookupError):
+class IscrizioneNonTrovata(NonTrovato):
     def __init__(self, iscrizione_id: int) -> None:
-        self.iscrizione_id = iscrizione_id
-        super().__init__(f"Iscrizione {iscrizione_id} inesistente")
+        super().__init__("Iscrizione", iscrizione_id)
 
 
 # Lock di riga: `FOR NO KEY UPDATE` (key_share=True) serializza chi modifica la riga ma
@@ -43,12 +43,15 @@ def blocca_iscrizione(sessione: Session, iscrizione_id: int) -> Iscrizione:
 
 def blocca_edizione(sessione: Session, edizione_id: int) -> Edizione:
     """Lock sull'edizione: serializza chi tocca `posti_confermati` (R3)."""
-    return sessione.scalars(
+    edizione = sessione.scalar(
         select(Edizione)
         .where(Edizione.id == edizione_id)
         .with_for_update(key_share=True)
         .execution_options(populate_existing=True)
-    ).one()
+    )
+    if edizione is None:
+        raise NonTrovato("Edizione", edizione_id)
+    return edizione
 
 
 def registra_evento(

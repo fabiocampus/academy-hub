@@ -3,18 +3,13 @@
 from sqlalchemy.orm import Session
 
 from academy_hub.db.modelli import Iscrizione
+from academy_hub.dominio.errori import EdizioneCancellata
 from academy_hub.dominio.stati import (
     StatoIscrizione,
     TransizioneNonConsentita,
     verifica_transizione,
 )
 from academy_hub.repository import iscrizioni as repository
-
-
-class EdizioneCancellata(Exception):
-    def __init__(self, edizione_id: int) -> None:
-        self.edizione_id = edizione_id
-        super().__init__(f"Edizione {edizione_id} cancellata")
 
 
 def _cambia_stato(

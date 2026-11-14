@@ -7,6 +7,7 @@ Termini usati in codice, test, issue e documentazione. Nel codice i nomi restano
 | Termine | Definizione | Da non confondere con |
 |---|---|---|
 | **Corso** | Un argomento di formazione con titolo, descrizione e durata in ore. Non ha date. | Edizione |
+| **Corso archiviato** | Corso ritirato dal catalogo: non riceve nuove edizioni, ma le sue edizioni restano nei report. | Edizione cancellata |
 | **Edizione** | Un'istanza datata di un corso: data di inizio e fine, capienza, eventuale docente. Le iscrizioni si fanno sulle edizioni. | Corso |
 | **Capienza** | Numero massimo di iscrizioni `Confermata` per un'edizione. | Numero di richieste |
 | **Persona** | Un dipendente con nome, email e team. Ha un ruolo applicativo. | Utente di Keycloak o di Databricks (l'identità tecnica) |

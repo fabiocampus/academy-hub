@@ -1,0 +1,1419 @@
+{
+  "components": {
+    "schemas": {
+      "CorsoInBreve": {
+        "properties": {
+          "durata_ore": {
+            "title": "Durata Ore",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "titolo": {
+            "title": "Titolo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "titolo",
+          "durata_ore"
+        ],
+        "title": "CorsoInBreve",
+        "type": "object"
+      },
+      "CorsoLetto": {
+        "properties": {
+          "archiviato_il": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archiviato Il"
+          },
+          "descrizione": {
+            "title": "Descrizione",
+            "type": "string"
+          },
+          "durata_ore": {
+            "title": "Durata Ore",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "titolo": {
+            "title": "Titolo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "titolo",
+          "descrizione",
+          "durata_ore",
+          "archiviato_il"
+        ],
+        "title": "CorsoLetto",
+        "type": "object"
+      },
+      "EdizioneLetta": {
+        "properties": {
+          "cancellata_il": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancellata Il"
+          },
+          "capienza": {
+            "title": "Capienza",
+            "type": "integer"
+          },
+          "corso_id": {
+            "title": "Corso Id",
+            "type": "integer"
+          },
+          "data_fine": {
+            "format": "date",
+            "title": "Data Fine",
+            "type": "string"
+          },
+          "data_inizio": {
+            "format": "date",
+            "title": "Data Inizio",
+            "type": "string"
+          },
+          "docente_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Docente Id"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "posti_confermati": {
+            "title": "Posti Confermati",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "corso_id",
+          "data_inizio",
+          "data_fine",
+          "capienza",
+          "posti_confermati",
+          "docente_id",
+          "cancellata_il"
+        ],
+        "title": "EdizioneLetta",
+        "type": "object"
+      },
+      "ErroreCampo": {
+        "properties": {
+          "campo": {
+            "title": "Campo",
+            "type": "string"
+          },
+          "messaggio": {
+            "title": "Messaggio",
+            "type": "string"
+          }
+        },
+        "required": [
+          "campo",
+          "messaggio"
+        ],
+        "title": "ErroreCampo",
+        "type": "object"
+      },
+      "MiaIscrizione": {
+        "properties": {
+          "stato": {
+            "$ref": "#/components/schemas/StatoIscrizione"
+          }
+        },
+        "required": [
+          "stato"
+        ],
+        "title": "MiaIscrizione",
+        "type": "object"
+      },
+      "ModificaCorso": {
+        "additionalProperties": false,
+        "description": "Solo i campi presenti vengono modificati.",
+        "properties": {
+          "descrizione": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descrizione"
+          },
+          "durata_ore": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 1000.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Durata Ore"
+          },
+          "titolo": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Titolo"
+          }
+        },
+        "title": "ModificaCorso",
+        "type": "object"
+      },
+      "ModificaEdizione": {
+        "additionalProperties": false,
+        "description": "Solo i campi presenti vengono modificati; le date si confrontano con quelle salvate.",
+        "properties": {
+          "capienza": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 10000.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capienza"
+          },
+          "data_fine": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Fine"
+          },
+          "data_inizio": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Inizio"
+          },
+          "docente_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Assente: invariato; null: toglie il docente",
+            "title": "Docente Id"
+          }
+        },
+        "title": "ModificaEdizione",
+        "type": "object"
+      },
+      "NuovaEdizione": {
+        "additionalProperties": false,
+        "properties": {
+          "capienza": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 10000.0,
+            "title": "Capienza",
+            "type": "integer"
+          },
+          "corso_id": {
+            "title": "Corso Id",
+            "type": "integer"
+          },
+          "data_fine": {
+            "format": "date",
+            "title": "Data Fine",
+            "type": "string"
+          },
+          "data_inizio": {
+            "format": "date",
+            "title": "Data Inizio",
+            "type": "string"
+          },
+          "docente_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Docente Id"
+          }
+        },
+        "required": [
+          "corso_id",
+          "data_inizio",
+          "data_fine",
+          "capienza"
+        ],
+        "title": "NuovaEdizione",
+        "type": "object"
+      },
+      "NuovoCorso": {
+        "additionalProperties": false,
+        "properties": {
+          "descrizione": {
+            "default": "",
+            "title": "Descrizione",
+            "type": "string"
+          },
+          "durata_ore": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 1000.0,
+            "title": "Durata Ore",
+            "type": "integer"
+          },
+          "titolo": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Titolo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "titolo",
+          "durata_ore"
+        ],
+        "title": "NuovoCorso",
+        "type": "object"
+      },
+      "PaginaCatalogo": {
+        "properties": {
+          "elementi": {
+            "items": {
+              "$ref": "#/components/schemas/VoceCatalogo"
+            },
+            "title": "Elementi",
+            "type": "array"
+          },
+          "limite": {
+            "title": "Limite",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "totale": {
+            "title": "Totale",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "elementi",
+          "totale",
+          "limite",
+          "offset"
+        ],
+        "title": "PaginaCatalogo",
+        "type": "object"
+      },
+      "Problema": {
+        "description": "Corpo degli errori (RFC 9457), con l'estensione `errori` per i dati non validi.",
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "errori": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ErroreCampo"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Errori"
+          },
+          "instance": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instance"
+          },
+          "status": {
+            "title": "Status",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "type": {
+            "examples": [
+              "/problemi/iscrizione-duplicata"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status"
+        ],
+        "title": "Problema",
+        "type": "object"
+      },
+      "StatoIscrizione": {
+        "enum": [
+          "Richiesta",
+          "Approvata",
+          "Rifiutata",
+          "InAttesa",
+          "Confermata",
+          "Annullata",
+          "Completata"
+        ],
+        "title": "StatoIscrizione",
+        "type": "string"
+      },
+      "VoceCatalogo": {
+        "properties": {
+          "capienza": {
+            "title": "Capienza",
+            "type": "integer"
+          },
+          "corso": {
+            "$ref": "#/components/schemas/CorsoInBreve"
+          },
+          "data_fine": {
+            "format": "date",
+            "title": "Data Fine",
+            "type": "string"
+          },
+          "data_inizio": {
+            "format": "date",
+            "title": "Data Inizio",
+            "type": "string"
+          },
+          "edizione_id": {
+            "title": "Edizione Id",
+            "type": "integer"
+          },
+          "lista_attesa": {
+            "description": "Iscrizioni InAttesa dell'edizione",
+            "title": "Lista Attesa",
+            "type": "integer"
+          },
+          "mia_iscrizione": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MiaIscrizione"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "La mia iscrizione attiva all'edizione, se c'è"
+          },
+          "posti_confermati": {
+            "title": "Posti Confermati",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "edizione_id",
+          "corso",
+          "data_inizio",
+          "data_fine",
+          "capienza",
+          "posti_confermati",
+          "lista_attesa",
+          "mia_iscrizione"
+        ],
+        "title": "VoceCatalogo",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Iscrizioni ai corsi dell'Academy. Errori in formato RFC 9457.",
+    "title": "Academy Hub",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/catalogo": {
+      "get": {
+        "operationId": "consultaCatalogo",
+        "parameters": [
+          {
+            "description": "Parte del titolo",
+            "in": "query",
+            "name": "titolo",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Parte del titolo",
+              "title": "Titolo"
+            }
+          },
+          {
+            "description": "Inizio non prima di",
+            "in": "query",
+            "name": "dal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Inizio non prima di",
+              "title": "Dal"
+            }
+          },
+          {
+            "description": "Inizio non dopo",
+            "in": "query",
+            "name": "al",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Inizio non dopo",
+              "title": "Al"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limite",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limite",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+            "in": "header",
+            "name": "x-persona-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+              "title": "X-Persona-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaCatalogo"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Consulta Catalogo",
+        "tags": [
+          "catalogo"
+        ]
+      }
+    },
+    "/api/v1/corsi": {
+      "post": {
+        "operationId": "creaCorso",
+        "parameters": [
+          {
+            "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+            "in": "header",
+            "name": "x-persona-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+              "title": "X-Persona-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NuovoCorso"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CorsoLetto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Crea Corso",
+        "tags": [
+          "corsi"
+        ]
+      }
+    },
+    "/api/v1/corsi/{corso_id}": {
+      "get": {
+        "operationId": "leggiCorso",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "corso_id",
+            "required": true,
+            "schema": {
+              "title": "Corso Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+            "in": "header",
+            "name": "x-persona-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+              "title": "X-Persona-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CorsoLetto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Leggi Corso",
+        "tags": [
+          "corsi"
+        ]
+      },
+      "patch": {
+        "operationId": "modificaCorso",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "corso_id",
+            "required": true,
+            "schema": {
+              "title": "Corso Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+            "in": "header",
+            "name": "x-persona-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+              "title": "X-Persona-Id"
+            }
+          },
+          {
+            "description": "ETag letto con la GET: concorrenza ottimistica",
+            "in": "header",
+            "name": "if-match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ETag letto con la GET: concorrenza ottimistica",
+              "title": "If-Match"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModificaCorso"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CorsoLetto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Precondition Failed"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "428": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Precondition Required"
+          }
+        },
+        "summary": "Modifica Corso",
+        "tags": [
+          "corsi"
+        ]
+      }
+    },
+    "/api/v1/corsi/{corso_id}/archiviazione": {
+      "post": {
+        "operationId": "archiviaCorso",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "corso_id",
+            "required": true,
+            "schema": {
+              "title": "Corso Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+            "in": "header",
+            "name": "x-persona-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+              "title": "X-Persona-Id"
+            }
+          },
+          {
+            "description": "ETag letto con la GET: concorrenza ottimistica",
+            "in": "header",
+            "name": "if-match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ETag letto con la GET: concorrenza ottimistica",
+              "title": "If-Match"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CorsoLetto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Precondition Failed"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "428": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Precondition Required"
+          }
+        },
+        "summary": "Archivia un corso: esce dal catalogo, le edizioni restano nei report",
+        "tags": [
+          "corsi"
+        ]
+      }
+    },
+    "/api/v1/edizioni": {
+      "post": {
+        "operationId": "creaEdizione",
+        "parameters": [
+          {
+            "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+            "in": "header",
+            "name": "x-persona-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+              "title": "X-Persona-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NuovaEdizione"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EdizioneLetta"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Crea Edizione",
+        "tags": [
+          "edizioni"
+        ]
+      }
+    },
+    "/api/v1/edizioni/{edizione_id}": {
+      "get": {
+        "operationId": "leggiEdizione",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "edizione_id",
+            "required": true,
+            "schema": {
+              "title": "Edizione Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+            "in": "header",
+            "name": "x-persona-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+              "title": "X-Persona-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EdizioneLetta"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Leggi Edizione",
+        "tags": [
+          "edizioni"
+        ]
+      },
+      "patch": {
+        "operationId": "modificaEdizione",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "edizione_id",
+            "required": true,
+            "schema": {
+              "title": "Edizione Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+            "in": "header",
+            "name": "x-persona-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Identità provvisoria della fase 5 (id numerico della persona), accettata solo in locale con ACADEMY_IDENTITA_PROVVISORIA=true. Dalla fase 6 l'identità arriva dal token OIDC.",
+              "title": "X-Persona-Id"
+            }
+          },
+          {
+            "description": "ETag letto con la GET: concorrenza ottimistica",
+            "in": "header",
+            "name": "if-match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ETag letto con la GET: concorrenza ottimistica",
+              "title": "If-Match"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModificaEdizione"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EdizioneLetta"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Precondition Failed"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "428": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            },
+            "description": "Precondition Required"
+          }
+        },
+        "summary": "Modifica Edizione",
+        "tags": [
+          "edizioni"
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Health",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health",
+        "tags": [
+          "sistema"
+        ]
+      }
+    }
+  }
+}

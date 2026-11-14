@@ -5,11 +5,14 @@ from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.engine import make_url
 from testcontainers.community.postgres import PostgresContainer
 
+from academy_hub.config import impostazioni
 from academy_hub.db.migrazioni import aggiorna_schema
+from academy_hub.main import crea_app
 
 COMPOSE = Path(__file__).resolve().parents[2] / "docker-compose.yml"
 
@@ -51,6 +54,22 @@ def motore(postgres: PostgresContainer) -> Iterator[Engine]:
     motore = create_engine(url)
     yield motore
     motore.dispose()
+
+
+@pytest.fixture
+def client(db: Engine, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
+    """Client HTTP sull'app collegata al database di test (svuotato dopo ogni test).
+
+    Accetta l'identità provvisoria `X-Persona-Id`, come docker compose in locale.
+    """
+    monkeypatch.setenv("ACADEMY_AMBIENTE", "locale")
+    monkeypatch.setenv("ACADEMY_IDENTITA_PROVVISORIA", "true")
+    impostazioni.cache_clear()
+    try:
+        with TestClient(crea_app(motore=db)) as client:
+            yield client
+    finally:
+        impostazioni.cache_clear()
 
 
 @pytest.fixture
