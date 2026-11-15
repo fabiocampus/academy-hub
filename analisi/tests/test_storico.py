@@ -115,35 +115,25 @@ def test_bronze_prima_del_registro_poi_scatto_vuoto(spark: SparkSession) -> None
     assert prossimo_snapshot(bronze, scatti, secondo[1]) is None
 
 
-# Il catalogo vero passa da Hadoop, che sulla Java della CI non va (getSubject): la lettura
-# della tabella è sostituita da una che solleva l'errore voluto.
-class _ErroreSpark(AnalysisException):
-    """Come l'errore che arriva dalla JVM: le sue condizioni non sono nel JSON di pyspark."""
-
-    def __init__(self, condizione: str) -> None:
-        Exception.__init__(self, condizione)
-        self._condizione = condizione
-
-    def getCondition(self) -> str:  # noqa: N802 (nome di pyspark)
-        return self._condizione
-
-
-def _lettura_che_fallisce(monkeypatch: pytest.MonkeyPatch, condizione: str) -> None:
-    def fallisce(_self: DataFrameReader, _nome: str) -> DataFrame:
-        raise _ErroreSpark(condizione)
-
-    # tableExists nella pipeline serverless non è permesso (#101): non va chiamato.
+@pytest.fixture(autouse=True)
+def _niente_table_exists(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Nella pipeline serverless tableExists non è permesso (#101): non va chiamato.
     def vietato(_self: Catalog, _nome: str) -> bool:
         raise AssertionError("tableExists non permesso nella pipeline")
 
-    monkeypatch.setattr(DataFrameReader, "table", fallisce)
     monkeypatch.setattr(Catalog, "tableExists", vietato)
 
 
-def test_registro_non_ancora_creato(spark: SparkSession, monkeypatch: pytest.MonkeyPatch) -> None:
-    _lettura_che_fallisce(monkeypatch, TABELLA_ASSENTE)
+class _ErroreSpark(AnalysisException):
+    """Un errore col messaggio come arriva dalla JVM: `[CONDIZIONE] testo`."""
 
-    scatti = leggi_scatti(spark, "academy_collaudo.bronze.scatti")
+    def __init__(self, condizione: str) -> None:
+        super().__init__(message=f"[{condizione}] errore di prova")
+
+
+def test_registro_non_ancora_creato(spark: SparkSession) -> None:
+    # Lettura vera, con il nome a due parti della pipeline: l'errore viene dalla JVM.
+    scatti = leggi_scatti(spark, "bronze.scatti")
 
     assert scatti.columns == [COLONNA_SNAPSHOT]
     assert scatti.collect() == []
@@ -153,10 +143,32 @@ def test_registro_illeggibile_per_altro_motivo(
     spark: SparkSession, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # Un registro che esiste ma non si legge non va scambiato per uno mai creato.
-    _lettura_che_fallisce(monkeypatch, "INSUFFICIENT_PERMISSIONS")
+    def fallisce(_self: DataFrameReader, _nome: str) -> DataFrame:
+        raise _ErroreSpark("INSUFFICIENT_PERMISSIONS")
 
-    with pytest.raises(AnalysisException):
-        leggi_scatti(spark, "academy_collaudo.bronze.scatti")
+    monkeypatch.setattr(DataFrameReader, "table", fallisce)
+
+    with pytest.raises(AnalysisException, match="INSUFFICIENT_PERMISSIONS"):
+        leggi_scatti(spark, "bronze.scatti")
+
+
+class _LetturaPigra:
+    """Come Spark Connect: `read.table` riesce, l'errore arriva con lo schema."""
+
+    @property
+    def schema(self) -> None:
+        raise _ErroreSpark(TABELLA_ASSENTE)
+
+
+def test_registro_assente_con_lettura_pigra(
+    spark: SparkSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def pigra(_self: DataFrameReader, _nome: str) -> _LetturaPigra:
+        return _LetturaPigra()
+
+    monkeypatch.setattr(DataFrameReader, "table", pigra)
+
+    assert leggi_scatti(spark, "bronze.scatti").collect() == []
 
 
 def test_registro_esistente_letto_dalla_tabella(
@@ -165,9 +177,9 @@ def test_registro_esistente_letto_dalla_tabella(
     registro = _scatti(spark, PRIMO)
 
     def legge(_self: DataFrameReader, nome: str) -> DataFrame:
-        assert nome == "academy_collaudo.bronze.scatti"
+        assert nome == "bronze.scatti"
         return registro
 
     monkeypatch.setattr(DataFrameReader, "table", legge)
 
-    assert leggi_scatti(spark, "academy_collaudo.bronze.scatti") is registro
+    assert leggi_scatti(spark, "bronze.scatti") is registro

@@ -38,14 +38,18 @@ def leggi_scatti(spark: SparkSession, nome: str) -> DataFrame:
 
     La pipeline può girare da sola (avvio a mano, full refresh) prima della prima passata
     del job dopo il rilascio: senza registro valgono solo le versioni già in bronze.
-    Niente `spark.catalog.tableExists`: nella pipeline serverless non è permesso (#101).
+    Anche uno schema `bronze` assente dà `TABLE_OR_VIEW_NOT_FOUND`: lo crea Terraform.
+
+    Nella pipeline serverless py4j ammette solo alcuni metodi: `spark.catalog.tableExists`
+    no (#101), e `getCondition()` passa da altre chiamate alla JVM mai provate lì. La
+    condizione si legge quindi dal messaggio, già copiato quando l'errore arriva in Python.
     """
     try:
         registro = spark.read.table(nome)
         _ = registro.schema  # con Spark Connect la lettura è pigra: l'errore arriva qui
         return registro
     except AnalysisException as errore:
-        if errore.getCondition() != TABELLA_ASSENTE:
+        if f"[{TABELLA_ASSENTE}]" not in str(errore):
             raise
     return spark.createDataFrame([], f"{COLONNA_SNAPSHOT} TIMESTAMP")
 
