@@ -5,6 +5,9 @@ database di Lakebase (sola lettura) e aggiunge le righe a `bronze.<tabella>` con
 stesso `_snapshot_il` per tutte: bronze conserva ogni fotografia, silver ne ricava lo
 storico. Le tabelle sono lette una dopo l'altra, non in una transazione: fra due letture
 l'App può scrivere (accettabile per report giornalieri).
+
+Ogni passata riuscita lascia una riga in `bronze.scatti`, scritta dopo tutte le tabelle:
+una tabella vuota non aggiunge righe, ma il suo snapshot (vuoto) esiste lo stesso (#99).
 """
 
 import argparse
@@ -18,6 +21,8 @@ from pyspark.sql import functions as F
 from academy_analisi.tabelle import TABELLE, Tabella
 
 COLONNA_SNAPSHOT = "_snapshot_il"
+# Registro delle passate: un istante per riga.
+TABELLA_SCATTI = "scatti"
 
 # I nomi finiscono in spark.read.table e saveAsTable: solo `catalogo.schema` semplici.
 _SCHEMA = re.compile(r"[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*")
@@ -35,6 +40,11 @@ def snapshot(sorgente: DataFrame, tabella: Tabella, istante: datetime) -> DataFr
     return sorgente.select(*tabella.colonne).withColumn(COLONNA_SNAPSHOT, F.lit(istante))
 
 
+def scatto(spark: SparkSession, istante: datetime) -> DataFrame:
+    """La riga del registro di una passata."""
+    return spark.createDataFrame([(istante,)], f"{COLONNA_SNAPSHOT} TIMESTAMP")
+
+
 def scatta(
     *,
     leggi: Callable[[str], DataFrame],
@@ -43,8 +53,14 @@ def scatta(
     sorgente: str,
     destinazione: str,
     istante: datetime,
+    scatto: DataFrame,
 ) -> dict[str, int]:
-    """Uno snapshot di ogni tabella da `sorgente` a `destinazione`; righe scritte per tabella."""
+    """Uno snapshot di ogni tabella da `sorgente` a `destinazione`; righe scritte per tabella.
+
+    `scatto`, la riga del registro, si scrive dopo tutte le tabelle: rende visibile anche lo
+    snapshot di una tabella vuota, che non aggiunge righe. Non filtra le passate
+    interrotte: lo storico legge anche le versioni presenti solo nelle righe di bronze.
+    """
     contate: dict[str, int] = {}
     for tabella in tabelle:
         righe = snapshot(leggi(nome_tabella(sorgente, tabella.nome)), tabella, istante)
@@ -52,6 +68,7 @@ def scatta(
         # Solo per il log. Il compute serverless non ha cache(): è una seconda lettura,
         # che può differire di qualche riga se l'App ha scritto nel frattempo.
         contate[tabella.nome] = righe.count()
+    scrivi(scatto, nome_tabella(destinazione, TABELLA_SCATTI))
     return contate
 
 
@@ -81,6 +98,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         sorgente=a.sorgente,
         destinazione=a.destinazione,
         istante=istante,
+        scatto=scatto(spark, istante),
     )
     for nome, righe in contate.items():
         print(f"{a.destinazione}.{nome}: {righe} righe (snapshot {istante.isoformat()})")
