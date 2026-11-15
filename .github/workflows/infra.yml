@@ -167,7 +167,7 @@ jobs:
         with:
           python-version: "3.11"
       - if: matrix.cartella == 'databricks'
-        uses: databricks/setup-cli@8de769ec2543ee05e456ee2121350efc7efc4bda  # v1.22.1
+        uses: databricks/setup-cli@2da6132749245fbffb3c10d57cec219de3669967  # v1.26.0
       - run: terraform init
       - run: terraform plan -no-color -lock-timeout=5m -out=piano.tfplan
       - run: terraform apply -no-color -lock-timeout=5m piano.tfplan
