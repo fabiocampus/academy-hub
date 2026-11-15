@@ -1,6 +1,6 @@
 # Il task gold scrive in uno schema che non esiste
 
-- **Data**: 2026-11-15 · **Durata**: dalle 23:10 (run fallita) alle 23:21 (rollback in collaudo) · **Ambiente**: collaudo
+- **Data**: 2026-11-15 · **Durata**: dalle 23:10 (run fallita) alle 23:24 (job di nuovo verde dopo il rollback) · **Ambiente**: collaudo
 - **Impatto**: report del collaudo non aggiornati per una passata del job `analisi`; SLO di freschezza (`docs/slo.md`) non toccato, perché il gold precedente restava valido e l'interruzione è durata meno di un'ora. Produzione non toccata: l'approvazione di `prod` è stata rifiutata.
 - **Tipo**: incidente **simulato** della fase 12 (#111): l'errore è stato introdotto apposta con la PR #114.
 
@@ -18,6 +18,7 @@ Orari Europe/Rome.
 | 23:19 | Alert SQL `academy-qualita-collaudo` lanciato a mano (lo schedule è alle 06:00): TRIGGERED, email ricevuta. |
 | 23:19 | Diagnosi dal runbook (punto 1): `[SCHEMA_NOT_FOUND] academy_collaudo.report` nell'output del task. Il parametro l'ha cambiato l'ultimo rilascio (punto 2): rollback (punto 3), run 43768687650 verso la run di Rilascio 43766794266. |
 | 23:21 | Rollback in collaudo e fumo verdi. Nuovo lancio del job. |
+| 23:24 | Run 830289494029554 `SUCCESS`, tutti i task verdi: servizio ripristinato. Approvazione di `prod` del rollback (stessa versione già in produzione). |
 | — | Correzione su `main` con test (PR di #111). |
 
 ## Rilevamento
