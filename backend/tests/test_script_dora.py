@@ -6,6 +6,7 @@ GitHub è sostituito da un dizionario url -> risposta.
 
 import importlib.util
 import types
+import urllib.error
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -199,7 +200,10 @@ def test_deployment_finiti_da_github(dora: types.ModuleType) -> None:
         f"{R}/actions/runs/30": {"path": ".github/workflows/rilascio.yml"},
         f"{R}/actions/runs/40": {"path": ".github/workflows/rollback.yml"},
         f"{R}/commits/{A}": commit(ore(2)),
-        f"{R}/compare/{A}...{B}": {"commits": [commit(ore(4)), commit(ore(5))]},
+        f"{R}/compare/{A}...{B}": {
+            "status": "ahead",
+            "commits": [commit(ore(4)), commit(ore(5))],
+        },
     }
 
     def leggi(url: str) -> Any:
@@ -221,3 +225,34 @@ def test_deployment_finiti_da_github(dora: types.ModuleType) -> None:
     assert deployment[1].commit == (ore(2),)
     assert deployment[2].commit == (ore(4), ore(5))
     assert deployment[3].commit == ()
+
+
+def test_rilascio_di_uno_sha_vecchio_non_sposta_il_riferimento(dora: types.ModuleType) -> None:
+    """Prod approvati in ordine inverso: B (nuovo) prima di A (vecchio), poi C."""
+    risposte: dict[str, Any] = {
+        f"{R}/deployments?environment=prod&per_page=100": [
+            {"id": 3, "sha": C},
+            {"id": 2, "sha": A},
+            {"id": 1, "sha": B},
+        ],
+        f"{R}/deployments/1/statuses?per_page=100": [stato("success", ore(1), 10)],
+        f"{R}/deployments/2/statuses?per_page=100": [stato("success", ore(2), 20)],
+        f"{R}/deployments/3/statuses?per_page=100": [stato("success", ore(3), 30)],
+        f"{R}/commits/{B}": commit(ore(0)),
+        f"{R}/compare/{B}...{A}": {"status": "behind", "commits": []},
+        f"{R}/compare/{B}...{C}": {"status": "ahead", "commits": [commit(ore(2.5))]},
+    }
+
+    def leggi(url: str) -> Any:
+        if "/actions/runs/" in url:
+            # run cancellata: si conta come rilascio
+            raise urllib.error.HTTPError(url, 404, "Not Found", None, None)  # type: ignore[arg-type]
+        return risposte[url]
+
+    def elenco(url: str) -> Iterator[Any]:
+        yield from risposte[url]
+
+    deployment = dora.deployment_finiti(leggi, elenco, "o/r", "prod")
+
+    assert [d.rollback for d in deployment] == [False, False, False]
+    assert [d.commit for d in deployment] == [(ore(0),), (), (ore(2.5),)]

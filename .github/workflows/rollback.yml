@@ -38,6 +38,11 @@ jobs:
           RUN_ID: ${{ inputs.run_id }}
         run: |
           set -euo pipefail
+          # Gli environment ammettono solo main: meglio dirlo subito che al deploy.
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Il rollback parte solo da main, non da $GITHUB_REF"
+            exit 1
+          fi
           if ! [[ "$RUN_ID" =~ ^[0-9]+$ ]]; then
             echo "::error::run_id non è un numero: $RUN_ID"
             exit 1

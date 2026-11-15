@@ -216,6 +216,17 @@ def run_del_log(url: str) -> int | None:
     return int(trovato.group(1)) if trovato else None
 
 
+def percorso_della_run(leggi: Leggi, base: str, run: int) -> str:
+    """Percorso del workflow della run; "" se la run non c'è più (cancellata): rilascio."""
+    try:
+        return leggi(f"{base}/actions/runs/{run}")["path"]
+    except urllib.error.HTTPError as errore:
+        if errore.code != 404:
+            raise
+        print(f"avviso: run {run} non trovata, contata come rilascio", file=sys.stderr)
+        return ""
+
+
 def deployment_finiti(
     leggi: Leggi, elenco: Callable[[str], Iterator[Json]], repo: str, environment: str
 ) -> list[Deployment]:
@@ -234,17 +245,25 @@ def deployment_finiti(
     for fine, d, finale in grezzi:
         run = run_del_log(finale.get("log_url") or finale.get("target_url") or "")
         if run is not None and run not in percorsi:
-            percorsi[run] = leggi(f"{base}/actions/runs/{run}")["path"]
+            percorsi[run] = percorso_della_run(leggi, base, run)
         rollback = run is not None and percorsi[run].endswith("/rollback.yml")
         riuscito = finale["state"] == "success"
         commit: tuple[datetime, ...] = ()
         if riuscito and not rollback:
             if precedente is None:
                 commit = (data(leggi(f"{base}/commits/{d['sha']}")["commit"]["committer"]["date"]),)
+                precedente = d["sha"]
             elif precedente != d["sha"]:
+                # Fino a 250 commit (compare non pagina oltre): basta fra due rilasci.
                 confronto = leggi(f"{base}/compare/{precedente}...{d['sha']}")
-                commit = tuple(data(c["commit"]["committer"]["date"]) for c in confronto["commits"])
-            precedente = d["sha"]
+                # Uno SHA più vecchio dell'ultimo rilasciato (prod approvati in ordine
+                # inverso) non porta commit nuovi e non sposta il riferimento: altrimenti
+                # i commit del rilascio dopo conterebbero due volte.
+                if confronto["status"] == "ahead":
+                    commit = tuple(
+                        data(c["commit"]["committer"]["date"]) for c in confronto["commits"]
+                    )
+                    precedente = d["sha"]
         risultato.append(Deployment(d["id"], d["sha"], rollback, riuscito, fine, commit))
     return risultato
 

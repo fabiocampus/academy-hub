@@ -32,7 +32,7 @@ databricks bundle run academy_hub -t collaudo   # avvia la versione caricata (an
 python scripts/fumo_rilascio.py --app academy-hub-collaudo --ambiente collaudo --rilascio $BUNDLE_VAR_rilascio
 ```
 
-Rollback (ADR-0015): Actions → Rollback → Run workflow con l'id della run di "Rilascio" da ripristinare (`gh workflow run rollback.yml -f run_id=<id>`), poi approvazione di prod; per tornare avanti, un altro rollback con la run più recente. Metriche DORA: `python scripts/dora.py` (token da `gh auth token`), `--aggiorna docs/dora.md` per l'istantanea.
+Rollback (ADR-0015): Actions → Rollback → Run workflow con l'id della run di "Rilascio" da ripristinare (`gh workflow run rollback.yml -f run_id=<id>`), poi approvazione di prod; prima rifiuta i prod di `rilascio.yml` in attesa e non fare merge finché il rollback non finisce (stesso gruppo di concurrency); per tornare avanti, un altro rollback con la run più recente. Metriche DORA: `python scripts/dora.py` (token da `gh auth token`), `--aggiorna docs/dora.md` per l'istantanea.
 
 Con il profilo `academy` restano le letture fuori dal bundle (`databricks apps get`) e l'apertura dell'App nel browser; `bundle summary` va fatto con le credenziali del service principal (con il profilo dell'utente legge la sua cartella, che non c'è più).
 

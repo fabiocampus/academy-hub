@@ -12,9 +12,9 @@ Il token viene da `GH_TOKEN` o `GITHUB_TOKEN`, altrimenti da `gh auth token`; se
 
 ## Dati
 
-Ogni job con `environment:` (`rilascia-ambiente.yml`) crea un deployment nell'environment, con lo SHA della run e una sequenza di stati: `waiting` (approvazione), `queued`, `in_progress`, poi `success`, `failure` o `error`; quando un deployment più recente riesce, il precedente diventa `inactive`.
+Ogni job con `environment:` (`rilascia-ambiente.yml`) crea un deployment nell'environment, con lo SHA della run e una sequenza di stati: `waiting` (approvazione), `queued`, `in_progress`, poi `success`, `failure` o `error`. `inactive`, se compare, si ignora.
 
-- Conta solo un deployment con uno stato finale (`success`, `failure`, `error`); la sua ora è quella dello stato finale. Uno in attesa, rifiutato all'approvazione o annullato non conta.
+- Conta solo un deployment con uno stato finale (`success`, `failure`, `error`); la sua ora è quella dello stato finale. Uno ancora in attesa non conta; un rifiuto all'approvazione o un annullamento conta solo se GitHub lo registra come `failure` o `error` (da verificare alla prima occasione).
 - È un **rollback** se la run collegata (`log_url`) è di `rollback.yml`, altrimenti è un **rilascio**.
 
 ## Definizioni
@@ -31,6 +31,8 @@ Ogni job con `environment:` (`rilascia-ambiente.yml`) crea un deployment nell'en
 - Un difetto corretto in avanti (con una PR, senza rollback) non si vede: il rilascio difettoso resta "riuscito". Servirebbe collegare le issue di tipo bug ai rilasci.
 - Un fallimento del solo test di fumo, con l'App già aggiornata, è un `failure` come un deploy non riuscito.
 - Con pochi rilasci e un periodo di 90 giorni la frequenza è bassa per costruzione: il progetto ha pochi giorni.
+- "Annullato" vuol dire seguito subito da un rollback: con R2 riuscito, R3 fallito e un rollback a R1, R2 non risulta annullato.
+- Il lead time di un rilascio legge al massimo 250 commit (limite di `compare`). Un rilascio di uno SHA più vecchio dell'ultimo (approvazioni in ordine inverso) non porta commit nuovi.
 - Il rollback di prova della fase 10 conta come un fallimento del rilascio che ha annullato.
 
 ## Istantanea
