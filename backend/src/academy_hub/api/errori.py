@@ -28,6 +28,7 @@ from academy_hub.dominio.errori import (
     ReportNonDisponibile,
     VersioneNonCorrispondente,
 )
+from academy_hub.osservabilita import HEADER, id_richiesta
 
 TIPO_MEDIA = "application/problem+json"
 
@@ -207,10 +208,15 @@ async def _versione_superata(richiesta: Request, errore: Exception) -> JSONRespo
 
 
 async def _imprevisto(richiesta: Request, errore: Exception) -> JSONResponse:
-    # Il dettaglio resta nel log: nel corpo potrebbe esporre dati interni.
-    # Una riga sola: il traceback lo registra il server, a cui Starlette rilancia l'errore.
-    log.error("Errore imprevisto su %s %s: %r", richiesta.method, richiesta.url.path, errore)
-    return problema(richiesta, 500, "about:blank", HTTPStatus(500).phrase)
+    # Né nel corpo né nel log il messaggio dell'errore: può contenere dati interni o
+    # personali (parametri SQL). Nel log classe e stack (FormatoJson), più l'id della
+    # richiesta, che torna anche nella risposta per ritrovare la riga.
+    log.error("Errore imprevisto", exc_info=errore)
+    risposta = problema(richiesta, 500, "about:blank", HTTPStatus(500).phrase)
+    rid = id_richiesta.get()
+    if rid is not None:
+        risposta.headers[HEADER] = rid
+    return risposta
 
 
 def registra_gestori(app: FastAPI) -> None:

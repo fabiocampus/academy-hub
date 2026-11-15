@@ -18,6 +18,7 @@ from academy_hub.api.rotte import report as rotte_report
 from academy_hub.config import impostazioni
 from academy_hub.db.motore import crea_motore
 from academy_hub.frontend import monta_frontend, origine
+from academy_hub.osservabilita import Correlazione, configura_log
 from academy_hub.report import LettoreReport, lettore_report
 
 
@@ -42,6 +43,7 @@ def crea_app(
     app.state.identita = identita or provider(impostazioni())
     app.state.report = report or lettore_report(impostazioni())
     registra_gestori(app)
+    app.add_middleware(Correlazione)
     for router in (
         catalogo.router,
         corsi.router,
@@ -72,4 +74,6 @@ def crea_app(
     return app
 
 
+# Anche con `uvicorn academy_hub.main:app` (immagine locale) i log escono in JSON.
+configura_log(impostazioni().livello_log)
 app = crea_app()
