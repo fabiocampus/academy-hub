@@ -232,7 +232,7 @@ resources:
               - --qualita
               - ${var.catalogo}.qualita
               - --gold
-              - ${var.catalogo}.gold
+              - ${var.catalogo}.report
         # Gira sempre, anche dopo un errore: registra com'è andata la passata.
         - task_key: registra_esito
           depends_on:
