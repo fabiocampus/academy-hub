@@ -10,11 +10,15 @@ bundle dalla cartella dell'App. Dentro finiscono:
     academy_hub/       il pacchetto Python (backend/src/academy_hub)
     frontend/          la build statica (frontend/dist), servita da FastAPI
     requirements.txt   dipendenze di runtime fissate con gli hash, da uv.lock
+    RILASCIO           commit da cui nasce l'artifact (ADR-0013): il bundle lo passa
+                       all'App come ACADEMY_RILASCIO e il test di fumo lo ritrova in /health
 
 `build/` è ignorata da Git: si rigenera a ogni deploy, la sorgente resta il repository.
 """
 
 import argparse
+import os
+import re
 import shutil
 import subprocess
 import sys
@@ -40,10 +44,24 @@ def esegui(comando: list[str], cartella: Path) -> str:
     return risultato.stdout
 
 
+def rilascio(indicato: str | None) -> str:
+    """SHA del commit dell'artifact; `sviluppo` se l'albero ha modifiche non committate."""
+    sha = indicato or os.environ.get("GITHUB_SHA")
+    if sha is None:
+        if esegui(["git", "status", "--porcelain"], RADICE).strip():
+            return "sviluppo"
+        sha = esegui(["git", "rev-parse", "HEAD"], RADICE).strip()
+    if not re.fullmatch(r"[0-9a-f]{40}", sha):
+        sys.exit(f"rilascio non valido: {sha!r} (serve lo SHA completo del commit)")
+    return sha
+
+
 def main() -> int:
     argomenti = argparse.ArgumentParser(description="Prepara build/app per la Databricks App")
     argomenti.add_argument("--senza-npm", action="store_true", help="non ricompilare il frontend")
+    argomenti.add_argument("--rilascio", help="SHA del commit (di difetto GITHUB_SHA o HEAD)")
     opzioni = argomenti.parse_args()
+    versione = rilascio(opzioni.rilascio)
 
     if not opzioni.senza_npm:
         esegui(["npm", "ci"], FRONTEND)
@@ -64,7 +82,8 @@ def main() -> int:
     esporta = ["uv", "export", "--frozen", "--no-dev", "--no-emit-project"]
     requisiti = esegui([*esporta, "--format", "requirements.txt"], BACKEND)
     (DESTINAZIONE / "requirements.txt").write_text(requisiti, encoding="utf-8", newline="\n")
-    print(f"App pronta in {DESTINAZIONE.relative_to(RADICE)}")
+    (DESTINAZIONE / "RILASCIO").write_text(versione + "\n", encoding="utf-8", newline="\n")
+    print(f"App pronta in {DESTINAZIONE.relative_to(RADICE)} (rilascio {versione})")
     return 0
 
 

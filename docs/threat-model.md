@@ -1,6 +1,6 @@
 # Threat model del flusso di approvazione
 
-- **Metodo:** STRIDE per elemento del flusso, sul sistema com'è alla fine della fase 6 (issue #56); aggiornato con il frontend servito dallo stesso processo (fase 7, issue #66).
+- **Metodo:** STRIDE per elemento del flusso, sul sistema com'è alla fine della fase 6 (issue #56); aggiornato con il frontend servito dallo stesso processo (fase 7, issue #66) e con il rilascio continuo (fase 10, issue #82).
 - **Perimetro:** richiesta, approvazione o rifiuto, conferma, annullamento, job di sistema. Della parte analitica su Databricks c'è solo la lettura dei report con l'identità dell'utente (ADR-0011); fuori perimetro le pipeline (fase 11) e Keycloak stesso. Del frontend (fase 7) ci sono le minacce sull'accesso e sul browser (XSS, clickjacking, file serviti).
 - **Da rivedere:** quando cambia il provider d'identità, prima del primo deploy su Databricks Apps.
 
@@ -48,6 +48,7 @@ Asset da proteggere: l'esito delle richieste (chi va al corso), i posti delle ed
 | D15 | Report letti con il token dell'utente (on-behalf-of-user, scope `sql`): decide Unity Catalog; il service principal dell'App non ha grant su Unity Catalog; catalogo e schema come parametri, query fissa; token mai nei log; `Cache-Control: no-store` | `academy_hub/report.py`, `databricks.yml`, ADR-0011 |
 | D14 | HTML dell'app con `Content-Security-Policy` (script solo dalla stessa origine, nessun `object`, `base-uri` e `form-action` limitati, `frame-ancestors 'none'`, rete solo verso l'app e l'emittente OIDC), `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`; file serviti solo da dentro la build, `/api` mai coperto dal fallback | `academy_hub/frontend.py`, ADR-0009 §14 |
 | D16 | Infrastruttura nel codice: ruleset, environment e permessi cambiano solo con una PR e un apply approvato nell'environment `infra` (policy sul ramo `main` per nome); token GitHub di sola lettura per il plan, quello che scrive solo nell'environment approvato; stato su HCP (cifrato, con lock), mai nel repository; deriva cercata ogni settimana | `infra/`, `.github/workflows/infra.yml`, ADR-0012 |
+| D17 | Rilascio continuo solo da `main`: environment `collaudo` e `prod` limitati al ramo `main`, `prod` con approvatore e senza bypass degli admin; credenziali del service principal `academy-rilascio` solo nei secret degli environment (mai nel repository, mai sulla riga di comando); URL dell'App, host e id del workspace mascherati nei log pubblici prima del deploy; secret OAuth che ruota dopo 335 giorni (#80); `bundle deploy` senza `--auto-approve` | `.github/workflows/rilascio.yml`, `rilascia-ambiente.yml`, `infra/databricks-identita/`, ADR-0013 |
 
 ## Minacce
 
@@ -100,6 +101,7 @@ Stato: **mitigata** (una difesa la copre), **accettata** (rischio residuo consap
 | Segreti nel repository pubblico | — | D12 (gitleaks in pre-commit e in CI, push protection), solo dati sintetici | mitigata |
 | `GET /configurazione` è pubblica e rivela emittente OIDC e client id del frontend | accesso | solo dati già visibili nella pagina di login; il client è pubblico (PKCE, nessun segreto) | accettata (fase 7, ADR-0009) |
 | Access token rubato dal browser con uno script iniettato (XSS): con l'HTML sulla stessa origine dell'API uno script vale una sessione intera | tutti | React fa l'escape del testo, nessun HTML grezzo; D14 (CSP: niente script inline o di altre origini, dati mandati solo all'app o all'emittente); token in `sessionStorage`, non in `localStorage`; durata breve del token di Keycloak | mitigata; resta `style-src 'unsafe-inline'` per gli stili di Mantine (iniezione di CSS, non di script) |
+| URL dell'App, host o id del workspace nei log pubblici dei workflow di rilascio | rilascio | D17: secret mascherati da GitHub; URL, host senza schema e id del workspace mascherati con `::add-mask::` prima del deploy, che si ferma se l'URL non si può leggere | mitigata; il workspace non è un segreto forte (senza credenziali non si entra), ma non serve renderlo pubblico |
 | File del server letti dal fallback della SPA (`../`, percorsi assoluti, collegamenti) | — | D14: percorso risolto e accettato solo dentro la build; test con un file sentinella accanto alla build | mitigata |
 
 ### D · Denial of service
@@ -123,6 +125,7 @@ Stato: **mitigata** (una difesa la copre), **accettata** (rischio residuo consap
 | Dipendenza vulnerabile (Python, immagine, azioni) | — | D12 | mitigata per le vulnerabilità note |
 | Codice vulnerabile o workflow iniettabile | — | D12 (CodeQL `security-extended`, permessi minimi nei workflow) | mitigata in parte |
 | Ruleset o environment allentati a mano dalla UI, o con un workflow modificato in una PR che legge i secret dell'infrastruttura | — | D16; il plan delle PR ha un token GitHub di sola lettura, le PR da fork non hanno secret; un ramo diverso da `main` non entra nell'environment `infra` | mitigata in parte: il token di HCP in `infra-plan` è un token utente e può scrivere lo stato (accettata: solo il proprietario apre rami); il proprietario resta amministratore e può cambiare tutto dalla UI (lo rileva il plan del lunedì) |
+| Workflow su `main` compromesso (merge di una PR malevola o di un'azione di terze parti alterata) che usa le credenziali di `academy-rilascio`: il service principal è admin del workspace | rilascio | D17, D12 (azioni fissate per SHA), D5 e ruleset (ogni modifica passa da PR con CI verde); prod esige l'approvazione | accettata: admin necessario per App e Lakebase su Free Edition, dati sintetici, un solo sviluppatore (ADR-0013); con un account vero federation OIDC e un workspace per ambiente |
 
 ## Rischi accettati e limiti del piano gratuito
 

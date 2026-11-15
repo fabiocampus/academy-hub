@@ -55,7 +55,13 @@ def crea_app(
 
     @app.get("/health", tags=["sistema"], operation_id="health")
     def health() -> dict[str, str]:  # pyright: ignore[reportUnusedFunction]
-        return {"stato": "ok", "versione": __version__, "ambiente": impostazioni().ambiente}
+        config = impostazioni()
+        return {
+            "stato": "ok",
+            "versione": __version__,
+            "ambiente": config.ambiente,
+            "rilascio": config.rilascio,
+        }
 
     config = impostazioni()
     cartella = frontend or config.frontend_dir

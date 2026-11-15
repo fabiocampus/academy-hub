@@ -15,3 +15,9 @@ variable "environment_github" {
   type        = set(string)
   default     = ["infra-plan", "infra"]
 }
+
+variable "environment_rilascio" {
+  description = "Environment di GitHub del workflow rilascio.yml (creati da infra/github)."
+  type        = set(string)
+  default     = ["collaudo", "prod"]
+}
