@@ -69,7 +69,8 @@ jobs:
             echo "::error::build/app/RILASCIO non è uno SHA: $rilascio"
             exit 1
           fi
-          echo "RILASCIO=$rilascio" >> "$GITHUB_ENV"
+          # Variabile del bundle per deploy e run (anche `bundle run` risolve le variabili).
+          echo "BUNDLE_VAR_rilascio=$rilascio" >> "$GITHUB_ENV"
       # Il repository è pubblico, e così i log: l'URL dell'App contiene l'id del workspace.
       - name: Maschera l'URL dell'App
         run: |
@@ -81,10 +82,10 @@ jobs:
       # Senza --auto-approve: se il deploy volesse cancellare o ricreare risorse
       # (dati del database compresi), si ferma invece di farlo.
       - name: Deploy del bundle
-        run: databricks bundle deploy -t "$TARGET" --var rilascio="$RILASCIO"
+        run: databricks bundle deploy -t "$TARGET"
       - name: Avvio della nuova versione
         run: databricks bundle run academy_hub -t "$TARGET"
       - name: Test di fumo
         run: >-
           python3 scripts/fumo_rilascio.py --app "$APP" --ambiente "$AMBIENTE"
-          --rilascio "$RILASCIO"
+          --rilascio "$BUNDLE_VAR_rilascio"

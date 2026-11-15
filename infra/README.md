@@ -55,19 +55,21 @@ Su Windows il provider databricks cerca la CLI per l'autenticazione del profilo:
 6. Rilascio continuo (fase 10, ADR-0013), dal PC:
    1. `github/`: `apply` (environment `collaudo` e `prod`);
    2. `databricks-identita/`: `apply` (service principal `academy-rilascio` e i suoi secret in `collaudo` e `prod`);
-   3. migrazione del bundle dallo stato dell'utente a quello del service principal, con le sue credenziali (dallo stato, senza stamparle) e un file di configurazione della CLI vuoto, così la CLI non usa il profilo dell'utente:
+   3. migrazione del bundle dallo stato dell'utente a quello del service principal, con le sue credenziali (dallo stato, senza stamparle) e un file di configurazione della CLI vuoto, così la CLI non usa il profilo dell'utente. Prima si sposta la cache locale `.databricks/` (ignorata da Git): contiene lo stato dei deploy fatti come utente, e la CLI la preferirebbe allo stato, vuoto, del service principal («Resource already managed»):
 
       ```bash
       export DATABRICKS_CONFIG_FILE=$(mktemp) DATABRICKS_HOST=... DATABRICKS_CLIENT_ID=... DATABRICKS_CLIENT_SECRET=...
-      python scripts/prepara_app.py
-      databricks bundle deployment bind academy_hub projects/academy-hub -t prod      # postgres_projects
-      databricks bundle deployment bind production projects/academy-hub/branches/production/endpoints/primary -t prod
-      databricks bundle deployment bind academy_hub academy-hub-prod -t prod          # apps
-      databricks bundle deployment bind collaudo projects/academy-hub/branches/collaudo -t collaudo
-      databricks bundle deployment bind collaudo projects/academy-hub/branches/collaudo/endpoints/primary -t collaudo
-      databricks bundle deployment bind academy_hub academy-hub-collaudo -t collaudo
+      export BUNDLE_VAR_admin_email=... BUNDLE_VAR_rilascio=$(python scripts/prepara_app.py >/dev/null && cat build/app/RILASCIO)
+      mv .databricks /altrove
+      databricks bundle deployment bind postgres_projects.academy_hub projects/academy-hub -t prod --auto-approve
+      databricks bundle deployment bind postgres_endpoints.production projects/academy-hub/branches/production/endpoints/primary -t prod --auto-approve
+      databricks bundle deployment bind apps.academy_hub academy-hub-prod -t prod --auto-approve
+      databricks bundle deployment bind postgres_branches.collaudo projects/academy-hub/branches/collaudo -t collaudo --auto-approve
+      databricks bundle deployment bind postgres_endpoints.collaudo projects/academy-hub/branches/collaudo/endpoints/primary -t collaudo --auto-approve
+      databricks bundle deployment bind apps.academy_hub academy-hub-collaudo -t collaudo --auto-approve
+      databricks bundle plan -t prod && databricks bundle plan -t collaudo   # 0 to add, 0 to delete
       ```
 
-      Poi un `bundle plan` per target senza creazioni né cancellazioni, `unbind` delle stesse chiavi con `-p academy` e cancellazione di `/Workspace/Users/<email>/.bundle/academy-hub`. Le chiavi uguali in tipi diversi (`academy_hub`, `collaudo`) chiedono il tipo: la CLI lo propone.
+      Le chiavi sono qualificate dal tipo: `academy_hub` e `collaudo` stanno in due tipi ciascuna. Poi un deploy di collaudo con `bundle run` e `scripts/fumo_rilascio.py`; infine si sposta di nuovo `.databricks/` e si cancella `/Workspace/Users/<email>/.bundle/academy-hub` (lo stato dell'utente con i file: le App non lo usano più). Fatto il 2026-11-15.
 
 Da lì ogni modifica passa da una PR (tranne `databricks-identita/`).

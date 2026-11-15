@@ -26,9 +26,10 @@ Il bundle (`databricks.yml`) lo rilascia il workflow `rilascio.yml` come service
 
 ```bash
 python scripts/prepara_app.py   # build/app: pacchetto Python, frontend, requirements.txt con hash, RILASCIO (SHA)
-databricks bundle deploy -t collaudo --var rilascio=$(cat build/app/RILASCIO)   # con BUNDLE_VAR_admin_email
-databricks bundle run academy_hub -t collaudo   # avvia la versione caricata
-python scripts/fumo_rilascio.py --app academy-hub-collaudo --ambiente collaudo --rilascio $(cat build/app/RILASCIO)
+export BUNDLE_VAR_rilascio=$(cat build/app/RILASCIO)   # e BUNDLE_VAR_admin_email
+databricks bundle deploy -t collaudo
+databricks bundle run academy_hub -t collaudo   # avvia la versione caricata (anche run vuole le variabili)
+python scripts/fumo_rilascio.py --app academy-hub-collaudo --ambiente collaudo --rilascio $BUNDLE_VAR_rilascio
 ```
 
 Con il profilo `academy` restano le letture (`databricks apps get`, `bundle summary`) e l'apertura dell'App nel browser.

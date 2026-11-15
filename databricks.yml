@@ -6,7 +6,8 @@
 # principal, mai con il proprio utente: lo stato del bundle sta nella sua cartella):
 #
 #   python scripts/prepara_app.py                       # artifact in build/app
-#   databricks bundle deploy -t collaudo --var admin_email=$ACADEMY_ADMIN_EMAIL #       --var rilascio=$(cat build/app/RILASCIO)
+#   export BUNDLE_VAR_rilascio=$(cat build/app/RILASCIO) BUNDLE_VAR_admin_email=...
+#   databricks bundle deploy -t collaudo
 #   databricks bundle run academy_hub -t collaudo        # avvia la versione caricata
 #
 # Workspace e credenziali non stanno qui (repository pubblico): arrivano dalle variabili
