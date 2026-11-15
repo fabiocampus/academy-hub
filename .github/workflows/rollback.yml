@@ -1,0 +1,103 @@
+name: Rollback
+run-name: Rollback al rilascio della run ${{ inputs.run_id }}
+
+# Rollback (ADR-0015): rilascia di nuovo l'artifact di una run precedente di
+# rilascio.yml, senza ricostruirlo, prima in collaudo e poi, dopo l'approvazione
+# dell'environment prod, in produzione. databricks.yml e script di fumo vengono dal
+# commit di quell'artifact. Il database non torna indietro: le migrazioni sono solo in
+# avanti e compatibili con la versione precedente (ADR-0013 §7).
+# Per tornare avanti: un altro rollback con la run del rilascio più recente, oppure
+# "Run workflow" di rilascio.yml.
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Id della run di "Rilascio" da ripristinare (dall'URL della run).
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  verifica:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+    outputs:
+      artifact: ${{ steps.run.outputs.artifact }}
+      rilascio: ${{ steps.run.outputs.rilascio }}
+    steps:
+      # Si ripristina solo un rilascio di main arrivato in produzione, con l'artifact
+      # ancora disponibile (90 giorni).
+      - id: run
+        name: Run da ripristinare
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.run_id }}
+        run: |
+          set -euo pipefail
+          # Gli environment ammettono solo main: meglio dirlo subito che al deploy.
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Il rollback parte solo da main, non da $GITHUB_REF"
+            exit 1
+          fi
+          if ! [[ "$RUN_ID" =~ ^[0-9]+$ ]]; then
+            echo "::error::run_id non è un numero: $RUN_ID"
+            exit 1
+          fi
+          run=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID")
+          percorso=$(jq -r .path <<< "$run")
+          ramo=$(jq -r .head_branch <<< "$run")
+          sha=$(jq -r .head_sha <<< "$run")
+          if [ "$percorso" != ".github/workflows/rilascio.yml" ] || [ "$ramo" != "main" ]; then
+            echo "::error::La run $RUN_ID non è un Rilascio di main ($percorso, $ramo)"
+            exit 1
+          fi
+          prod=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/jobs?filter=latest" \
+            --jq '.jobs[] | select(.name == "prod / rilascia") | .conclusion')
+          if [ "$prod" != "success" ]; then
+            echo "::error::Nella run $RUN_ID il rilascio in prod non è riuscito (${prod:-assente})"
+            exit 1
+          fi
+          artifact="app-$sha"
+          disponibile=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/artifacts" \
+            --jq ".artifacts[] | select(.name == \"$artifact\" and (.expired | not)) | .name")
+          if [ "$disponibile" != "$artifact" ]; then
+            echo "::error::L'artifact $artifact della run $RUN_ID non c'è più o è scaduto"
+            exit 1
+          fi
+          echo "artifact=$artifact" >> "$GITHUB_OUTPUT"
+          echo "rilascio=$sha" >> "$GITHUB_OUTPUT"
+          echo "Ripristino del rilascio $sha (run $RUN_ID)" >> "$GITHUB_STEP_SUMMARY"
+
+  collaudo:
+    needs: verifica
+    uses: ./.github/workflows/rilascia-ambiente.yml
+    permissions:
+      contents: read
+      actions: read
+    with:
+      environment: collaudo
+      target: collaudo
+      ambiente: collaudo
+      artifact: ${{ needs.verifica.outputs.artifact }}
+      run_id: ${{ inputs.run_id }}
+      rilascio: ${{ needs.verifica.outputs.rilascio }}
+    secrets: inherit
+
+  prod:
+    needs: [verifica, collaudo]
+    uses: ./.github/workflows/rilascia-ambiente.yml
+    permissions:
+      contents: read
+      actions: read
+    with:
+      environment: prod
+      target: prod
+      ambiente: produzione
+      artifact: ${{ needs.verifica.outputs.artifact }}
+      run_id: ${{ inputs.run_id }}
+      rilascio: ${{ needs.verifica.outputs.rilascio }}
+    secrets: inherit

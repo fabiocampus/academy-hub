@@ -52,12 +52,15 @@ jobs:
           name: ${{ steps.nome.outputs.artifact }}
           path: build/app
           if-no-files-found: error
-          # Il rollback (fase 10, PR B) riusa l'artifact di un rilascio precedente.
+          # Il rollback (rollback.yml) riusa l'artifact di un rilascio precedente.
           retention-days: 90
 
   collaudo:
     needs: build
     uses: ./.github/workflows/rilascia-ambiente.yml
+    permissions:
+      contents: read
+      actions: read
     with:
       environment: collaudo
       target: collaudo
@@ -71,6 +74,9 @@ jobs:
   prod:
     needs: [build, collaudo]
     uses: ./.github/workflows/rilascia-ambiente.yml
+    permissions:
+      contents: read
+      actions: read
     with:
       environment: prod
       target: prod
