@@ -12,11 +12,11 @@ Fase 7 (frontend, issue #59), in tre PR: A) base in `frontend/` (React, Vite, Ma
 
 Fase 8 (Databricks, issue #68), in due PR: A) l'App su Lakebase (issue #69): bundle `databricks.yml` con target `collaudo` e `prod`, un progetto Lakebase con un branch per ambiente, password del database = token OAuth per connessione, schema `academy`, avvio con migrazioni e persona amministratrice (ADR-0010); B) Unity Catalog e identità dell'utente (issue #73): cataloghi `academy_collaudo`/`academy_prod` con `bronze`/`silver`/`gold` nel bundle, report `GET /api/v1/report/iscrizioni-per-corso` letto con il token dell'utente (`X-Forwarded-Access-Token`, scope `sql`) su un SQL warehouse, porta `LettoreReport` in `report.py` (ADR-0011).
 
-Fase 9 (infrastruttura come codice, issue #75), in due PR: A) Terraform per GitHub in `infra/github/` (repository, ruleset, environment `infra`/`infra-plan`, label; esistenti con blocchi `import`), stato su HCP Terraform Free in execution mode locale, workflow `infra.yml` con plan nella PR, apply dopo approvazione e deriva il lunedì (issue #76, ADR-0012); B) Terraform per Databricks.
+Fase 9 (infrastruttura come codice, issue #75), in due PR: A) Terraform per GitHub in `infra/github/` (repository, ruleset, environment `infra`/`infra-plan`, label; esistenti con blocchi `import`), stato su HCP Terraform Free in execution mode locale, workflow `infra.yml` con plan nella PR, apply dopo approvazione e deriva il lunedì (issue #76, ADR-0012); B) Terraform per Databricks (issue #78): `infra/databricks/` con cataloghi (creati in SQL da `crea_catalogo.py`), schemi, grant e secret scope, usciti dal bundle con `bundle deployment unbind`; `infra/databricks-identita/` (solo dal PC) con il service principal `academy-terraform` del workflow e i suoi secret negli environment.
 
 ## Infrastruttura
 
-Terraform per la piattaforma, bundle per il progetto (ADR-0012). Istruzioni e bootstrap in `infra/README.md`. Dal PC: `terraform login` una volta, poi in `infra/github/` `terraform init` e `GITHUB_TOKEN=$(gh auth token) terraform plan`. Il workflow dell'infrastruttura non è un check obbligatorio (parte solo se cambia `infra/`).
+Terraform per la piattaforma, bundle per il progetto (ADR-0012). Istruzioni e bootstrap in `infra/README.md`. Dal PC: `terraform login` una volta, poi in `infra/github/` `terraform init` e `GITHUB_TOKEN=$(gh auth token) terraform plan`; in `infra/databricks/` e `infra/databricks-identita/` anche `DATABRICKS_CONFIG_PROFILE=academy`. `infra/databricks-identita/` non ha workflow: si applica solo dal PC. Il workflow dell'infrastruttura non è un check obbligatorio (parte solo se cambia `infra/`).
 
 ## Databricks
 
@@ -29,7 +29,7 @@ databricks bundle deploy -t collaudo -p academy --var admin_email=$ACADEMY_ADMIN
 databricks bundle run academy_hub -t collaudo -p academy   # avvia la versione caricata
 ```
 
-Unity Catalog (ADR-0011): Free Edition non crea cataloghi dal bundle. La prima volta per target `uv run --project backend python scripts/unity_catalog.py catalogo -t <target>`, poi `databricks bundle deployment bind academy academy_<target> -t <target> -p academy`, poi il deploy (schemi e grant); la tabella gold sintetica con `scripts/unity_catalog.py dati-gold -t <target>`.
+Unity Catalog (ADR-0011, ADR-0012): cataloghi, schemi e grant li gestisce Terraform in `infra/databricks/`, non il bundle. La tabella gold sintetica con `uv run --project backend python scripts/unity_catalog.py dati-gold -t <target>`.
 
 ## Ambiente locale
 

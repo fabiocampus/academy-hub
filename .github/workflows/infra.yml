@@ -37,7 +37,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        cartella: [github]
+        cartella: [github, databricks]
     defaults:
       run:
         working-directory: infra/${{ matrix.cartella }}
@@ -46,6 +46,11 @@ jobs:
       TF_INPUT: "0"
       # Token GitHub di sola lettura: il plan legge, non cambia niente.
       GITHUB_TOKEN: ${{ secrets.GH_TERRAFORM_LETTURA }}
+      # Service principal academy-terraform (OAuth M2M), scritto da infra/databricks.
+      # Unico per plan e apply: leggere il suo secret richiede un admin (ADR-0012).
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
+      DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
       HAS_TF_TOKEN: ${{ secrets.TF_API_TOKEN != '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -126,7 +131,7 @@ jobs:
       fail-fast: false
       max-parallel: 1
       matrix:
-        cartella: [github]
+        cartella: [github, databricks]
     defaults:
       run:
         working-directory: infra/${{ matrix.cartella }}
@@ -134,6 +139,9 @@ jobs:
       TF_IN_AUTOMATION: "1"
       TF_INPUT: "0"
       GITHUB_TOKEN: ${{ secrets.GH_TERRAFORM_SCRITTURA }}
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
+      DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -143,6 +151,13 @@ jobs:
           terraform_version: 1.17.1
           terraform_wrapper: false
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+      # Un catalogo nuovo nasce in SQL con crea_catalogo.py, che usa la CLI (ADR-0011).
+      - if: matrix.cartella == 'databricks'
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+        with:
+          python-version: "3.11"
+      - if: matrix.cartella == 'databricks'
+        uses: databricks/setup-cli@8de769ec2543ee05e456ee2121350efc7efc4bda  # v1.22.1
       - run: terraform init
       - run: terraform plan -no-color -lock-timeout=5m -out=piano.tfplan
       - run: terraform apply -no-color -lock-timeout=5m piano.tfplan
