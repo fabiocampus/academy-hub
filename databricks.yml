@@ -118,6 +118,52 @@ resources:
       # La risorsa postgres dell'App sta nei target: il branch è un riferimento
       # all'endpoint del target, così il bundle crea prima Lakebase e poi l'App.
 
+  # Parte analitica (ADR-0016). Il codice è nell'artifact (build/app/analisi), come
+  # l'App: stessa versione. Job e pipeline appartengono al service principal che fa il
+  # deploy (academy-rilascio) e girano con la sua identità; i grant su Unity Catalog,
+  # compreso il catalogo che registra Lakebase (<catalogo>_oltp), li dà Terraform.
+  pipelines:
+    storico:
+      name: academy-storico-${bundle.target}
+      catalog: ${var.catalogo}
+      schema: silver
+      serverless: true
+      channel: CURRENT
+      # In sys.path: pipeline_storico.py importa il pacchetto academy_analisi accanto.
+      root_path: ./build/app/analisi
+      libraries:
+        - file:
+            path: ./build/app/analisi/pipeline_storico.py
+
+  jobs:
+    analisi:
+      name: academy-analisi-${bundle.target}
+      description: Snapshot giornaliero di Lakebase in bronze, poi storico SCD 2 in silver
+      max_concurrent_runs: 1
+      schedule:
+        quartz_cron_expression: "0 0 5 * * ?"
+        timezone_id: Europe/Rome
+      environments:
+        # Ambiente serverless 4 (Python 3.12, come analisi/pyproject.toml).
+        - environment_key: analisi
+          spec:
+            environment_version: "4"
+      tasks:
+        - task_key: snapshot
+          environment_key: analisi
+          spark_python_task:
+            python_file: ./build/app/analisi/snapshot_bronze.py
+            parameters:
+              - --sorgente
+              - ${var.catalogo}_oltp.${var.schema_database}
+              - --destinazione
+              - ${var.catalogo}.bronze
+        - task_key: storico
+          depends_on:
+            - task_key: snapshot
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.storico.id}
+
 targets:
   collaudo:
     default: true

@@ -92,5 +92,8 @@ Una persona può avere più ruoli: un responsabile è anche dipendente.
 |---|---|
 | **Ore di formazione** | Somma delle ore dei corsi con iscrizione `Completata`, per persona o team. |
 | **Tasso di completamento** | Iscrizioni `Completata` diviso iscrizioni `Confermata` o `Completata` di edizioni concluse. |
+| **Snapshot** | Copia giornaliera delle tabelle dell'App in `bronze`, con l'istante dello scatto (`_snapshot_il`); solo in aggiunta (ADR-0016). Non è un backup. |
+| **Storico (SCD 2)** | In `silver`, ogni versione di una riga con il suo intervallo di validità (`__START_AT`, `__END_AT`, aperto se è quella corrente), ricavato dagli snapshot. Diverso dall'audit, che registra i cambi di stato. |
+| **Bronze, silver, gold** | I livelli del catalogo di un ambiente: dati grezzi come arrivano, dati puliti e storicizzati, aggregati dei report. Gli utenti leggono solo gold. |
 | **Quarantena** | Tabella che raccoglie le righe di un file importato che violano una regola di qualità non bloccante. |
 | **Gate di qualità** | Controllo che impedisce l'aggiornamento delle tabelle gold se una regola bloccante fallisce. |

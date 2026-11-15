@@ -9,6 +9,8 @@ bundle dalla cartella dell'App. Dentro finiscono:
 
     academy_hub/       il pacchetto Python (backend/src/academy_hub)
     frontend/          la build statica (frontend/dist), servita da FastAPI
+    analisi/           job e pipeline della parte analitica (analisi/src, ADR-0016): il
+                       bundle li prende da qui, così App e analisi hanno la stessa versione
     requirements.txt   dipendenze di runtime fissate con gli hash, da uv.lock
     RILASCIO           commit da cui nasce l'artifact (ADR-0013): il bundle lo passa
                        all'App come ACADEMY_RILASCIO e il test di fumo lo ritrova in /health
@@ -27,6 +29,7 @@ from pathlib import Path
 RADICE = Path(__file__).resolve().parents[1]
 BACKEND = RADICE / "backend"
 FRONTEND = RADICE / "frontend"
+ANALISI = RADICE / "analisi" / "src"
 DESTINAZIONE = RADICE / "build" / "app"
 
 
@@ -56,6 +59,15 @@ def rilascio(indicato: str | None) -> str:
     return sha
 
 
+def copia_analisi(sorgente: Path, destinazione: Path) -> None:
+    """Il codice di job e pipeline in `destinazione/analisi`, senza file compilati."""
+    shutil.copytree(
+        sorgente,
+        destinazione / "analisi",
+        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+    )
+
+
 def main() -> int:
     argomenti = argparse.ArgumentParser(description="Prepara build/app per la Databricks App")
     argomenti.add_argument("--senza-npm", action="store_true", help="non ricompilare il frontend")
@@ -79,6 +91,7 @@ def main() -> int:
         ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
     )
     shutil.copytree(dist, DESTINAZIONE / "frontend")
+    copia_analisi(ANALISI, DESTINAZIONE)
     esporta = ["uv", "export", "--frozen", "--no-dev", "--no-emit-project"]
     requisiti = esegui([*esporta, "--format", "requirements.txt"], BACKEND)
     (DESTINAZIONE / "requirements.txt").write_text(requisiti, encoding="utf-8", newline="\n")

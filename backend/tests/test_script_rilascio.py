@@ -90,6 +90,41 @@ def test_rilascio_rifiuta_cio_che_non_e_uno_sha_completo(
         prepara.rilascio(sha)
 
 
+# --- prepara_app.copia_analisi ----------------------------------------------------
+
+
+def test_copia_analisi_porta_job_pipeline_e_pacchetto(
+    prepara: types.ModuleType, tmp_path: Path
+) -> None:
+    sorgente = tmp_path / "src"
+    (sorgente / "academy_analisi" / "__pycache__").mkdir(parents=True)
+    (sorgente / "academy_analisi" / "tabelle.py").write_text("TABELLE = ()")
+    (sorgente / "academy_analisi" / "__pycache__" / "tabelle.cpython-312.pyc").write_bytes(b"")
+    (sorgente / "snapshot_bronze.py").write_text("")
+    (sorgente / "pipeline_storico.py").write_text("")
+    destinazione = tmp_path / "app"
+    destinazione.mkdir()
+
+    prepara.copia_analisi(sorgente, destinazione)
+
+    copiati = sorted(p.relative_to(destinazione).as_posix() for p in destinazione.rglob("*"))
+    assert copiati == [
+        "analisi",
+        "analisi/academy_analisi",
+        "analisi/academy_analisi/tabelle.py",
+        "analisi/pipeline_storico.py",
+        "analisi/snapshot_bronze.py",
+    ]
+
+
+def test_copia_analisi_del_repository(prepara: types.ModuleType, tmp_path: Path) -> None:
+    # I file che databricks.yml nomina devono esserci davvero.
+    prepara.copia_analisi(prepara.ANALISI, tmp_path)
+
+    for file in ("snapshot_bronze.py", "pipeline_storico.py", "academy_analisi/storico.py"):
+        assert (tmp_path / "analisi" / file).is_file()
+
+
 # --- fumo_rilascio.attendi_health -------------------------------------------------
 
 

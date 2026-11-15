@@ -16,6 +16,8 @@ Fase 9 (infrastruttura come codice, issue #75), in due PR: A) Terraform per GitH
 
 Fase 10 (rilascio continuo, issue #81), in due PR: A) pipeline (issue #82): `rilascio.yml` su ogni push a `main` (CI richiamata, un artifact `build/app`, collaudo, fumo, approvazione nell'environment `prod`, produzione, fumo) con il service principal `academy-rilascio` (ADR-0013); B1) feature flag per ambiente dal bundle, spenta per difetto e 404 da spenta, esposta in `/configurazione` (prima flag: evento `.ics` di un'iscrizione Confermata, `ACADEMY_FLAG_CALENDARIO`) e dati di prova sintetici del collaudo caricati all'avvio (`ACADEMY_DATI_PROVA`, vietati in produzione), ADR-0014 (issue #86); B2) rollback e metriche DORA (issue #88, ADR-0015): `rollback.yml` (`workflow_dispatch` con l'id di una run di `rilascio.yml` arrivata in prod: stesso artifact, `databricks.yml` e fumo del suo commit, collaudo poi approvazione di prod) e `scripts/dora.py` (frequenza, lead time, change failure rate, tempo di ripristino dai deployment degli environment di GitHub; metodo e istantanea in `docs/dora.md`).
 
+Fase 11 (parte analitica, issue #91), in tre PR: A) storico dei dati di Lakebase (issue #92, ADR-0016): database di Lakebase registrato in Unity Catalog (`academy_<env>_oltp`, Terraform), job `analisi` del bundle (ogni giorno: snapshot in `bronze`, poi pipeline Lakeflow `storico` con SCD di tipo 2 in `silver`), codice in `analisi/` dentro l'artifact del rilascio; B) importazioni, controlli di qualità e gold; C) row filter, governance e synced table.
+
 ## Infrastruttura
 
 Terraform per la piattaforma, bundle per il progetto (ADR-0012). Istruzioni e bootstrap in `infra/README.md`. Dal PC: `terraform login` una volta, poi in `infra/github/` `terraform init` e `GITHUB_TOKEN=$(gh auth token) terraform plan`; in `infra/databricks/` e `infra/databricks-identita/` anche `DATABRICKS_CONFIG_PROFILE=academy`. `infra/databricks-identita/` non ha workflow: si applica solo dal PC. Il workflow dell'infrastruttura non è un check obbligatorio (parte solo se cambia `infra/`).
@@ -74,6 +76,17 @@ uv run pre-commit install    # una volta per clone: hook pre-commit (ruff, gitle
 uv run pre-commit run --all-files
 ```
 
+Dentro `analisi/` (Python 3.12, come l'ambiente serverless 4 di Databricks; i test avviano Spark in locale: serve Java 17+):
+
+```bash
+uv sync                      # pyspark e gli strumenti, solo per sviluppo e test
+uv run pytest                # trasformazioni su Spark locale
+uv run ruff check --fix && uv run ruff format
+uv run pyright               # strict
+```
+
+Il job gira solo su Databricks (`databricks bundle run analisi -t collaudo`, come service principal): `create_auto_cdc_from_snapshot_flow` non esiste in pyspark open source.
+
 Dopo ogni modifica a un file `.py` del backend l'hook `.claude/hooks/dopo_modifica.py` lancia ruff e i test veloci (non quelli `integrazione`); se fallisce, correggi prima di proseguire. Prima della PR lancia anche `uv run pytest` completo.
 
 Dentro `frontend/`:
@@ -104,11 +117,12 @@ npm run e2e                  # Playwright + axe su docker compose acceso (http:/
   - `job.py`: job di sistema (scadenza all'inizio dell'edizione, rete di sicurezza della promozione), una transazione per edizione (ADR-0007).
   - `report.py`: porta `LettoreReport` per i report da Unity Catalog, letti con il token dell'utente via Statement Execution API (ADR-0011); `NessunReport` senza warehouse. Adapter verso un sistema esterno, fuori dai livelli: niente regole di business, query fissa, autorizza Unity Catalog.
   - `frontend.py`: serve la build del frontend (`ACADEMY_FRONTEND_DIR`) con fallback su `index.html` per le rotte del client; `/api` resta JSON (ADR-0009 §14).
+- `analisi/src/`: job e pipeline della parte analitica (ADR-0016). `academy_analisi/tabelle.py` elenca tabelle e colonne copiate da Lakebase (mai `SELECT *`; `backend/tests/test_contratto_analisi.py` le lega al modello SQLAlchemy: togliere o rinominare una colonna letta richiede di aggiornarle), `snapshot.py` lo scatto in `bronze`, `storico.py` la sorgente dello SCD 2; `snapshot_bronze.py` e `pipeline_storico.py` sono i punti d'ingresso su Databricks, copiati da `scripts/prepara_app.py` in `build/app/analisi/`.
 - `backend/contratto/`: contratto OpenAPI e impronte per versione; `tests/test_contratto.py` fallisce se l'API cambia senza aumentare la versione.
 - `backend/tests/`: test pytest. I test HTTP usano la fixture `client` (TestClient sull'app collegata al database di test, identità provvisoria `X-Persona-Id`) e `tests/api.py`; i test del token usano `tests/oidc.py` (chiave RSA di test). `dati.py` crea dati sintetici; `conftest.py` avvia PostgreSQL con la stessa immagine di docker compose e applica le migrazioni.
 - `frontend/src/`: `api/` (client `openapi-fetch` tipizzato da `schema.d.ts` generato, `ErroreApi` RFC 9457, hook React Query in `query.ts`), `accesso/` (OIDC o Databricks, secondo `GET /api/v1/configurazione`), `componenti/` (struttura con menu per profilo, stati di caricamento/errore/vuoto, notifiche degli esiti, paginazione), `pagine/` (catalogo, mie iscrizioni, approvazioni; `gestione/` con corsi, edizioni del corso e iscrizioni dell'edizione, hook in `api/gestione.ts`), `test/` (MSW e render con i provider). I test stanno accanto ai file (`*.test.tsx`). `frontend/e2e/`: Playwright su docker compose (`flusso.spec.ts` richiesta → approvazione → conferma, `accessibilita.spec.ts` axe per profilo; `sessione.ts` fa il login su Keycloak e crea con l'API un corso e un'edizione per test).
 - `backend/Dockerfile`: multi-stage con uv e uno stage Node che compila il frontend (contesto con nome `frontend`: `docker build --build-context frontend=../frontend backend`), runtime non root (uid 10001).
-- `.github/workflows/`: `ci.yml` (lint, typecheck, test, dipendenze con pip-audit su `uv.lock`, frontend, immagine + Trivy, compose, e2e con Playwright e axe, gitleaks), `codeql.yml` (CodeQL su Python, JavaScript/TypeScript e Actions) e `pr-issue.yml` (la PR deve collegare una issue). Sono status check obbligatori del ruleset su `main`. `infra.yml`: Terraform (plan nella PR, apply nell'environment `infra`, deriva), non obbligatorio. `rilascio.yml` (su push a `main`): richiama `ci.yml`, poi `rilascia-ambiente.yml` per collaudo e prod (ADR-0013). `rollback.yml` (a mano, input `run_id`): rilascia di nuovo l'artifact di una run precedente con lo stesso `rilascia-ambiente.yml` (ADR-0015). Sul repository sono attivi secret scanning con push protection, avvisi e aggiornamenti di sicurezza di Dependabot.
+- `.github/workflows/`: `ci.yml` (lint, typecheck, test, dipendenze con pip-audit su `uv.lock`, analisi, frontend, immagine + Trivy, compose, e2e con Playwright e axe, gitleaks), `codeql.yml` (CodeQL su Python, JavaScript/TypeScript e Actions) e `pr-issue.yml` (la PR deve collegare una issue). Sono status check obbligatori del ruleset su `main`. `infra.yml`: Terraform (plan nella PR, apply nell'environment `infra`, deriva), non obbligatorio. `rilascio.yml` (su push a `main`): richiama `ci.yml`, poi `rilascia-ambiente.yml` per collaudo e prod (ADR-0013). `rollback.yml` (a mano, input `run_id`): rilascia di nuovo l'artifact di una run precedente con lo stesso `rilascia-ambiente.yml` (ADR-0015). Sul repository sono attivi secret scanning con push protection, avvisi e aggiornamenti di sicurezza di Dependabot.
 
 ## Flusso di lavoro
 

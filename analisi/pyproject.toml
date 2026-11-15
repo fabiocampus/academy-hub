@@ -1,0 +1,56 @@
+[project]
+name = "academy-analisi"
+version = "0.1.0"
+description = "Academy Hub: job e pipeline della parte analitica su Databricks (ADR-0016)"
+# Python dell'ambiente serverless 4 di Databricks, dove girano job e pipeline.
+requires-python = ">=3.12,<3.13"
+# Nessuna dipendenza di runtime: Spark e il modulo delle pipeline li fornisce Databricks.
+dependencies = []
+
+[dependency-groups]
+dev = [
+    # Spark locale per i test delle trasformazioni (serve Java 17+); include
+    # pyspark.pipelines, il modulo delle pipeline dichiarative.
+    "pyspark>=4.1.1,<4.2",
+    "pyright",
+    "pytest",
+    "ruff",
+]
+
+[tool.uv]
+# Non si installa: il codice arriva su Databricks come file, dentro l'artifact del rilascio.
+package = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "S", "N", "RUF"]
+# N812: `from pyspark.sql import functions as F` è la convenzione di PySpark.
+ignore = ["N812"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["academy_analisi"]
+
+[tool.pyright]
+include = ["src", "tests"]
+extraPaths = ["src"]
+pythonVersion = "3.12"
+typeCheckingMode = "strict"
+venvPath = "."
+venv = ".venv"
+# Gli stub di pyspark lasciano tipi parziali in alcuni overload (createDataFrame, Row):
+# il resto del controllo strict resta attivo.
+reportUnknownMemberType = "none"
+reportUnknownVariableType = "none"
+reportUnknownArgumentType = "none"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-ra --strict-markers"

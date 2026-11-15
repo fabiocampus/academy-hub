@@ -1,0 +1,39 @@
+# ADR-0016 · Storico dei dati di Lakebase in Unity Catalog
+
+- **Stato:** accettato
+- **Data:** 2026-11-15
+
+## Contesto
+
+Fase 11 (issue #91, prima PR #92). I report della parte analitica (ore di formazione per team, tasso di completamento, valutazione media) servono anche "com'era" in passato: a che team apparteneva una persona quando ha seguito un corso, in che stato era un'iscrizione a una certa data. Lakebase tiene solo lo stato corrente, e l'audit (`eventi_audit`) copre solo le iscrizioni. La tabella gold della fase 8 era sintetica, caricata da uno script.
+
+Vincoli: Free Edition (compute solo serverless, niente cluster classici), un progetto Lakebase con un branch per ambiente (ADR-0010), cataloghi e grant in Terraform (ADR-0012), rilascio con un solo artifact e il service principal `academy-rilascio` (ADR-0013), repository pubblico.
+
+## Decisione
+
+1. **Livelli medallion nel catalogo dell'ambiente** (`academy_<env>`, ADR-0011): `bronze` contiene gli snapshot grezzi, `silver` lo storico pulito, `gold` gli aggregati dei report (PR B).
+2. **Lakebase registrato in Unity Catalog**: un catalogo `academy_<env>_oltp` per ambiente sul branch dell'ambiente (`collaudo`, `production`), database `databricks_postgres`, creato da Terraform (`databricks_postgres_catalog` in `infra/databricks/analisi.tf`). Si legge dal compute serverless in sola lettura, con i grant di Unity Catalog e senza ruoli Postgres per chi legge; niente copie con script o connessioni JDBC con password.
+3. **Snapshot giornaliero in bronze, solo in aggiunta.** Il task `snapshot` del job `analisi` (`analisi/src/academy_analisi/snapshot.py`) legge ogni tabella dello schema del target (`academy` o `academy_collaudo`) e aggiunge le righe a `bronze.<tabella>` con la colonna `_snapshot_il`, lo stesso istante (al secondo, UTC) per tutte le tabelle della passata. Le tabelle si leggono una dopo l'altra, non in una transazione: fra due letture l'App può scrivere, accettabile per report giornalieri.
+4. **Colonne esplicite** (`analisi/src/academy_analisi/tabelle.py`), mai `SELECT *`: una colonna nuova dell'App, magari un dato personale, non arriva nei dati analitici finché non la si aggiunge lì. Fuori `versione` (ADR-0005), `chiave_idempotenza` (ADR-0006) ed `eventi_audit`. `backend/tests/test_contratto_analisi.py` controlla che le colonne esistano nel modello SQLAlchemy e che la chiave sia la chiave primaria: una migrazione che toglie o rinomina una colonna letta fa fallire la CI del backend.
+5. **Storico SCD di tipo 2 in silver** con una pipeline Lakeflow (`storico`, `analisi/src/pipeline_storico.py`): `create_auto_cdc_from_snapshot_flow` con `stored_as_scd_type=2` per ogni tabella, colonne `__START_AT`/`__END_AT`. La sorgente è una funzione che, data l'ultima versione elaborata, restituisce lo snapshot successivo di bronze: uno snapshot rimasto indietro (pipeline fallita) si recupera alla passata dopo, in ordine. La **versione dello snapshot** è l'istante dello scatto in microsecondi interi (`unix_micros`): crescente e uguale per tutte le tabelle della passata.
+6. **Job e pipeline nel bundle, codice nell'artifact.** `databricks.yml` dichiara la pipeline `storico` (serverless, catalogo del target, schema `silver`) e il job `analisi` (ogni giorno alle 05:00 Europe/Rome: `snapshot`, poi `storico`). Il codice è copiato da `scripts/prepara_app.py` in `build/app/analisi/`: stessa versione dell'App, stesso rilascio e rollback (ADR-0013, ADR-0015).
+7. **Identità `academy-rilascio`.** Job e pipeline appartengono al service principal che fa il deploy e girano con la sua identità. Terraform gli dà solo quello che serve: `USE_CATALOG`, `USE_SCHEMA`, `SELECT` sul catalogo `_oltp`; `USE_CATALOG` sul catalogo dell'ambiente; `USE_SCHEMA` e `CREATE_TABLE` su `bronze`; `USE_SCHEMA`, `CREATE_TABLE`, `CREATE_MATERIALIZED_VIEW` su `silver` (su `gold` dalla PR B). Le tabelle create sono sue: per riscriverle basta essere proprietario.
+8. **Lo stato `Completata` si calcola solo in gold** (PR B), da edizione conclusa e iscrizione `Confermata`: la parte analitica non scrive mai su Lakebase. L'App resta l'unica a scrivere le iscrizioni, con le sue regole e il suo audit (R6).
+9. **Su serverless niente `cache()`/`persist()`** (non sono supportati): un conteggio per il log è una seconda lettura. La logica è in funzioni su `DataFrame` testate con Spark locale (`analisi/tests/`); `pyspark.pipelines.create_auto_cdc_from_snapshot_flow` esiste solo nel runtime di Databricks, quindi `pipeline_storico.py` resta un sottile strato di dichiarazioni.
+10. **Progetto Python separato** `analisi/` (uv, Python 3.12 come l'ambiente serverless 4, pyspark solo nelle dipendenze di sviluppo), con il suo job `analisi` in CI: ruff, pyright strict, pytest, pip-audit su `analisi/uv.lock`.
+
+## Alternative scartate
+
+- **Change data feed o CDC logico da Postgres** (Lakeflow Connect, replica): storico a ogni modifica invece che giornaliero, ma non provato su Free Edition e sproporzionato per report giornalieri.
+- **Storico nell'App** (tabelle `*_storico` con trigger): sposta nel transazionale un bisogno dei report e appesantisce ogni scrittura.
+- **Snapshot con `MERGE` scritto a mano**: lo SCD 2 dichiarativo gestisce chiusura e apertura delle righe, cancellazioni e snapshot recuperati in ritardo.
+- **Job e pipeline in Terraform**: cambiano insieme al codice, quindi stanno nel bundle con l'App (ADR-0012); in Terraform resta la piattaforma (catalogo `_oltp`, grant).
+- **Scrivere `Completata` su Lakebase da un job**: due scrittori dello stato dell'iscrizione, regole duplicate e un audit con un attore in più.
+
+## Conseguenze
+
+- Lo storico ha la granularità di un giorno: due modifiche nello stesso giorno ne lasciano vedere solo l'ultima.
+- Bronze cresce di una copia delle tabelle al giorno: per un prototipo va bene; con dati veri servirebbe una conservazione (per esempio 90 giorni di snapshot, lo storico resta in silver).
+- `persone.email` arriva in bronze e silver: dato personale fuori dall'App. I due schemi li leggono solo `academy-rilascio`, il proprietario del catalogo e gli admin; gli utenti leggono solo gold (D20 nel threat model). Il diritto all'oblio richiederebbe di cancellare anche lì.
+- Una colonna nuova da analizzare richiede una PR su `tabelle.py`; una colonna letta che sparisce dall'App fa fallire la CI, non il job di notte.
+- Il catalogo `_oltp` vede tutti gli schemi del branch (anche `academy` nel branch di collaudo, copiato da produzione): il job legge solo lo schema del suo target, passato come parametro.

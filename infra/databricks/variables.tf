@@ -18,3 +18,24 @@ variable "warehouse" {
   type        = string
   default     = "Serverless Starter Warehouse"
 }
+
+variable "progetto_lakebase" {
+  description = "Progetto Lakebase dell'App (fase 8), creato dal bundle."
+  type        = string
+  default     = "academy-hub"
+}
+
+variable "database_lakebase" {
+  description = "Database Postgres di Lakebase con gli schemi dell'App."
+  type        = string
+  default     = "databricks_postgres"
+}
+
+variable "rami_lakebase" {
+  description = "Branch Lakebase di ogni target: lo stesso insieme di chiavi di var.cataloghi."
+  type        = map(string)
+  default = {
+    collaudo = "collaudo"
+    prod     = "production"
+  }
+}
