@@ -32,7 +32,7 @@ databricks bundle run academy_hub -t collaudo   # avvia la versione caricata (an
 python scripts/fumo_rilascio.py --app academy-hub-collaudo --ambiente collaudo --rilascio $BUNDLE_VAR_rilascio
 ```
 
-Con il profilo `academy` restano le letture (`databricks apps get`, `bundle summary`) e l'apertura dell'App nel browser.
+Con il profilo `academy` restano le letture fuori dal bundle (`databricks apps get`) e l'apertura dell'App nel browser; `bundle summary` va fatto con le credenziali del service principal (con il profilo dell'utente legge la sua cartella, che non c'è più).
 
 Unity Catalog (ADR-0011, ADR-0012): cataloghi, schemi e grant li gestisce Terraform in `infra/databricks/`, non il bundle. La tabella gold sintetica con `uv run --project backend python scripts/unity_catalog.py dati-gold -t <target>`.
 

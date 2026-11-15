@@ -36,6 +36,7 @@ Una storia è `Fatto` solo se:
 - [ ] la scansione di sicurezza (dipendenze, SAST, segreti) non segnala problemi nuovi;
 - [ ] la pull request è collegata alla issue (`Closes #n`) e la sua descrizione dice che cosa è stato eseguito e con quale esito;
 - [ ] il contratto OpenAPI, la documentazione e gli ADR sono aggiornati nella stessa pull request, se toccati;
+- [ ] le migrazioni del database sono compatibili con la versione precedente (expand/contract, ADR-0013 §7): una colonna si toglie solo nel rilascio dopo quello che smette di usarla;
 - [ ] la modifica è stata rilasciata almeno in collaudo (dalla fase 10 in poi).
 
 ## Regole di collaborazione

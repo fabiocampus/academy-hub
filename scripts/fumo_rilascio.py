@@ -113,16 +113,22 @@ def attendi_health(base: str, token: str, ambiente: str, rilascio: str) -> None:
     scadenza = time.monotonic() + ATTESA_MASSIMA
     ultimo = "nessuna risposta"
     while time.monotonic() < scadenza:
-        stato, _, corpo = apri(richiesta(f"{base}/health", token))
-        if stato == 200:
-            salute: dict[str, str] = json.loads(corpo)
+        # Mentre l'App si riavvia il proxy può chiudere la connessione, scadere o
+        # rispondere con una pagina che non è JSON: è "nessuna risposta", si riprova.
+        try:
+            stato, _, corpo = apri(richiesta(f"{base}/health", token))
+            salute: dict[str, str] | None = json.loads(corpo) if stato == 200 else None
+        except (urllib.error.URLError, TimeoutError, ConnectionError, json.JSONDecodeError) as e:
+            stato, salute = None, None
+            ultimo = f"nessuna risposta ({type(e).__name__})"
+        if salute is not None:
             if salute.get("rilascio") == rilascio:
                 controlla(salute.get("stato") == "ok", "/health risponde ok")
                 controlla(salute.get("ambiente") == ambiente, f"ambiente {ambiente}")
-                controlla(True, f"rilascio {rilascio}")
+                print(f"ok  rilascio {rilascio}")
                 return
             ultimo = f"rilascio {salute.get('rilascio')}"
-        else:
+        elif stato is not None:
             ultimo = f"HTTP {stato}"
         print(f"..  /health: {ultimo}, riprovo fra {PAUSA} s")
         time.sleep(PAUSA)

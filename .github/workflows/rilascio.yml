@@ -7,15 +7,15 @@ name: Rilascio
 on:
   push:
     branches: [main]
+  # Rilascio a mano dell'ultimo main (gli environment ammettono solo il ramo main).
+  workflow_dispatch:
 
 permissions:
   contents: read
 
-# Un rilascio alla volta, in ordine: nessuno interrotto a metà (un deploy cancellato
-# lascerebbe l'App fra due versioni). GitHub tiene in coda solo l'ultimo in attesa.
-concurrency:
-  group: rilascio
-  cancel-in-progress: false
+# Nessuna concurrency a livello di workflow: un prod in attesa di approvazione
+# bloccherebbe anche il collaudo dei push successivi. Il gruppo è per ambiente, nel job
+# di rilascia-ambiente.yml.
 
 jobs:
   ci:
@@ -27,6 +27,7 @@ jobs:
   build:
     needs: ci
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     outputs:
       artifact: ${{ steps.nome.outputs.artifact }}
     env:

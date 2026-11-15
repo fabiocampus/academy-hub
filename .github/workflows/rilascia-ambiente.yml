@@ -32,6 +32,12 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     timeout-minutes: 30
+    # Un rilascio alla volta per ambiente, mai interrotto a metà (un deploy cancellato
+    # lascerebbe l'App fra due versioni). Per ambiente, non per workflow: un prod in
+    # attesa di approvazione non deve bloccare il collaudo dei push successivi.
+    concurrency:
+      group: rilascio-${{ inputs.environment }}
+      cancel-in-progress: false
     env:
       DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
       DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
@@ -72,12 +78,21 @@ jobs:
           # Variabile del bundle per deploy e run (anche `bundle run` risolve le variabili).
           echo "BUNDLE_VAR_rilascio=$rilascio" >> "$GITHUB_ENV"
       # Il repository è pubblico, e così i log: l'URL dell'App contiene l'id del workspace.
+      # Si mascherano anche l'host senza schema e l'id del workspace, che compare nell'URL.
       - name: Maschera l'URL dell'App
         run: |
+          set -euo pipefail
           url=$(databricks apps get "$APP" -o json | jq -r '.url // empty')
-          if [ -n "$url" ]; then
-            echo "::add-mask::$url"
-            echo "::add-mask::${url#https://}"
+          if [ -z "$url" ]; then
+            echo "::error::L'App $APP non ha un URL: impossibile mascherarlo, deploy fermato"
+            exit 1
+          fi
+          echo "::add-mask::$url"
+          echo "::add-mask::${url#https://}"
+          echo "::add-mask::${DATABRICKS_HOST#https://}"
+          id=$(grep -oE '[0-9]{10,}' <<< "$url" | head -n 1 || true)
+          if [ -n "$id" ]; then
+            echo "::add-mask::$id"
           fi
       # Senza --auto-approve: se il deploy volesse cancellare o ricreare risorse
       # (dati del database compresi), si ferma invece di farlo.
