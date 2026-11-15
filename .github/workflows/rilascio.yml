@@ -63,6 +63,10 @@ jobs:
       target: collaudo
       ambiente: collaudo
       artifact: ${{ needs.build.outputs.artifact }}
+    # Senza inherit il workflow riusabile riceve un contesto `secrets` vuoto, anche
+    # con `environment:` sul suo job. Il repository non ha secret propri: passano solo
+    # quelli dell'environment.
+    secrets: inherit
 
   prod:
     needs: [build, collaudo]
@@ -72,3 +76,4 @@ jobs:
       target: prod
       ambiente: produzione
       artifact: ${{ needs.build.outputs.artifact }}
+    secrets: inherit
