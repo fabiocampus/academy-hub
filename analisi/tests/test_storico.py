@@ -8,7 +8,8 @@ from academy_analisi.snapshot import COLONNA_SNAPSHOT
 from academy_analisi.storico import prossimo_snapshot, versione
 
 PRIMO = datetime(2026, 11, 14, 5, 0, tzinfo=UTC)
-SECONDO = datetime(2026, 11, 15, 5, 0, tzinfo=UTC)
+# Con i microsecondi: la versione calcolata da Spark (unix_micros) deve coincidere.
+SECONDO = datetime(2026, 11, 15, 5, 0, 0, 123456, tzinfo=UTC)
 
 
 def _bronze(spark: SparkSession) -> DataFrame:
@@ -21,6 +22,7 @@ def _bronze(spark: SparkSession) -> DataFrame:
 def test_versione_cresce_con_l_istante() -> None:
     assert versione(PRIMO) < versione(SECONDO)
     assert versione(PRIMO) == int(PRIMO.timestamp()) * 1_000_000
+    assert versione(SECONDO) == int(SECONDO.timestamp()) * 1_000_000 + 123456
 
 
 def test_la_prima_chiamata_restituisce_lo_snapshot_piu_vecchio(spark: SparkSession) -> None:

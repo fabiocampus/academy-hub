@@ -71,7 +71,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         nome_tabella(a.destinazione, t.nome)
 
     spark = SparkSession.builder.getOrCreate()
-    istante = datetime.now(UTC).replace(microsecond=0)
+    # Al microsecondo, come la versione dello storico: due passate nello stesso secondo
+    # restano due snapshot distinti.
+    istante = datetime.now(UTC)
     contate = scatta(
         leggi=spark.read.table,
         scrivi=scrivi_in_aggiunta,

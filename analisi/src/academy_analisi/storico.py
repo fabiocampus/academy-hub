@@ -18,7 +18,11 @@ _VERSIONE = "_versione"
 
 
 def versione(istante: datetime) -> int:
-    """Microsecondi dall'epoch dell'istante dello scatto (come `unix_micros` di Spark)."""
+    """Microsecondi dall'epoch dell'istante dello scatto.
+
+    La regola della versione, scritta in Python; `prossimo_snapshot` la calcola in Spark
+    con `unix_micros` e i test controllano che le due coincidano.
+    """
     secondi = int(istante.timestamp())
     return secondi * 1_000_000 + istante.microsecond
 

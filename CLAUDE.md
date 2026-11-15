@@ -85,7 +85,7 @@ uv run ruff check --fix && uv run ruff format
 uv run pyright               # strict
 ```
 
-Il job gira solo su Databricks (`databricks bundle run analisi -t collaudo`, come service principal): `create_auto_cdc_from_snapshot_flow` non esiste in pyspark open source.
+Il job gira solo su Databricks (`databricks bundle run analisi -t collaudo`, come service principal e con le stesse variabili `BUNDLE_VAR_*` di `bundle run academy_hub`): `create_auto_cdc_from_snapshot_flow` non esiste in pyspark open source.
 
 Dopo ogni modifica a un file `.py` del backend l'hook `.claude/hooks/dopo_modifica.py` lancia ruff e i test veloci (non quelli `integrazione`); se fallisce, correggi prima di proseguire. Prima della PR lancia anche `uv run pytest` completo.
 

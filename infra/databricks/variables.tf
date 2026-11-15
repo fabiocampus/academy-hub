@@ -31,6 +31,15 @@ variable "database_lakebase" {
   default     = "databricks_postgres"
 }
 
+variable "schemi_lakebase" {
+  description = "Schema dell'App nel database di ogni target (var.schema_database del bundle)."
+  type        = map(string)
+  default = {
+    collaudo = "academy_collaudo"
+    prod     = "academy"
+  }
+}
+
 variable "rami_lakebase" {
   description = "Branch Lakebase di ogni target: lo stesso insieme di chiavi di var.cataloghi."
   type        = map(string)
