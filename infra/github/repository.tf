@@ -38,6 +38,20 @@ resource "github_repository" "academy_hub" {
 
   lifecycle {
     prevent_destroy = true
+
+    # GitHub restituisce le impostazioni di merge solo a chi ha accesso in
+    # scrittura: col PAT di sola lettura del plan sembrerebbero sempre false o
+    # vuote, con una deriva finta in ogni PR e nel plan del lunedì. Terraform
+    # le imposta alla creazione ma non le controlla più; lo squash obbligatorio
+    # lo impone comunque il ruleset (allowed_merge_methods).
+    ignore_changes = [
+      allow_squash_merge,
+      delete_branch_on_merge,
+      merge_commit_message,
+      merge_commit_title,
+      squash_merge_commit_message,
+      squash_merge_commit_title,
+    ]
   }
 }
 
