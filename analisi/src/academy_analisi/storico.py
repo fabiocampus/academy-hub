@@ -13,12 +13,14 @@ prima passata fallisce e una tabella svuotata non chiude mai le sue righe (#99).
 
 from datetime import datetime
 
+from pyspark.errors import AnalysisException
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
 from academy_analisi.snapshot import COLONNA_SNAPSHOT
 
 _VERSIONE = "_versione"
+TABELLA_ASSENTE = "TABLE_OR_VIEW_NOT_FOUND"
 
 
 def versione(istante: datetime) -> int:
@@ -36,9 +38,15 @@ def leggi_scatti(spark: SparkSession, nome: str) -> DataFrame:
 
     La pipeline può girare da sola (avvio a mano, full refresh) prima della prima passata
     del job dopo il rilascio: senza registro valgono solo le versioni già in bronze.
+    Niente `spark.catalog.tableExists`: nella pipeline serverless non è permesso (#101).
     """
-    if spark.catalog.tableExists(nome):
-        return spark.read.table(nome)
+    try:
+        registro = spark.read.table(nome)
+        _ = registro.schema  # con Spark Connect la lettura è pigra: l'errore arriva qui
+        return registro
+    except AnalysisException as errore:
+        if errore.getCondition() != TABELLA_ASSENTE:
+            raise
     return spark.createDataFrame([], f"{COLONNA_SNAPSHOT} TIMESTAMP")
 
 
