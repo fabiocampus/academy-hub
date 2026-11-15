@@ -15,6 +15,7 @@ locals {
     "frontend",
     "CodeQL (javascript-typescript)",
     "e2e",
+    "analisi",
   ]
   # GitHub Actions: i check devono arrivare da lì, non da un'altra integrazione.
   integrazione_actions = 15368

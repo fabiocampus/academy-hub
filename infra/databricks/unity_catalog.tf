@@ -70,6 +70,13 @@ resource "databricks_grants" "catalogo" {
     principal  = data.databricks_service_principal.terraform.application_id
     privileges = ["ALL_PRIVILEGES", "MANAGE"]
   }
+
+  # Il job e la pipeline della parte analitica (analisi.tf) girano con l'identità del
+  # service principal del rilascio.
+  grant {
+    principal  = data.databricks_service_principal.rilascio.application_id
+    privileges = ["USE_CATALOG"]
+  }
 }
 
 resource "databricks_grants" "gold" {
