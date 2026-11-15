@@ -12,6 +12,12 @@ Fase 7 (frontend, issue #59), in tre PR: A) base in `frontend/` (React, Vite, Ma
 
 Fase 8 (Databricks, issue #68), in due PR: A) l'App su Lakebase (issue #69): bundle `databricks.yml` con target `collaudo` e `prod`, un progetto Lakebase con un branch per ambiente, password del database = token OAuth per connessione, schema `academy`, avvio con migrazioni e persona amministratrice (ADR-0010); B) Unity Catalog e identità dell'utente (issue #73): cataloghi `academy_collaudo`/`academy_prod` con `bronze`/`silver`/`gold` nel bundle, report `GET /api/v1/report/iscrizioni-per-corso` letto con il token dell'utente (`X-Forwarded-Access-Token`, scope `sql`) su un SQL warehouse, porta `LettoreReport` in `report.py` (ADR-0011).
 
+Fase 9 (infrastruttura come codice, issue #75), in due PR: A) Terraform per GitHub in `infra/github/` (repository, ruleset, environment `infra`/`infra-plan`, label; esistenti con blocchi `import`), stato su HCP Terraform Free in execution mode locale, workflow `infra.yml` con plan nella PR, apply dopo approvazione e deriva il lunedì (issue #76, ADR-0012); B) Terraform per Databricks.
+
+## Infrastruttura
+
+Terraform per la piattaforma, bundle per il progetto (ADR-0012). Istruzioni e bootstrap in `infra/README.md`. Dal PC: `terraform login` una volta, poi in `infra/github/` `terraform init` e `GITHUB_TOKEN=$(gh auth token) terraform plan`. Il workflow dell'infrastruttura non è un check obbligatorio (parte solo se cambia `infra/`).
+
 ## Databricks
 
 Dalla radice, con il profilo `academy` della CLI e l'email dell'account in `ACADEMY_ADMIN_EMAIL` (mai nel repository):
@@ -93,7 +99,7 @@ npm run e2e                  # Playwright + axe su docker compose acceso (http:/
 - `backend/tests/`: test pytest. I test HTTP usano la fixture `client` (TestClient sull'app collegata al database di test, identità provvisoria `X-Persona-Id`) e `tests/api.py`; i test del token usano `tests/oidc.py` (chiave RSA di test). `dati.py` crea dati sintetici; `conftest.py` avvia PostgreSQL con la stessa immagine di docker compose e applica le migrazioni.
 - `frontend/src/`: `api/` (client `openapi-fetch` tipizzato da `schema.d.ts` generato, `ErroreApi` RFC 9457, hook React Query in `query.ts`), `accesso/` (OIDC o Databricks, secondo `GET /api/v1/configurazione`), `componenti/` (struttura con menu per profilo, stati di caricamento/errore/vuoto, notifiche degli esiti, paginazione), `pagine/` (catalogo, mie iscrizioni, approvazioni; `gestione/` con corsi, edizioni del corso e iscrizioni dell'edizione, hook in `api/gestione.ts`), `test/` (MSW e render con i provider). I test stanno accanto ai file (`*.test.tsx`). `frontend/e2e/`: Playwright su docker compose (`flusso.spec.ts` richiesta → approvazione → conferma, `accessibilita.spec.ts` axe per profilo; `sessione.ts` fa il login su Keycloak e crea con l'API un corso e un'edizione per test).
 - `backend/Dockerfile`: multi-stage con uv e uno stage Node che compila il frontend (contesto con nome `frontend`: `docker build --build-context frontend=../frontend backend`), runtime non root (uid 10001).
-- `.github/workflows/`: `ci.yml` (lint, typecheck, test, dipendenze con pip-audit su `uv.lock`, frontend, immagine + Trivy, compose, e2e con Playwright e axe, gitleaks), `codeql.yml` (CodeQL su Python, JavaScript/TypeScript e Actions) e `pr-issue.yml` (la PR deve collegare una issue). Sono status check obbligatori del ruleset su `main`. Sul repository sono attivi secret scanning con push protection, avvisi e aggiornamenti di sicurezza di Dependabot.
+- `.github/workflows/`: `ci.yml` (lint, typecheck, test, dipendenze con pip-audit su `uv.lock`, frontend, immagine + Trivy, compose, e2e con Playwright e axe, gitleaks), `codeql.yml` (CodeQL su Python, JavaScript/TypeScript e Actions) e `pr-issue.yml` (la PR deve collegare una issue). Sono status check obbligatori del ruleset su `main`. `infra.yml`: Terraform (plan nella PR, apply nell'environment `infra`, deriva), non obbligatorio. Sul repository sono attivi secret scanning con push protection, avvisi e aggiornamenti di sicurezza di Dependabot.
 
 ## Flusso di lavoro
 
