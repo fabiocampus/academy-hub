@@ -95,5 +95,11 @@ Una persona può avere più ruoli: un responsabile è anche dipendente.
 | **Snapshot** | Copia giornaliera delle tabelle dell'App in `bronze`, con l'istante dello scatto (`_snapshot_il`); solo in aggiunta; ogni passata riuscita è registrata in `bronze.scatti`, anche per le tabelle vuote (ADR-0016). Non è un backup. |
 | **Storico (SCD 2)** | In `silver`, ogni versione di una riga con il suo intervallo di validità (`__START_AT`, `__END_AT`, aperto se è quella corrente), ricavato dagli snapshot. Diverso dall'audit, che registra i cambi di stato. |
 | **Bronze, silver, gold** | I livelli del catalogo di un ambiente: dati grezzi come arrivano, dati puliti e storicizzati, aggregati dei report. Gli utenti leggono solo gold. |
-| **Quarantena** | Tabella che raccoglie le righe di un file importato che violano una regola di qualità non bloccante. |
-| **Gate di qualità** | Controllo che impedisce l'aggiornamento delle tabelle gold se una regola bloccante fallisce. |
+| **Importazione** | Un file CSV di presenze o valutazioni caricato nel volume `bronze.importazioni`; la persona si riconosce dall'email (ADR-0017). Un file si legge una volta: una correzione è un file nuovo. |
+| **Quarantena** | Tabella che raccoglie le righe scartate di un file importato, come sono arrivate e con il motivo (`qualita.presenze_quarantena`, `qualita.valutazioni_quarantena`). |
+| **Regola bloccante** | Regola di qualità la cui violazione, anche in una sola riga, fa respingere l'intero file: edizione inesistente, giorno futuro. |
+| **File respinto** | File importato con almeno una riga bloccante o con più del 10% di righe scartate. Le sue righe non arrivano mai nel gold. Diverso da una riga in quarantena, che da sola non respinge il file. |
+| **Verdetto** | Accettato o respinto: la decisione del gate su un file importato, presa la prima volta che il job lo vede e mai più cambiata (`qualita.verdetti`). |
+| **Gate di qualità** | Task `controlli` del job `analisi`: fissa i verdetti dei file nuovi e, se uno è respinto, ferma l'aggiornamento del gold in quella passata. |
+| **Esito** | Com'è andata una passata del job: `aggiornato` (gold riscritto), `bloccato` (file respinti, con il motivo) o `errore` (`qualita.esiti`). |
+| **Giornate dell'edizione** | I giorni di calendario dal primo all'ultimo compresi: la base della soglia di completamento. |

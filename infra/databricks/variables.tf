@@ -48,3 +48,12 @@ variable "rami_lakebase" {
     prod     = "production"
   }
 }
+
+variable "importazioni_aperte" {
+  description = <<-EOT
+    Target in cui tutti gli utenti del workspace possono caricare CSV nel volume delle
+    importazioni (ADR-0017). Negli altri carica solo il proprietario del catalogo.
+  EOT
+  type        = set(string)
+  default     = ["collaudo"]
+}
