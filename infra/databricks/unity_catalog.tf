@@ -37,12 +37,6 @@ locals {
   ]...)
 }
 
-import {
-  for_each = local.schemi
-  to       = databricks_schema.livello[each.key]
-  id       = "${each.value.catalogo}.${each.value.schema}"
-}
-
 resource "databricks_schema" "livello" {
   for_each = local.schemi
 
@@ -59,12 +53,6 @@ resource "databricks_schema" "livello" {
 # Grant autoritativi: quello che non è qui, Terraform lo toglie (e il plan del
 # lunedì lo segnala come deriva). Il proprietario del catalogo non compare: ha i
 # diritti senza grant.
-import {
-  for_each = var.cataloghi
-  to       = databricks_grants.catalogo[each.key]
-  id       = "catalog/${each.value}"
-}
-
 resource "databricks_grants" "catalogo" {
   for_each = var.cataloghi
 
@@ -82,12 +70,6 @@ resource "databricks_grants" "catalogo" {
     principal  = data.databricks_service_principal.terraform.application_id
     privileges = ["ALL_PRIVILEGES", "MANAGE"]
   }
-}
-
-import {
-  for_each = var.cataloghi
-  to       = databricks_grants.gold[each.key]
-  id       = "schema/${each.value}.gold"
 }
 
 resource "databricks_grants" "gold" {

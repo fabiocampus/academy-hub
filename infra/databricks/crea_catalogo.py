@@ -42,7 +42,11 @@ def main() -> int:
     if esito.returncode != 0:
         print(esito.stderr, file=sys.stderr)
         return 1
-    stato = json.loads(esito.stdout).get("status", {})
+    try:
+        stato = json.loads(esito.stdout).get("status", {})
+    except json.JSONDecodeError:
+        print(f"Risposta inattesa della CLI: {esito.stdout[:200]!r}", file=sys.stderr)
+        return 1
     if stato.get("state") != "SUCCEEDED":
         print(f"{nome}: {stato}", file=sys.stderr)
         return 1

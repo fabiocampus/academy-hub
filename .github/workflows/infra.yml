@@ -45,12 +45,12 @@ jobs:
       TF_IN_AUTOMATION: "1"
       TF_INPUT: "0"
       # Token GitHub di sola lettura: il plan legge, non cambia niente.
-      GITHUB_TOKEN: ${{ secrets.GH_TERRAFORM_LETTURA }}
-      # Service principal academy-terraform (OAuth M2M), scritto da infra/databricks.
-      # Unico per plan e apply: leggere il suo secret richiede un admin (ADR-0012).
-      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
-      DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
-      DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
+      GITHUB_TOKEN: ${{ matrix.cartella == 'github' && secrets.GH_TERRAFORM_LETTURA || '' }}
+      # Service principal academy-terraform (OAuth M2M), scritto da
+      # infra/databricks-identita; lo stesso per plan e apply (ADR-0012 §4).
+      DATABRICKS_HOST: ${{ matrix.cartella == 'databricks' && secrets.DATABRICKS_HOST || '' }}
+      DATABRICKS_CLIENT_ID: ${{ matrix.cartella == 'databricks' && secrets.DATABRICKS_CLIENT_ID || '' }}
+      DATABRICKS_CLIENT_SECRET: ${{ matrix.cartella == 'databricks' && secrets.DATABRICKS_CLIENT_SECRET || '' }}
       HAS_TF_TOKEN: ${{ secrets.TF_API_TOKEN != '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -80,9 +80,13 @@ jobs:
         # -detailed-exitcode: 0 nessuna modifica, 2 modifiche, 1 errore.
         run: |
           set +e
-          terraform plan -no-color -lock-timeout=5m -detailed-exitcode > plan.txt 2>&1
+          terraform plan -no-color -lock-timeout=5m -detailed-exitcode > plan-completo.txt 2>&1
           codice=$?
           set -e
+          # Repository pubblico: log e commento sono pubblici. Via le righe di lettura,
+          # che riportano gli id interni del workspace (service principal, warehouse).
+          grep -vE ': (Reading\.\.\.|Read complete after|Refreshing state\.\.\.)' plan-completo.txt > plan.txt || true
+          rm plan-completo.txt
           cat plan.txt
           echo "codice=$codice" >> "$GITHUB_OUTPUT"
           if [ "$codice" = 1 ]; then exit 1; fi
@@ -98,6 +102,11 @@ jobs:
             const cartella = process.env.CARTELLA;
             const marca = `<!-- terraform-plan:${cartella} -->`;
             let plan = fs.readFileSync(`infra/${cartella}/plan.txt`, 'utf8');
+            // Il commento non passa dal mascheramento dei secret del log: li togliamo qui.
+            for (const nome of ['DATABRICKS_HOST', 'DATABRICKS_CLIENT_ID']) {
+              const valore = process.env[nome];
+              if (valore) plan = plan.split(valore).join('***');
+            }
             // Un commento ha al massimo 65536 caratteri: il plan completo resta nel log del job.
             const massimo = 60000;
             if (plan.length > massimo) {
@@ -138,10 +147,11 @@ jobs:
     env:
       TF_IN_AUTOMATION: "1"
       TF_INPUT: "0"
-      GITHUB_TOKEN: ${{ secrets.GH_TERRAFORM_SCRITTURA }}
-      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
-      DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
-      DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
+      # A ogni cartella solo le credenziali del suo provider.
+      GITHUB_TOKEN: ${{ matrix.cartella == 'github' && secrets.GH_TERRAFORM_SCRITTURA || '' }}
+      DATABRICKS_HOST: ${{ matrix.cartella == 'databricks' && secrets.DATABRICKS_HOST || '' }}
+      DATABRICKS_CLIENT_ID: ${{ matrix.cartella == 'databricks' && secrets.DATABRICKS_CLIENT_ID || '' }}
+      DATABRICKS_CLIENT_SECRET: ${{ matrix.cartella == 'databricks' && secrets.DATABRICKS_CLIENT_SECRET || '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
