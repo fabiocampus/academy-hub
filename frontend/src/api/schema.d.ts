@@ -360,10 +360,73 @@ export interface paths {
         };
         /**
          * Iscrizioni Per Corso
-         * @description Iscrizioni per corso dallo schema gold. Basta essere una persona registrata: chi
-         *     può leggere la tabella lo decidono i permessi di Unity Catalog della persona.
+         * @deprecated
+         * @description Iscrizioni per corso dalla tabella sintetica della fase 8: sostituito dai report sul
+         *     gold calcolato (ore per team, tasso di completamento, valutazione media). Basta essere
+         *     una persona registrata: chi può leggere la tabella lo decide Unity Catalog.
          */
         get: operations["reportIscrizioniPerCorso"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/report/ore-per-team": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ore Per Team
+         * @description Ore di formazione per team (il team alla fine dell'edizione), dal gold (ADR-0017).
+         *     Chi vede quali team lo decide Unity Catalog con l'identità della persona.
+         */
+        get: operations["reportOrePerTeam"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/report/tasso-completamento": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tasso Completamento
+         * @description Per corso: iscrizioni concluse, completate e tasso, dal gold (ADR-0017).
+         */
+        get: operations["reportTassoCompletamento"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/report/valutazione-media": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Valutazione Media
+         * @description Per corso: voto medio delle iscrizioni completate, dal gold (ADR-0017).
+         */
+        get: operations["reportValutazioneMedia"];
         put?: never;
         post?: never;
         delete?: never;
@@ -773,6 +836,36 @@ export interface components {
             /** Righe */
             righe: components["schemas"]["RigaReportIscrizioni"][];
         };
+        /** ReportOrePerTeam */
+        ReportOrePerTeam: {
+            /**
+             * Letto Come
+             * @description Identità con cui Databricks ha eseguito la query (current_user()); null se il report è vuoto
+             */
+            letto_come: string | null;
+            /** Righe */
+            righe: components["schemas"]["RigaOrePerTeam"][];
+        };
+        /** ReportTassoCompletamento */
+        ReportTassoCompletamento: {
+            /**
+             * Letto Come
+             * @description Identità con cui Databricks ha eseguito la query (current_user()); null se il report è vuoto
+             */
+            letto_come: string | null;
+            /** Righe */
+            righe: components["schemas"]["RigaTassoCompletamento"][];
+        };
+        /** ReportValutazioneMedia */
+        ReportValutazioneMedia: {
+            /**
+             * Letto Come
+             * @description Identità con cui Databricks ha eseguito la query (current_user()); null se il report è vuoto
+             */
+            letto_come: string | null;
+            /** Righe */
+            righe: components["schemas"]["RigaValutazioneMedia"][];
+        };
         /** RichiestaDaApprovare */
         RichiestaDaApprovare: {
             corso: components["schemas"]["CorsoInBreve"];
@@ -797,6 +890,23 @@ export interface components {
             /** Motivo */
             motivo: string;
         };
+        /** RigaOrePerTeam */
+        RigaOrePerTeam: {
+            /** Iscrizioni Completate */
+            iscrizioni_completate: number;
+            /**
+             * Ore Formazione
+             * @description Somma della durata dei corsi completati
+             */
+            ore_formazione: number;
+            /**
+             * Team
+             * @description Nome del team; null se il team non è più nello storico
+             */
+            team: string | null;
+            /** Team Id */
+            team_id: number;
+        };
         /** RigaReportIscrizioni */
         RigaReportIscrizioni: {
             /**
@@ -815,6 +925,42 @@ export interface components {
             in_attesa: number;
             /** Titolo */
             titolo: string;
+        };
+        /** RigaTassoCompletamento */
+        RigaTassoCompletamento: {
+            /** Completate */
+            completate: number;
+            /**
+             * Concluse
+             * @description Iscrizioni di edizioni concluse (Confermata o Completata)
+             */
+            concluse: number;
+            /** Corso Id */
+            corso_id: number;
+            /**
+             * Tasso
+             * @description completate / concluse, da 0 a 1 (4 decimali)
+             */
+            tasso: number;
+            /** Titolo */
+            titolo: string;
+        };
+        /** RigaValutazioneMedia */
+        RigaValutazioneMedia: {
+            /** Corso Id */
+            corso_id: number;
+            /** Titolo */
+            titolo: string;
+            /**
+             * Valutazioni
+             * @description Valutazioni di iscrizioni completate, una per iscrizione
+             */
+            valutazioni: number;
+            /**
+             * Voto Medio
+             * @description Media dei voti (2 decimali)
+             */
+            voto_medio: number;
         };
         /**
          * Ruolo
@@ -2409,6 +2555,183 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReportIscrizioni"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+        };
+    };
+    reportOrePerTeam: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008). */
+                "X-Persona-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportOrePerTeam"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+        };
+    };
+    reportTassoCompletamento: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008). */
+                "X-Persona-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportTassoCompletamento"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+        };
+    };
+    reportValutazioneMedia: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Identità provvisoria (id numerico della persona): solo in locale con ACADEMY_IDENTITA=provvisoria, per i test (ADR-0008). */
+                "X-Persona-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportValutazioneMedia"];
                 };
             };
             /** @description Unauthorized */

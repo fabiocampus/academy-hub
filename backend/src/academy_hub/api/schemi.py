@@ -306,3 +306,54 @@ class ReportIscrizioni(BaseModel):
         "null se il report è vuoto"
     )
     righe: list[RigaReportIscrizioni]
+
+
+class RigaOrePerTeam(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    team_id: int
+    team: str | None = Field(description="Nome del team; null se il team non è più nello storico")
+    ore_formazione: int = Field(description="Somma della durata dei corsi completati")
+    iscrizioni_completate: int
+
+
+class RigaTassoCompletamento(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    corso_id: int
+    titolo: str
+    concluse: int = Field(description="Iscrizioni di edizioni concluse (Confermata o Completata)")
+    completate: int
+    tasso: float = Field(description="completate / concluse, da 0 a 1 (4 decimali)")
+
+
+class RigaValutazioneMedia(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    corso_id: int
+    titolo: str
+    valutazioni: int = Field(description="Valutazioni di iscrizioni completate, una per iscrizione")
+    voto_medio: float = Field(description="Media dei voti (2 decimali)")
+
+
+class _ReportGold(BaseModel):
+    """Dal gold calcolato dal job `analisi` (ADR-0017), letto con l'identità dell'utente."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    letto_come: str | None = Field(
+        description="Identità con cui Databricks ha eseguito la query (current_user()); "
+        "null se il report è vuoto"
+    )
+
+
+class ReportOrePerTeam(_ReportGold):
+    righe: list[RigaOrePerTeam]
+
+
+class ReportTassoCompletamento(_ReportGold):
+    righe: list[RigaTassoCompletamento]
+
+
+class ReportValutazioneMedia(_ReportGold):
+    righe: list[RigaValutazioneMedia]

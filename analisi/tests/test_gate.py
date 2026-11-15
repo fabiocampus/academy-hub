@@ -81,6 +81,28 @@ def test_file_gia_valutato_non_cambia_verdetto(spark: SparkSession) -> None:
     assert registro.scritte == []
 
 
+def test_ritentativo_della_stessa_run_resta_bloccato(spark: SparkSession) -> None:
+    # Il serverless ritenta `controlli`: il file respinto al primo tentativo non è più
+    # nuovo, ma il gate deve bloccare ancora.
+    registro = _Registro()
+    file = f"{CARTELLA}/presenze/sporco.csv"
+
+    respinti = controlla(
+        spark=spark,
+        stato=_stato(spark, (file, "presenze", False, "giorno_futuro: 1 riga")),
+        verdetti=spark.createDataFrame(
+            [(file, "presenze", False, "giorno_futuro: 1 riga", 10, 3, 8, ISTANTE)],
+            SCHEMA_VERDETTI,
+        ),
+        scrivi=registro,
+        run_id=8,
+        istante=ISTANTE,
+    )
+
+    assert respinti == [Respinto(file=file, tipo="presenze", motivo="giorno_futuro: 1 riga")]
+    assert registro.scritte == []
+
+
 def test_stesso_nome_di_tipo_diverso_e_un_altro_file(spark: SparkSession) -> None:
     registro = _Registro()
 

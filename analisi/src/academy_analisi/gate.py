@@ -79,7 +79,16 @@ def controlla(
 
     Un file è nuovo se non ha ancora un verdetto per il suo tipo. I verdetti si scrivono
     tutti, anche quelli dei file respinti, prima che il gate blocchi.
+
+    Valgono anche i file respinti in questa stessa run (`run_id` del job): il serverless
+    ritenta da solo un task fallito, e al secondo tentativo quei file non sono più nuovi.
     """
+    gia_respinti = [
+        Respinto(r.file, r.tipo, r.motivo or "")
+        for r in verdetti.where((F.col("run_id") == run_id) & ~F.col("accettato"))
+        .orderBy("tipo", "file")
+        .collect()
+    ]
     nuovi = (
         stato.join(verdetti.select("file", "tipo"), ["file", "tipo"], "left_anti")
         .select(
@@ -98,7 +107,9 @@ def controlla(
         # Dalle righe già calcolate: scrivere il risultato di un join che legge la stessa
         # tabella di destinazione la rileggerebbe a metà.
         scrivi(spark.createDataFrame(nuovi, SCHEMA_VERDETTI))
-    return [Respinto(r.file, r.tipo, r.motivo or "") for r in nuovi if not r.accettato]
+    return gia_respinti + [
+        Respinto(r.file, r.tipo, r.motivo or "") for r in nuovi if not r.accettato
+    ]
 
 
 def esito_passata(
@@ -144,7 +155,7 @@ def main_controlli(argv: Sequence[str] | None = None) -> int:
     )
     if respinti:
         raise FileRespintiError(respinti)
-    print("Gate di qualità: nessun file nuovo respinto")
+    print("Gate di qualità: nessun file respinto")
     return 0
 
 

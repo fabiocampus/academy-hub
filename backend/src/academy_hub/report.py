@@ -23,7 +23,7 @@ import logging
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Protocol, cast
+from typing import Any, Generic, Protocol, TypeVar, cast
 
 from academy_hub.config import Impostazioni
 from academy_hub.dominio.errori import ReportNonAutorizzato, ReportNonDisponibile
@@ -48,9 +48,90 @@ class ReportIscrizioniPerCorso:
     righe: list[RigaIscrizioniPerCorso]
 
 
+@dataclass(frozen=True)
+class RigaOrePerTeam:
+    team_id: int
+    team: str | None
+    ore_formazione: int
+    iscrizioni_completate: int
+
+
+@dataclass(frozen=True)
+class RigaTassoCompletamento:
+    corso_id: int
+    titolo: str
+    concluse: int
+    completate: int
+    tasso: float
+
+
+@dataclass(frozen=True)
+class RigaValutazioneMedia:
+    corso_id: int
+    titolo: str
+    valutazioni: int
+    voto_medio: float
+
+
+T = TypeVar("T")
+
+
+@dataclass(frozen=True)
+class ReportGold(Generic[T]):
+    letto_come: str | None
+    righe: list[T]
+
+
+@dataclass(frozen=True)
+class Gold(Generic[T]):
+    """Una tabella del gold calcolato dal job `analisi` (ADR-0017) e come leggerne le righe.
+
+    `sql` è una costante di questo modulo: mai input del client nel testo. La prima
+    colonna è `letto_come`; `riga` converte le altre.
+    """
+
+    sql: str
+    colonne: tuple[str, ...]
+    riga: Callable[[list[str | None]], T]
+
+
+def _intero(valore: str | None) -> int:
+    return int(valore or 0)
+
+
+def _decimale(valore: str | None) -> float:
+    return float(valore or 0)
+
+
+ORE_PER_TEAM = Gold(
+    "SELECT current_user() AS letto_come, team_id, team, ore_formazione, iscrizioni_completate "
+    "FROM ore_per_team ORDER BY team, team_id LIMIT 1000",
+    ("letto_come", "team_id", "team", "ore_formazione", "iscrizioni_completate"),
+    lambda r: RigaOrePerTeam(_intero(r[0]), r[1], _intero(r[2]), _intero(r[3])),
+)
+TASSO_COMPLETAMENTO = Gold(
+    "SELECT current_user() AS letto_come, corso_id, titolo, concluse, completate, tasso "
+    "FROM tasso_completamento ORDER BY titolo, corso_id LIMIT 1000",
+    ("letto_come", "corso_id", "titolo", "concluse", "completate", "tasso"),
+    lambda r: RigaTassoCompletamento(
+        _intero(r[0]), r[1] or "", _intero(r[2]), _intero(r[3]), _decimale(r[4])
+    ),
+)
+VALUTAZIONE_MEDIA = Gold(
+    "SELECT current_user() AS letto_come, corso_id, titolo, valutazioni, voto_medio "
+    "FROM valutazione_media ORDER BY titolo, corso_id LIMIT 1000",
+    ("letto_come", "corso_id", "titolo", "valutazioni", "voto_medio"),
+    lambda r: RigaValutazioneMedia(_intero(r[0]), r[1] or "", _intero(r[2]), _decimale(r[3])),
+)
+
+
 class LettoreReport(Protocol):
     def iscrizioni_per_corso(self, token_utente: str | None) -> ReportIscrizioniPerCorso:
         """Il report con l'identità del token; errori come eccezioni di questo modulo."""
+        ...
+
+    def gold(self, report: Gold[T], token_utente: str | None) -> ReportGold[T]:
+        """Una tabella del gold con l'identità del token; errori come sopra."""
         ...
 
 
@@ -58,6 +139,9 @@ class NessunReport:
     """Ambiente senza warehouse (locale, test): i report non ci sono."""
 
     def iscrizioni_per_corso(self, token_utente: str | None) -> ReportIscrizioniPerCorso:
+        raise ReportNonDisponibile("Report non configurati in questo ambiente")
+
+    def gold(self, report: Gold[T], token_utente: str | None) -> ReportGold[T]:
         raise ReportNonDisponibile("Report non configurati in questo ambiente")
 
 
@@ -88,6 +172,22 @@ class ReportDatabricks:
         return cls(warehouse_id, catalogo, invio_http(host))
 
     def iscrizioni_per_corso(self, token_utente: str | None) -> ReportIscrizioniPerCorso:
+        return _report(self._esegui(token_utente, SQL_ISCRIZIONI_PER_CORSO, COLONNE))
+
+    def gold(self, report: Gold[T], token_utente: str | None) -> ReportGold[T]:
+        righe = self._esegui(token_utente, report.sql, report.colonne)
+        try:
+            return ReportGold(
+                letto_come=righe[0][0] if righe else None,
+                righe=[report.riga(r[1:]) for r in righe],
+            )
+        except (ValueError, IndexError) as errore:
+            log.warning("Valori inattesi nel report: %s", type(errore).__name__)
+            raise ReportNonDisponibile("Valori inattesi nella tabella del report") from errore
+
+    def _esegui(
+        self, token_utente: str | None, sql: str, colonne: tuple[str, ...]
+    ) -> list[list[str | None]]:
         if not token_utente:
             raise ReportNonDisponibile(
                 "Manca il token dell'utente: l'App deve avere lo scope sql (user_api_scopes)"
@@ -98,7 +198,7 @@ class ReportDatabricks:
                 "warehouse_id": self._warehouse_id,
                 "catalog": self._catalogo,
                 "schema": "gold",
-                "statement": SQL_ISCRIZIONI_PER_CORSO,
+                "statement": sql,
                 "wait_timeout": self.ATTESA,
                 "on_wait_timeout": "CANCEL",
                 "disposition": "INLINE",
@@ -106,7 +206,7 @@ class ReportDatabricks:
             },
         )
         _verifica_http(stato, risposta)
-        return _report(_dati(risposta))
+        return _dati(risposta, colonne)
 
 
 def _verifica_http(stato: int, risposta: dict[str, Any]) -> None:
@@ -120,7 +220,7 @@ def _verifica_http(stato: int, risposta: dict[str, Any]) -> None:
     raise ReportNonDisponibile("Il warehouse non ha accettato la richiesta")
 
 
-def _dati(risposta: dict[str, Any]) -> list[list[str | None]]:
+def _dati(risposta: dict[str, Any], attese: tuple[str, ...]) -> list[list[str | None]]:
     stato: dict[str, Any] = risposta.get("status") or {}
     match stato.get("state"):
         case "SUCCEEDED":
@@ -142,7 +242,7 @@ def _dati(risposta: dict[str, Any]) -> list[list[str | None]]:
     schema: dict[str, Any] = manifesto.get("schema") or {}
     descritte: list[dict[str, Any]] = schema.get("columns") or []
     colonne = tuple(str(c.get("name")) for c in descritte)
-    if colonne != COLONNE:
+    if colonne != attese:
         log.warning("Colonne inattese nel report: %s", colonne)
         raise ReportNonDisponibile("La tabella del report non ha le colonne attese")
     risultato: dict[str, Any] = risposta.get("result") or {}

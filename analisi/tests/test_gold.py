@@ -14,6 +14,8 @@ from academy_analisi.gold import (
     iscrizioni_concluse,
     lettore,
     ore_per_team,
+    sql_filtro_team,
+    sql_sovrascrivi,
     tasso_completamento,
     valutazione_media,
 )
@@ -346,3 +348,24 @@ def test_soglia_fuori_scala(
             oggi=F.lit(OGGI),
             soglia=0,
         )
+
+
+def test_filtro_team_legge_silver_e_riconosce_per_email() -> None:
+    sql = sql_filtro_team("academy_collaudo.silver", "academy_collaudo.gold")
+
+    assert sql.startswith("CREATE OR REPLACE FUNCTION academy_collaudo.gold.vede_team(")
+    assert "academy_collaudo.silver.team t JOIN academy_collaudo.silver.persone p" in sql
+    assert "lower(p.email) = lower(current_user())" in sql
+    assert "array_contains(p.ruoli, 'admin_academy')" in sql
+    with pytest.raises(ValueError):
+        sql_filtro_team("silver; DROP", "academy_collaudo.gold")
+
+
+def test_sovrascrivi_con_filtro_nella_stessa_istruzione() -> None:
+    assert sql_sovrascrivi("c.gold.ore_per_team", "_v", "c.gold.vede_team") == (
+        "CREATE OR REPLACE TABLE c.gold.ore_per_team "
+        "WITH ROW FILTER c.gold.vede_team ON (team_id) AS SELECT * FROM _v"
+    )
+    assert sql_sovrascrivi("c.gold.tasso_completamento", "_v", None) == (
+        "CREATE OR REPLACE TABLE c.gold.tasso_completamento AS SELECT * FROM _v"
+    )
