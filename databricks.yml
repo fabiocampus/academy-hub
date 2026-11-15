@@ -210,6 +210,11 @@ resources:
         # Gate di qualità (ADR-0017): fissa il verdetto dei file importati nuovi e fallisce
         # se uno è respinto, così il gold non si aggiorna.
         - task_key: controlli
+          # La run finisce SUCCESS_WITH_FAILURES (registra_esito gira sempre e riesce):
+          # on_failure del job non scatta, quello del task sì (post-mortem 2026-11-15).
+          email_notifications:
+            on_failure:
+              - ${var.admin_email}
           depends_on:
             - task_key: storico
           environment_key: analisi
@@ -221,6 +226,11 @@ resources:
               - --run-id
               - "{{job.run_id}}"
         - task_key: gold
+          # La run finisce SUCCESS_WITH_FAILURES (registra_esito gira sempre e riesce):
+          # on_failure del job non scatta, quello del task sì (post-mortem 2026-11-15).
+          email_notifications:
+            on_failure:
+              - ${var.admin_email}
           depends_on:
             - task_key: controlli
           environment_key: analisi
@@ -232,7 +242,7 @@ resources:
               - --qualita
               - ${var.catalogo}.qualita
               - --gold
-              - ${var.catalogo}.report
+              - ${var.catalogo}.gold
         # Gira sempre, anche dopo un errore: registra com'è andata la passata.
         - task_key: registra_esito
           depends_on:

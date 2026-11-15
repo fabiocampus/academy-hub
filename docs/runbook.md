@@ -7,6 +7,7 @@ Cosa fare quando arriva un avviso. Gli SLO che gli avvisi proteggono: `docs/slo.
 | Avviso | Da | Quando |
 |---|---|---|
 | Job `academy-analisi-<target>` failed | email del job (`email_notifications.on_failure`) | ogni run fallita, anche dopo i ritentativi |
+| Task `gold` o `controlli` failed | email del task (`email_notifications.on_failure` del task) | ogni tentativo fallito: la run finisce `SUCCESS_WITH_FAILURES` perché `registra_esito` gira sempre, e l'email del job non parte |
 | Pipeline `academy-storico-<target>` update failed | email della pipeline (`notifications`) | aggiornamento fallito |
 | Alert `academy-qualita-<target>` triggered | alert SQL | alle 06:00, esito `bloccato` o `errore` nelle ultime 24 ore |
 | Rilascio o Rollback failed | email di GitHub Actions | deploy o fumo falliti |
