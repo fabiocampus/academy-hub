@@ -1,12 +1,16 @@
-# Declarative Automation Bundle di Academy Hub (fase 8, ADR-0010).
+# Declarative Automation Bundle di Academy Hub (fase 8, ADR-0010; rilascio ADR-0013).
 #
-#   python scripts/prepara_app.py                       # codice dell'App in build/app
-#   databricks bundle deploy -t prod     -p academy --var admin_email=$ACADEMY_ADMIN_EMAIL
-#   databricks bundle deploy -t collaudo -p academy --var admin_email=$ACADEMY_ADMIN_EMAIL
-#   databricks bundle run academy_hub -t collaudo -p academy   # avvia la nuova versione
+# Il rilascio lo fa il workflow .github/workflows/rilascio.yml con il service principal
+# academy-rilascio: build/app è l'artifact della build, uguale per collaudo e prod;
+# cambiano solo il target e le variabili. A mano (emergenza, sempre come quel service
+# principal, mai con il proprio utente: lo stato del bundle sta nella sua cartella):
 #
-# Workspace e credenziali non stanno qui (repository pubblico): arrivano dal profilo
-# della CLI (-p) o, in CI, dalle variabili DATABRICKS_HOST e affini (fase 10).
+#   python scripts/prepara_app.py                       # artifact in build/app
+#   databricks bundle deploy -t collaudo --var admin_email=$ACADEMY_ADMIN_EMAIL #       --var rilascio=$(cat build/app/RILASCIO)
+#   databricks bundle run academy_hub -t collaudo        # avvia la versione caricata
+#
+# Workspace e credenziali non stanno qui (repository pubblico): arrivano dalle variabili
+# DATABRICKS_HOST, DATABRICKS_CLIENT_ID e DATABRICKS_CLIENT_SECRET.
 # Il progetto Lakebase è uno solo (Free Edition): lo possiede il target prod, il cui branch
 # è quello di difetto (`production`); collaudo aggiunge il suo branch, copia di production
 # al momento della creazione. La prima volta si fa quindi il deploy di prod prima di
@@ -28,7 +32,13 @@ sync:
 
 variables:
   admin_email:
-    description: Email della persona admin_academy creata all'avvio. Mai nel repository.
+    description: >-
+      Email della persona admin_academy creata all'avvio. Mai nel repository: in CI è un
+      secret dell'environment (ADR-0013).
+  rilascio:
+    description: >-
+      SHA del commit dell'artifact, letto da build/app/RILASCIO: l'App lo mostra in /health
+      e il test di fumo lo controlla (ADR-0013).
   progetto_lakebase:
     default: academy-hub
   branch_lakebase:
@@ -83,6 +93,8 @@ resources:
             value: frontend
           - name: ACADEMY_ADMIN_EMAIL
             value: ${var.admin_email}
+          - name: ACADEMY_RILASCIO
+            value: ${var.rilascio}
           - name: ACADEMY_REPORT_WAREHOUSE_ID
             value_from: warehouse
           # Il catalogo lo gestisce Terraform (infra/databricks, ADR-0012).

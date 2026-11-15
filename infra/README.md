@@ -4,9 +4,9 @@ Terraform per la piattaforma, il bundle (`databricks.yml`) per le risorse del pr
 
 | Cartella | Provider | Workspace HCP | Che cosa |
 |---|---|---|---|
-| `github/` | `integrations/github` | `academy-github` | repository, ruleset `main protetto`, environment `infra` e `infra-plan`, label |
+| `github/` | `integrations/github` | `academy-github` | repository, ruleset `main protetto`, environment `infra` e `infra-plan` (Terraform) e `collaudo` e `prod` (rilascio, ADR-0013), label |
 | `databricks/` | `databricks/databricks` | `academy-databricks` | cataloghi `academy_collaudo`/`academy_prod` (in SQL, `crea_catalogo.py`), schemi `bronze`/`silver`/`gold`, grant, secret scope `academy-hub` |
-| `databricks-identita/` | `databricks`, `github`, `time` | `academy-databricks-identita` | service principal `academy-terraform` (admin del workspace, `CREATE CATALOG`), il suo secret OAuth e i secret `DATABRICKS_*` negli environment. **Solo dal PC**, niente workflow |
+| `databricks-identita/` | `databricks`, `github`, `time` | `academy-databricks-identita` | service principal `academy-terraform` (admin del workspace, `CREATE CATALOG`) e `academy-rilascio` (admin del workspace, deploy del bundle, ADR-0013), i loro secret OAuth e i secret `DATABRICKS_*` (e `ACADEMY_ADMIN_EMAIL`) negli environment. **Solo dal PC**, niente workflow |
 
 Lo stato è su HCP Terraform Free (organizzazione `academy-hub-studio`, execution mode locale). Il workflow `.github/workflows/infra.yml` fa il plan nelle PR, l'apply su `main` dopo l'approvazione nell'environment `infra` e un plan di deriva ogni lunedì, per `github/` e `databricks/`.
 
@@ -24,7 +24,7 @@ DATABRICKS_CONFIG_PROFILE=academy GITHUB_TOKEN=$(gh auth token) terraform plan
 
 Su Windows il provider databricks cerca la CLI per l'autenticazione del profilo: se non la trova, `DATABRICKS_CLI_PATH` con il percorso di `databricks.exe`. Per creare un catalogo servono anche `python` (non l'alias dello Store) e `databricks` nel PATH: `crea_catalogo.py` gira con `cmd /C`.
 
-`databricks-identita/` si applica solo dal PC: il secret di un service principal si legge con un'API di account, e su Free Edition admin dell'account è solo il proprietario. Lì va rifatto un `apply` quando il plan propone di sostituire il secret (dopo 335 giorni; scade dopo un anno).
+`databricks-identita/` si applica solo dal PC: il secret di un service principal si legge con un'API di account, e su Free Edition admin dell'account è solo il proprietario. Lì va rifatto un `apply` quando il plan propone di sostituire i secret (dopo 335 giorni; scadono dopo un anno).
 
 ## Prima volta (bootstrap)
 
@@ -51,5 +51,23 @@ Su Windows il provider databricks cerca la CLI per l'autenticazione del profilo:
    2. `databricks/`: `apply` (cataloghi, schemi, grant, secret scope). Su un workspace dove esistono già, senza stato, prima `terraform import` di schemi (`<catalogo>.<schema>`) e grant (`catalog/<catalogo>`, `schema/<catalogo>.gold`).
 
    Se cataloghi e schemi stanno ancora nel bundle, prima `databricks bundle deployment unbind <chiave> -t <target>` per `academy`, `bronze`, `silver`, `gold`, con il `databricks.yml` che li contiene: un `bundle deploy` che non li trova più nel file li cancellerebbe.
+
+6. Rilascio continuo (fase 10, ADR-0013), dal PC:
+   1. `github/`: `apply` (environment `collaudo` e `prod`);
+   2. `databricks-identita/`: `apply` (service principal `academy-rilascio` e i suoi secret in `collaudo` e `prod`);
+   3. migrazione del bundle dallo stato dell'utente a quello del service principal, con le sue credenziali (dallo stato, senza stamparle) e un file di configurazione della CLI vuoto, così la CLI non usa il profilo dell'utente:
+
+      ```bash
+      export DATABRICKS_CONFIG_FILE=$(mktemp) DATABRICKS_HOST=... DATABRICKS_CLIENT_ID=... DATABRICKS_CLIENT_SECRET=...
+      python scripts/prepara_app.py
+      databricks bundle deployment bind academy_hub projects/academy-hub -t prod      # postgres_projects
+      databricks bundle deployment bind production projects/academy-hub/branches/production/endpoints/primary -t prod
+      databricks bundle deployment bind academy_hub academy-hub-prod -t prod          # apps
+      databricks bundle deployment bind collaudo projects/academy-hub/branches/collaudo -t collaudo
+      databricks bundle deployment bind collaudo projects/academy-hub/branches/collaudo/endpoints/primary -t collaudo
+      databricks bundle deployment bind academy_hub academy-hub-collaudo -t collaudo
+      ```
+
+      Poi un `bundle plan` per target senza creazioni né cancellazioni, `unbind` delle stesse chiavi con `-p academy` e cancellazione di `/Workspace/Users/<email>/.bundle/academy-hub`. Le chiavi uguali in tipi diversi (`academy_hub`, `collaudo`) chiedono il tipo: la CLI lo propone.
 
 Da lì ogni modifica passa da una PR (tranne `databricks-identita/`).

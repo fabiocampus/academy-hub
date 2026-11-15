@@ -30,6 +30,10 @@ class Impostazioni(BaseSettings):
     # Persona con ruolo admin_academy creata all'avvio dell'App (academy_hub.avvio): l'email
     # arriva dalla variabile del bundle, mai dal repository, che è pubblico.
     admin_email: str | None = None
+    # Commit da cui è nato l'artifact del rilascio (ADR-0013): scritto da
+    # scripts/prepara_app.py in build/app/RILASCIO e passato dal bundle. Il test di fumo
+    # lo confronta con /health per sapere di parlare con la versione appena rilasciata.
+    rilascio: str = Field(default="sviluppo", pattern=r"^(sviluppo|[0-9a-f]{40})$")
     livello_log: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     # Da dove arriva l'identità (ADR-0008):
     # - oidc: token Bearer di un provider OIDC (Keycloak in locale);

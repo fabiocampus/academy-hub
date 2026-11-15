@@ -14,20 +14,24 @@ Fase 8 (Databricks, issue #68), in due PR: A) l'App su Lakebase (issue #69): bun
 
 Fase 9 (infrastruttura come codice, issue #75), in due PR: A) Terraform per GitHub in `infra/github/` (repository, ruleset, environment `infra`/`infra-plan`, label; esistenti con blocchi `import`), stato su HCP Terraform Free in execution mode locale, workflow `infra.yml` con plan nella PR, apply dopo approvazione e deriva il lunedì (issue #76, ADR-0012); B) Terraform per Databricks (issue #78): `infra/databricks/` con cataloghi (creati in SQL da `crea_catalogo.py`), schemi, grant e secret scope, usciti dal bundle con `bundle deployment unbind`; `infra/databricks-identita/` (solo dal PC) con il service principal `academy-terraform` del workflow e i suoi secret negli environment.
 
+Fase 10 (rilascio continuo, issue #81), in due PR: A) pipeline (issue #82): `rilascio.yml` su ogni push a `main` (CI richiamata, un artifact `build/app`, collaudo, fumo, approvazione nell'environment `prod`, produzione, fumo) con il service principal `academy-rilascio` (ADR-0013); B) feature flag, rollback e metriche DORA.
+
 ## Infrastruttura
 
 Terraform per la piattaforma, bundle per il progetto (ADR-0012). Istruzioni e bootstrap in `infra/README.md`. Dal PC: `terraform login` una volta, poi in `infra/github/` `terraform init` e `GITHUB_TOKEN=$(gh auth token) terraform plan`; in `infra/databricks/` e `infra/databricks-identita/` anche `DATABRICKS_CONFIG_PROFILE=academy`. `infra/databricks-identita/` non ha workflow: si applica solo dal PC. Il workflow dell'infrastruttura non è un check obbligatorio (parte solo se cambia `infra/`).
 
 ## Databricks
 
-Dalla radice, con il profilo `academy` della CLI e l'email dell'account in `ACADEMY_ADMIN_EMAIL` (mai nel repository):
+Il bundle (`databricks.yml`) lo rilascia il workflow `rilascio.yml` come service principal `academy-rilascio` (ADR-0013): un merge su `main` va in collaudo, e in produzione dopo l'approvazione nell'environment `prod`. Lo stato del bundle sta nella cartella del service principal: **mai `bundle deploy` con il profilo `academy`**, creerebbe un secondo stato. In emergenza dal PC, con le credenziali del service principal (`infra/README.md`, bootstrap 6):
 
 ```bash
-python scripts/prepara_app.py   # build/app: pacchetto Python, build del frontend, requirements.txt con hash
-databricks bundle deploy -t prod -p academy --var admin_email=$ACADEMY_ADMIN_EMAIL       # la prima volta: crea il progetto Lakebase
-databricks bundle deploy -t collaudo -p academy --var admin_email=$ACADEMY_ADMIN_EMAIL
-databricks bundle run academy_hub -t collaudo -p academy   # avvia la versione caricata
+python scripts/prepara_app.py   # build/app: pacchetto Python, frontend, requirements.txt con hash, RILASCIO (SHA)
+databricks bundle deploy -t collaudo --var rilascio=$(cat build/app/RILASCIO)   # con BUNDLE_VAR_admin_email
+databricks bundle run academy_hub -t collaudo   # avvia la versione caricata
+python scripts/fumo_rilascio.py --app academy-hub-collaudo --ambiente collaudo --rilascio $(cat build/app/RILASCIO)
 ```
+
+Con il profilo `academy` restano le letture (`databricks apps get`, `bundle summary`) e l'apertura dell'App nel browser.
 
 Unity Catalog (ADR-0011, ADR-0012): cataloghi, schemi e grant li gestisce Terraform in `infra/databricks/`, non il bundle. La tabella gold sintetica con `uv run --project backend python scripts/unity_catalog.py dati-gold -t <target>`.
 
@@ -99,7 +103,7 @@ npm run e2e                  # Playwright + axe su docker compose acceso (http:/
 - `backend/tests/`: test pytest. I test HTTP usano la fixture `client` (TestClient sull'app collegata al database di test, identità provvisoria `X-Persona-Id`) e `tests/api.py`; i test del token usano `tests/oidc.py` (chiave RSA di test). `dati.py` crea dati sintetici; `conftest.py` avvia PostgreSQL con la stessa immagine di docker compose e applica le migrazioni.
 - `frontend/src/`: `api/` (client `openapi-fetch` tipizzato da `schema.d.ts` generato, `ErroreApi` RFC 9457, hook React Query in `query.ts`), `accesso/` (OIDC o Databricks, secondo `GET /api/v1/configurazione`), `componenti/` (struttura con menu per profilo, stati di caricamento/errore/vuoto, notifiche degli esiti, paginazione), `pagine/` (catalogo, mie iscrizioni, approvazioni; `gestione/` con corsi, edizioni del corso e iscrizioni dell'edizione, hook in `api/gestione.ts`), `test/` (MSW e render con i provider). I test stanno accanto ai file (`*.test.tsx`). `frontend/e2e/`: Playwright su docker compose (`flusso.spec.ts` richiesta → approvazione → conferma, `accessibilita.spec.ts` axe per profilo; `sessione.ts` fa il login su Keycloak e crea con l'API un corso e un'edizione per test).
 - `backend/Dockerfile`: multi-stage con uv e uno stage Node che compila il frontend (contesto con nome `frontend`: `docker build --build-context frontend=../frontend backend`), runtime non root (uid 10001).
-- `.github/workflows/`: `ci.yml` (lint, typecheck, test, dipendenze con pip-audit su `uv.lock`, frontend, immagine + Trivy, compose, e2e con Playwright e axe, gitleaks), `codeql.yml` (CodeQL su Python, JavaScript/TypeScript e Actions) e `pr-issue.yml` (la PR deve collegare una issue). Sono status check obbligatori del ruleset su `main`. `infra.yml`: Terraform (plan nella PR, apply nell'environment `infra`, deriva), non obbligatorio. Sul repository sono attivi secret scanning con push protection, avvisi e aggiornamenti di sicurezza di Dependabot.
+- `.github/workflows/`: `ci.yml` (lint, typecheck, test, dipendenze con pip-audit su `uv.lock`, frontend, immagine + Trivy, compose, e2e con Playwright e axe, gitleaks), `codeql.yml` (CodeQL su Python, JavaScript/TypeScript e Actions) e `pr-issue.yml` (la PR deve collegare una issue). Sono status check obbligatori del ruleset su `main`. `infra.yml`: Terraform (plan nella PR, apply nell'environment `infra`, deriva), non obbligatorio. `rilascio.yml` (su push a `main`): richiama `ci.yml`, poi `rilascia-ambiente.yml` per collaudo e prod (ADR-0013). Sul repository sono attivi secret scanning con push protection, avvisi e aggiornamenti di sicurezza di Dependabot.
 
 ## Flusso di lavoro
 

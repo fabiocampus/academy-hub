@@ -1,0 +1,90 @@
+name: Rilascia in un ambiente
+
+# Un ambiente del rilascio continuo (ADR-0013): deploy del bundle con l'artifact della
+# build, avvio della nuova versione e test di fumo. Lo richiama rilascio.yml, una volta
+# per collaudo e una per prod. Le credenziali sono i secret dell'environment di GitHub
+# (service principal academy-rilascio, scritto da infra/databricks-identita).
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: Environment di GitHub (collaudo, prod), con secret e approvatori.
+        type: string
+        required: true
+      target:
+        description: Target del bundle (collaudo, prod).
+        type: string
+        required: true
+      ambiente:
+        description: ACADEMY_AMBIENTE atteso in /health (collaudo, produzione).
+        type: string
+        required: true
+      artifact:
+        description: Nome dell'artifact con build/app.
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  rilascia:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    timeout-minutes: 30
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
+      DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
+      # Il bundle legge le variabili BUNDLE_VAR_*: l'email non passa dalla riga di comando.
+      BUNDLE_VAR_admin_email: ${{ secrets.ACADEMY_ADMIN_EMAIL }}
+      ENVIRONMENT: ${{ inputs.environment }}
+      TARGET: ${{ inputs.target }}
+      AMBIENTE: ${{ inputs.ambiente }}
+      APP: academy-hub-${{ inputs.target }}
+    steps:
+      - name: Credenziali presenti
+        run: |
+          for nome in DATABRICKS_HOST DATABRICKS_CLIENT_ID DATABRICKS_CLIENT_SECRET BUNDLE_VAR_admin_email; do
+            if [ -z "${!nome}" ]; then
+              echo "::error::Manca $nome nell'environment $ENVIRONMENT (infra/databricks-identita)"
+              exit 1
+            fi
+          done
+      # Serve solo databricks.yml e lo script di fumo: il codice dell'App è l'artifact.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          name: ${{ inputs.artifact }}
+          path: build/app
+      - uses: databricks/setup-cli@2da6132749245fbffb3c10d57cec219de3669967  # v1.26.0
+        with:
+          version: 1.26.0
+      - name: Versione dell'artifact
+        run: |
+          rilascio=$(cat build/app/RILASCIO)
+          if ! [[ "$rilascio" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::build/app/RILASCIO non è uno SHA: $rilascio"
+            exit 1
+          fi
+          echo "RILASCIO=$rilascio" >> "$GITHUB_ENV"
+      # Il repository è pubblico, e così i log: l'URL dell'App contiene l'id del workspace.
+      - name: Maschera l'URL dell'App
+        run: |
+          url=$(databricks apps get "$APP" -o json | jq -r '.url // empty')
+          if [ -n "$url" ]; then
+            echo "::add-mask::$url"
+            echo "::add-mask::${url#https://}"
+          fi
+      # Senza --auto-approve: se il deploy volesse cancellare o ricreare risorse
+      # (dati del database compresi), si ferma invece di farlo.
+      - name: Deploy del bundle
+        run: databricks bundle deploy -t "$TARGET" --var rilascio="$RILASCIO"
+      - name: Avvio della nuova versione
+        run: databricks bundle run academy_hub -t "$TARGET"
+      - name: Test di fumo
+        run: >-
+          python3 scripts/fumo_rilascio.py --app "$APP" --ambiente "$AMBIENTE"
+          --rilascio "$RILASCIO"

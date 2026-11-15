@@ -1,0 +1,73 @@
+name: Rilascio
+
+# Rilascio continuo (ADR-0013): ogni push su main passa dalla CI, produce un solo
+# artifact (build/app) e lo porta in collaudo, poi, dopo il test di fumo e
+# l'approvazione nell'environment prod, in produzione. Fra gli ambienti cambiano solo
+# target del bundle, variabili e secret dell'environment: il codice è lo stesso.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Un rilascio alla volta, in ordine: nessuno interrotto a metà (un deploy cancellato
+# lascerebbe l'App fra due versioni). GitHub tiene in coda solo l'ultimo in attesa.
+concurrency:
+  group: rilascio
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+      pull-requests: read
+
+  build:
+    needs: ci
+    runs-on: ubuntu-latest
+    outputs:
+      artifact: ${{ steps.nome.outputs.artifact }}
+    env:
+      # Come nel job frontend della CI: nessuno script di installazione dei pacchetti npm.
+      NPM_CONFIG_IGNORE_SCRIPTS: "true"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
+      - name: Artifact dell'App
+        run: python3 scripts/prepara_app.py --rilascio "$GITHUB_SHA"
+      - id: nome
+        run: echo "artifact=app-$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: ${{ steps.nome.outputs.artifact }}
+          path: build/app
+          if-no-files-found: error
+          # Il rollback (fase 10, PR B) riusa l'artifact di un rilascio precedente.
+          retention-days: 90
+
+  collaudo:
+    needs: build
+    uses: ./.github/workflows/rilascia-ambiente.yml
+    with:
+      environment: collaudo
+      target: collaudo
+      ambiente: collaudo
+      artifact: ${{ needs.build.outputs.artifact }}
+
+  prod:
+    needs: [build, collaudo]
+    uses: ./.github/workflows/rilascia-ambiente.yml
+    with:
+      environment: prod
+      target: prod
+      ambiente: produzione
+      artifact: ${{ needs.build.outputs.artifact }}

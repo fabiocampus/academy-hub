@@ -15,3 +15,9 @@ variable "approvatori_infra" {
   type        = list(string)
   default     = ["fabiocampus"]
 }
+
+variable "approvatori_prod" {
+  description = "Utenti GitHub che approvano il rilascio nell'environment prod."
+  type        = list(string)
+  default     = ["fabiocampus"]
+}

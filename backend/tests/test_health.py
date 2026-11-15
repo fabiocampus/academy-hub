@@ -30,6 +30,28 @@ def test_ambiente_letto_dalla_variabile(monkeypatch: pytest.MonkeyPatch) -> None
     assert TestClient(crea_app()).get("/health").json()["ambiente"] == "collaudo"
 
 
+def test_rilascio_di_difetto_in_sviluppo(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("ACADEMY_RILASCIO", raising=False)
+
+    assert TestClient(crea_app()).get("/health").json()["rilascio"] == "sviluppo"
+
+
+def test_rilascio_letto_dalla_variabile(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Il test di fumo del rilascio confronta questo valore con lo SHA dell'artifact."""
+    sha = "0123456789abcdef0123456789abcdef01234567"
+    monkeypatch.setenv("ACADEMY_RILASCIO", sha)
+
+    assert TestClient(crea_app()).get("/health").json()["rilascio"] == sha
+
+
+@pytest.mark.parametrize("valore", ["", "main", "0123456", "<script>", "a" * 41])
+def test_rilascio_non_valido_rifiutato(monkeypatch: pytest.MonkeyPatch, valore: str) -> None:
+    monkeypatch.setenv("ACADEMY_RILASCIO", valore)
+
+    with pytest.raises(ValidationError, match="rilascio"):
+        Impostazioni()
+
+
 def test_x_persona_id_ignorato_con_la_configurazione_predefinita(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
