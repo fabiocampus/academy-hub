@@ -69,8 +69,9 @@ jobs:
 
   analisi:
     # Job e pipeline della parte analitica (analisi/, ADR-0016): lint, formato, tipi,
-    # test con Spark locale (Java 17 è già sul runner) e vulnerabilità note nelle
-    # dipendenze bloccate, con il pip-audit del backend (versione e hash nel suo uv.lock).
+    # test con Spark locale (Java 17, fissata: dalla 24 Hadoop non va, getSubject) e
+    # vulnerabilità note nelle dipendenze bloccate, con il pip-audit del backend (versione
+    # e hash nel suo uv.lock).
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -79,6 +80,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad  # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
         with:
           enable-cache: true
