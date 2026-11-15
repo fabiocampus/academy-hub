@@ -4,7 +4,7 @@ Prototipo di studio: iscrizioni ai corsi di un'Academy aziendale (parte transazi
 
 ## Stato
 
-Fasi 1–12 del piano chiuse, fase 13 (documentazione) in corso: la storia per fase è nelle issue epic (#49 API, #36/#56 sicurezza, #59 frontend, #68 Databricks, #75 infrastruttura, #81 rilascio, #91 analisi, #107 osservabilità) e negli ADR. Mappa del sistema in `docs/architettura.md` (C4 in Mermaid), avvio in `README.md`, regole di contribuzione in `CONTRIBUTING.md`. Rimandati: synced table e pagina dei report nel frontend (fase 11), OpenTelemetry (fase 12).
+Fasi 1–12 del piano chiuse, fase 13 (documentazione) in corso: la storia per fase è nelle issue epic (#49 API, #36/#56 sicurezza, #59 frontend, #68 Databricks, #75 infrastruttura, #81 rilascio, #91 analisi, #107 osservabilità) e negli ADR. Mappa del sistema in `docs/architettura.md` (C4 in Mermaid), avvio in `README.md`, regole di contribuzione in `CONTRIBUTING.md`, errori dell'agente e regole nate da essi in `docs/retrospettiva-ai.md`. Rimandati: synced table e pagina dei report nel frontend (fase 11), OpenTelemetry (fase 12).
 
 ## Strumenti dell'agente
 

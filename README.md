@@ -67,6 +67,7 @@ Ogni merge su `main` passa la CI, va in **collaudo** su Databricks Apps con un t
 - [Threat model](docs/threat-model.md)
 - [SLI e SLO](docs/slo.md), [runbook](docs/runbook.md), [post-mortem](docs/postmortem/)
 - [Metriche DORA](docs/dora.md)
+- [Retrospettiva dello sviluppo con un agente](docs/retrospettiva-ai.md)
 - [Infrastruttura e bootstrap](infra/README.md)
 - [CSV di esempio](data/samples/README.md)
 
