@@ -14,7 +14,8 @@ Vertice (nessun responsabile): Vera, Admin, Dora
 └── Web  (resp. Verdi): Carla
 ```
 
-Anna ha una Richiesta (edizione A) e un'Approvata (edizione B); l'edizione C è libera.
+Anna ha una Richiesta (edizione A), un'Approvata (edizione B) e una Confermata (edizione D);
+l'edizione C è libera. Le feature flag sono accese (ADR-0014): spente, le rotte rispondono 404.
 Vera ha una Richiesta (edizione A): la decide l'amministrazione Academy.
 Il responsabile non è un ruolo che apre rotte: decide chi è `responsabile_id` del team
 del richiedente (R2); l'amministratore non decide al posto suo.
@@ -38,6 +39,7 @@ from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session
 
 from academy_hub.api import PREFISSO
+from academy_hub.config import impostazioni
 from academy_hub.db.modelli import Edizione, Persona
 from academy_hub.dominio.ruoli import Ruolo
 from academy_hub.dominio.stati import StatoIscrizione
@@ -78,6 +80,7 @@ class Mondo:
     richiesta: int
     approvata: int
     richiesta_vertice: int
+    confermata: int
 
 
 @dataclass(frozen=True)
@@ -182,6 +185,11 @@ MATRICE: dict[tuple[str, str], Riga] = {
         lambda m: Chiamata("GET", f"/iscrizioni/{m.richiesta}"),
         _attesi(200, 403, 200, 403, altro_dip=403),
     ),
+    # Feature flag del calendario (ADR-0014): solo il titolare di una Confermata.
+    ("GET", "/iscrizioni/{iscrizione_id}/calendario.ics"): (
+        lambda m: Chiamata("GET", f"/iscrizioni/{m.confermata}/calendario.ics"),
+        _attesi(200, 403, 403, 403, altro_dip=403),
+    ),
     ("POST", "/iscrizioni/{iscrizione_id}/approvazione"): (
         lambda m: Chiamata("POST", f"/iscrizioni/{m.richiesta}/approvazione"),
         _attesi(403, 200, 403, 403, altro_resp=403),
@@ -262,15 +270,22 @@ def provider() -> ProviderFinto:
 
 
 @pytest.fixture
-def client(db: Engine, provider: ProviderFinto) -> Iterator[TestClient]:
+def client(
+    db: Engine, provider: ProviderFinto, monkeypatch: pytest.MonkeyPatch
+) -> Iterator[TestClient]:
+    monkeypatch.setenv("ACADEMY_FLAG_CALENDARIO", "true")
+    impostazioni.cache_clear()
     report = ReportIscrizioniPerCorso(letto_come=None, righe=[])
 
     class Lettore:
         def iscrizioni_per_corso(self, token_utente: str | None) -> ReportIscrizioniPerCorso:
             return report
 
-    with TestClient(crea_app(motore=db, identita=provider.oidc(), report=Lettore())) as client:
-        yield client
+    try:
+        with TestClient(crea_app(motore=db, identita=provider.oidc(), report=Lettore())) as client:
+            yield client
+    finally:
+        impostazioni.cache_clear()
 
 
 @pytest.fixture
@@ -290,13 +305,15 @@ def mondo(db: Engine) -> Mondo:
         team["Web"].responsabile_id = persone["altro_responsabile"].id
         anna = persone["dipendente"]
         vera = crea_persona(sessione, "Vera", vertice, (R.DIPENDENTE,))
-        a, b, c = (crea_edizione(sessione) for _ in range(3))
+        a, b, c, d = (crea_edizione(sessione) for _ in range(4))
         richiesta = crea_iscrizione(sessione, anna, a, S.RICHIESTA)
         approvata = crea_iscrizione(sessione, anna, b, S.APPROVATA)
         richiesta_vertice = crea_iscrizione(sessione, vera, a, S.RICHIESTA)
+        d.posti_confermati = 1
+        confermata = crea_iscrizione(sessione, anna, d, S.CONFERMATA)
         sessione.commit()
         corso = sessione.get_one(Edizione, c.id).corso_id
-        return Mondo(corso, c.id, richiesta.id, approvata.id, richiesta_vertice.id)
+        return Mondo(corso, c.id, richiesta.id, approvata.id, richiesta_vertice.id, confermata.id)
 
 
 def _identita(provider: ProviderFinto, profilo: str) -> dict[str, str]:

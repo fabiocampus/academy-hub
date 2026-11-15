@@ -18,6 +18,7 @@ from academy_hub.dominio.errori import (
     EdizioneIniziata,
     NonTrovato,
 )
+from academy_hub.dominio.ics import EventoEdizione, calendario
 from academy_hub.dominio.organigramma import verifica_decisore
 from academy_hub.dominio.ruoli import Ruolo
 from academy_hub.dominio.stati import (
@@ -54,6 +55,13 @@ class ScadenzaAnnullamentoSuperata(Conflitto):
 
     tipo = "scadenza-annullamento-superata"
     titolo = "Scadenza di annullamento superata"
+
+
+class IscrizioneNonConfermata(Conflitto):
+    """Il calendario c'è solo per un posto confermato: le altre iscrizioni possono ancora cadere."""
+
+    tipo = "iscrizione-non-confermata"
+    titolo = "Iscrizione non confermata"
 
 
 class ChiaveIdempotenzaRiusata(DatiNonValidi):
@@ -336,3 +344,38 @@ def iscrizioni_dell_edizione(
     attore.richiedi(Ruolo.ADMIN_ACADEMY)
     catalogo.edizione(sessione, edizione_id)
     return repository.iscrizioni_dell_edizione(sessione, edizione_id, stato, limite, offset)
+
+
+# --- Calendario dell'iscrizione confermata (fase 10, feature flag, ADR-0014) ----------
+
+
+def evento_calendario(sessione: Session, attore: Attore, iscrizione_id: int, ambiente: str) -> str:
+    """Il file `.ics` dell'edizione per il calendario del titolare, solo se il posto è confermato.
+
+    `ambiente` entra nell'UID dell'evento (unico fra collaudo e prod); `DTSTAMP` è l'ora
+    del database, come ogni altro istante dei servizi.
+
+    Solo il titolare: è il suo calendario, l'amministrazione vede già tutto altrove.
+    Edizione cancellata o iniziata non contano: una Confermata in un'edizione cancellata è
+    già diventata Annullata (D10), e un evento passato si può comunque scaricare.
+    """
+    trovata = repository.iscrizione(sessione, iscrizione_id)
+    if trovata.persona_id != attore.persona_id:
+        raise AzioneNonConsentita("Puoi scaricare il calendario solo delle tue iscrizioni")
+    if trovata.stato is not S.CONFERMATA:
+        raise IscrizioneNonConfermata(
+            f"L'iscrizione {iscrizione_id} è {trovata.stato.value}: il calendario c'è solo "
+            "per un posto confermato"
+        )
+    edizione = catalogo.edizione(sessione, trovata.edizione_id)
+    corso = catalogo.corso(sessione, edizione.corso_id)
+    evento = EventoEdizione(
+        iscrizione_id=trovata.id,
+        titolo=corso.titolo,
+        descrizione=corso.descrizione,
+        data_inizio=edizione.data_inizio,
+        data_fine=edizione.data_fine,
+        versione=edizione.versione,
+        ambiente=ambiente,
+    )
+    return calendario(evento, repository.adesso(sessione))

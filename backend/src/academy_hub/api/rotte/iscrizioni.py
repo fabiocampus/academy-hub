@@ -6,7 +6,7 @@ si verifica sotto lock, quindi niente `If-Match` (ADR-0005, punto 3).
 
 from typing import Annotated
 
-from fastapi import APIRouter, Header, Query, Response, status
+from fastapi import APIRouter, Depends, Header, Query, Response, status
 
 from academy_hub.api import PREFISSO
 from academy_hub.api.dipendenze import AttoreCorrente, SessioneDb
@@ -25,6 +25,7 @@ from academy_hub.api.schemi import (
     VoceMiaIscrizione,
 )
 from academy_hub.config import impostazioni
+from academy_hub.dominio.errori import FunzioneNonDisponibile
 from academy_hub.servizi import iscrizioni
 
 router = APIRouter(prefix="/iscrizioni", tags=["iscrizioni"], responses=risposte(401))
@@ -92,6 +93,42 @@ def leggi_iscrizione(
     return IscrizioneConStoria(
         **IscrizioneLetta.model_validate(trovata).model_dump(),
         storia=[EventoLetto.model_validate(e) for e in storia],
+    )
+
+
+def flag_calendario() -> None:
+    """Con la flag spenta la rotta risponde 404 prima ancora dell'identità (ADR-0014)."""
+    if not impostazioni().flag_calendario:
+        raise FunzioneNonDisponibile("Il calendario delle iscrizioni non è attivo qui")
+
+
+@router.get(
+    "/{iscrizione_id}/calendario.ics",
+    # Dipendenza nel decoratore: FastAPI la risolve prima di quelle dei parametri.
+    dependencies=[Depends(flag_calendario)],
+    response_class=Response,
+    responses={
+        200: {
+            "content": {"text/calendar": {"schema": {"type": "string"}}},
+            "description": "Evento iCalendar (RFC 5545) dell'edizione, tutto il giorno",
+        },
+        **risposte(403, 404, 409),
+    },
+    operation_id="calendarioIscrizione",
+    summary="Evento da aggiungere al calendario, per un'iscrizione Confermata (feature flag)",
+)
+def calendario_iscrizione(
+    iscrizione_id: int, sessione: SessioneDb, attore: AttoreCorrente
+) -> Response:
+    evento = iscrizioni.evento_calendario(sessione, attore, iscrizione_id, impostazioni().ambiente)
+    return Response(
+        content=evento,
+        media_type="text/calendar; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="iscrizione-{iscrizione_id}.ics"',
+            # Dati personali: niente cache intermedie.
+            "Cache-Control": "no-store",
+        },
     )
 
 

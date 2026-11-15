@@ -59,6 +59,16 @@ variables:
     description: >-
       Catalogo Unity Catalog del target (ADR-0011). Cataloghi, schemi e grant li
       gestisce Terraform in infra/databricks (ADR-0012); il bundle passa solo il nome all'App.
+  flag_calendario:
+    description: >-
+      Feature flag dell'evento di calendario (.ics) di un'iscrizione confermata
+      (ACADEMY_FLAG_CALENDARIO, ADR-0014): spenta per difetto, accesa per target.
+    default: "false"
+  dati_prova:
+    description: >-
+      Dati di prova sintetici caricati all'avvio (ACADEMY_DATI_PROVA): solo collaudo,
+      la configurazione dell'App li vieta in produzione.
+    default: "false"
   warehouse_id:
     description: >-
       SQL warehouse con cui l'App legge i report, con l'identità dell'utente. Cercato per
@@ -96,6 +106,10 @@ resources:
             value: ${var.admin_email}
           - name: ACADEMY_RILASCIO
             value: ${var.rilascio}
+          - name: ACADEMY_FLAG_CALENDARIO
+            value: ${var.flag_calendario}
+          - name: ACADEMY_DATI_PROVA
+            value: ${var.dati_prova}
           - name: ACADEMY_REPORT_WAREHOUSE_ID
             value_from: warehouse
           # Il catalogo lo gestisce Terraform (infra/databricks, ADR-0012).
@@ -113,6 +127,8 @@ targets:
       branch_lakebase: collaudo
       schema_database: academy_collaudo
       catalogo: academy_collaudo
+      flag_calendario: "true"
+      dati_prova: "true"
     resources:
       postgres_branches:
         collaudo:
@@ -149,6 +165,9 @@ targets:
       ambiente: produzione
       branch_lakebase: production
       catalogo: academy_prod
+      # Accensione in produzione con una PR che cambia questa riga (ADR-0014).
+      flag_calendario: "false"
+      dati_prova: "false"
     resources:
       postgres_projects:
         academy_hub:

@@ -14,7 +14,7 @@ Fase 8 (Databricks, issue #68), in due PR: A) l'App su Lakebase (issue #69): bun
 
 Fase 9 (infrastruttura come codice, issue #75), in due PR: A) Terraform per GitHub in `infra/github/` (repository, ruleset, environment `infra`/`infra-plan`, label; esistenti con blocchi `import`), stato su HCP Terraform Free in execution mode locale, workflow `infra.yml` con plan nella PR, apply dopo approvazione e deriva il lunedì (issue #76, ADR-0012); B) Terraform per Databricks (issue #78): `infra/databricks/` con cataloghi (creati in SQL da `crea_catalogo.py`), schemi, grant e secret scope, usciti dal bundle con `bundle deployment unbind`; `infra/databricks-identita/` (solo dal PC) con il service principal `academy-terraform` del workflow e i suoi secret negli environment.
 
-Fase 10 (rilascio continuo, issue #81), in due PR: A) pipeline (issue #82): `rilascio.yml` su ogni push a `main` (CI richiamata, un artifact `build/app`, collaudo, fumo, approvazione nell'environment `prod`, produzione, fumo) con il service principal `academy-rilascio` (ADR-0013); B) feature flag, rollback e metriche DORA.
+Fase 10 (rilascio continuo, issue #81), in due PR: A) pipeline (issue #82): `rilascio.yml` su ogni push a `main` (CI richiamata, un artifact `build/app`, collaudo, fumo, approvazione nell'environment `prod`, produzione, fumo) con il service principal `academy-rilascio` (ADR-0013); B1) feature flag per ambiente dal bundle, spenta per difetto e 404 da spenta, esposta in `/configurazione` (prima flag: evento `.ics` di un'iscrizione Confermata, `ACADEMY_FLAG_CALENDARIO`) e dati di prova sintetici del collaudo caricati all'avvio (`ACADEMY_DATI_PROVA`, vietati in produzione), ADR-0014 (issue #86); B2) rollback e metriche DORA.
 
 ## Infrastruttura
 
@@ -63,6 +63,7 @@ uv run pytest -m "not integrazione"   # solo i test veloci, senza Docker
 uv run python -m academy_hub.db.migrazioni   # migra il PostgreSQL locale (o ACADEMY_DATABASE_URL)
 uv run python -m academy_hub.job              # una passata del job di sistema (--ogni N per ripeterla)
 uv run python -m academy_hub.db.demo          # dati demo (persone degli utenti Keycloak, catalogo), solo in locale
+uv run python -m academy_hub.db.dati_prova    # dati di prova sintetici del collaudo (@academy.example), mai in produzione
 uv run python -m academy_hub.contratto        # rigenera backend/contratto/ dopo un cambio dell'API (aumenta VERSIONE_API)
 uv run ruff check --fix      # lint
 uv run ruff format           # formattazione
@@ -96,7 +97,8 @@ npm run e2e                  # Playwright + axe su docker compose acceso (http:/
   - `db/`: modelli SQLAlchemy (`modelli.py`) e migrazioni Alembic (`schema/versions/`). Lo schema cambia solo con una migrazione. Vedi `docs/database.md`.
   - `repository/`: le query, con i lock `FOR UPDATE`. Ordine dei lock: prima l'edizione, poi le sue iscrizioni (ADR-0004).
   - `servizi/`: le regole. Ogni cambio di stato di un'iscrizione passa da un solo punto che verifica la transizione e scrive l'audit (R6). Ogni posto liberato passa da `promuovi_dalla_lista` nella stessa transazione (R4).
-  - `db/motore.py`: `crea_motore`, l'unico modo di creare un motore SQLAlchemy (token OAuth come password su Lakebase, `search_path` sullo schema dedicato). `avvio.py`: comando dell'App su Databricks (migrazioni, `db/amministratore.py`, uvicorn).
+  - `db/motore.py`: `crea_motore`, l'unico modo di creare un motore SQLAlchemy (token OAuth come password su Lakebase, `search_path` sullo schema dedicato). `avvio.py`: comando dell'App su Databricks (migrazioni, `db/amministratore.py`, `db/dati_prova.py` se `ACADEMY_DATI_PROVA`, uvicorn).
+  - Feature flag (ADR-0014): `ACADEMY_FLAG_<NOME>` in `config.py`, valore per target in `databricks.yml` (collaudo accesa, prod spenta; accesa in `docker-compose.yml`), rotta con la dipendenza che risponde 404 da spenta, campo `flag` di `/configurazione` letto dal frontend (`frontend/src/api/flag.ts`). Una flag si toglie quando la funzione è stabile.
   - `job.py`: job di sistema (scadenza all'inizio dell'edizione, rete di sicurezza della promozione), una transazione per edizione (ADR-0007).
   - `report.py`: porta `LettoreReport` per i report da Unity Catalog, letti con il token dell'utente via Statement Execution API (ADR-0011); `NessunReport` senza warehouse. Adapter verso un sistema esterno, fuori dai livelli: niente regole di business, query fissa, autorizza Unity Catalog.
   - `frontend.py`: serve la build del frontend (`ACADEMY_FRONTEND_DIR`) con fallback su `index.html` per le rotte del client; `/api` resta JSON (ADR-0009 §14).

@@ -35,6 +35,12 @@ class Impostazioni(BaseSettings):
     # lo confronta con /health per sapere di parlare con la versione appena rilasciata.
     rilascio: str = Field(default="sviluppo", pattern=r"^(sviluppo|[0-9a-f]{40})$")
     livello_log: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
+    # Feature flag (ADR-0014): una funzione nuova arriva spenta in produzione e si accende
+    # per ambiente dalla variabile del bundle, senza un nuovo artifact. Spente per difetto.
+    flag_calendario: bool = False
+    # Dati di prova sintetici caricati all'avvio dell'App (academy_hub.db.dati_prova):
+    # per il collaudo, mai in produzione (lo vieta il validatore sotto).
+    dati_prova: bool = False
     # Da dove arriva l'identità (ADR-0008):
     # - oidc: token Bearer di un provider OIDC (Keycloak in locale);
     # - databricks: header X-Forwarded-Email messo dal proxy di Databricks Apps; fidarsi
@@ -72,6 +78,12 @@ class Impostazioni(BaseSettings):
             raise ValueError(
                 "report: ACADEMY_REPORT_WAREHOUSE_ID e ACADEMY_REPORT_CATALOGO vanno insieme"
             )
+        return self
+
+    @model_validator(mode="after")
+    def _dati_prova_fuori_da_produzione(self) -> Self:
+        if self.dati_prova and self.ambiente == "produzione":
+            raise ValueError("ACADEMY_DATI_PROVA non è ammessa in produzione")
         return self
 
     @model_validator(mode="after")

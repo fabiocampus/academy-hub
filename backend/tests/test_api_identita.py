@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from academy_hub.api import PREFISSO
 from academy_hub.api.identita import Databricks, Oidc
+from academy_hub.config import impostazioni
 from academy_hub.main import crea_app
 
 from .api import R
@@ -213,10 +214,21 @@ def _rotte_api() -> list[tuple[str, str]]:
 
 
 @pytest.mark.parametrize(("metodo", "percorso"), _rotte_api())
-def test_ogni_rotta_senza_identita_401(client: TestClient, metodo: str, percorso: str) -> None:
-    """US-16: senza identità valida ogni rotta risponde 401, tranne /health e PUBBLICHE."""
+def test_ogni_rotta_senza_identita_401(
+    client: TestClient, metodo: str, percorso: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """US-16: senza identità valida ogni rotta risponde 401, tranne /health e PUBBLICHE.
+
+    Con le feature flag accese: spente, le loro rotte rispondono 404 a tutti (ADR-0014,
+    `test_api_calendario.py`).
+    """
+    monkeypatch.setenv("ACADEMY_FLAG_CALENDARIO", "true")
+    impostazioni.cache_clear()
     concreto = re.sub(r"\{[^}]+\}", "1", percorso)
 
-    risposta = client.request(metodo, concreto, headers={"If-Match": '"1"'})
+    try:
+        risposta = client.request(metodo, concreto, headers={"If-Match": '"1"'})
+    finally:
+        impostazioni.cache_clear()
 
     assert risposta.status_code == 401, risposta.text

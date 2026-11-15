@@ -1,7 +1,8 @@
 """Comando dell'App su Databricks: ``python -m academy_hub.avvio`` (ADR-0010).
 
 Databricks Apps esegue un solo comando: qui le migrazioni, la persona amministratrice
-da `ACADEMY_ADMIN_EMAIL` e poi uvicorn. Le migrazioni girano con l'identità dell'App,
+da `ACADEMY_ADMIN_EMAIL`, i dati di prova se `ACADEMY_DATI_PROVA` (solo collaudo,
+`db/dati_prova.py`) e poi uvicorn. Le migrazioni girano con l'identità dell'App,
 così il suo service principal possiede schema e tabelle su Lakebase.
 """
 
@@ -12,6 +13,7 @@ import sys
 import uvicorn
 
 from academy_hub.config import impostazioni
+from academy_hub.db import dati_prova
 from academy_hub.db.amministratore import assicura_amministratore
 from academy_hub.db.migrazioni import aggiorna_schema
 from academy_hub.db.motore import crea_motore
@@ -28,13 +30,21 @@ def prepara() -> None:
     config = impostazioni()
     aggiorna_schema()
     log.info("Schema aggiornato")
-    if config.admin_email:
-        motore = crea_motore(config)
-        try:
+    if not (config.admin_email or config.dati_prova):
+        return
+    motore = crea_motore(config)
+    try:
+        if config.admin_email:
             creata = assicura_amministratore(motore, config.admin_email)
-        finally:
-            motore.dispose()
-        log.info("Persona amministratrice %s", "creata" if creata else "già presente")
+            log.info("Persona amministratrice %s", "creata" if creata else "già presente")
+        if config.dati_prova:
+            riepilogo = dati_prova.carica(motore)
+            if riepilogo is None:
+                log.info("Dati di prova già presenti")
+            else:
+                log.info("Dati di prova caricati: %s", riepilogo)
+    finally:
+        motore.dispose()
 
 
 def main() -> int:

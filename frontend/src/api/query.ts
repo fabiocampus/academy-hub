@@ -152,3 +152,32 @@ export function useRifiuta() {
     onSettled: () => rileggiElenchi(queryClient),
   });
 }
+
+/**
+ * Evento di calendario di un'iscrizione Confermata (feature flag `calendario`). Si scarica
+ * con il client, non con un link: con OIDC serve il Bearer, che un `<a href>` non manda.
+ */
+export function useScaricaCalendario() {
+  return useMutation({
+    mutationFn: async (iscrizioneId: number) => {
+      const evento = dati(
+        await api.GET("/api/v1/iscrizioni/{iscrizione_id}/calendario.ics", {
+          params: { path: { iscrizione_id: iscrizioneId } },
+          parseAs: "blob",
+        }),
+      );
+      const indirizzo = URL.createObjectURL(evento);
+      const link = document.createElement("a");
+      link.href = indirizzo;
+      link.download = `iscrizione-${String(iscrizioneId)}.ics`;
+      // Nel documento: alcuni browser (Firefox vecchi, WebView) ignorano il click altrimenti.
+      document.body.append(link);
+      link.click();
+      link.remove();
+      // Non subito: alcuni browser leggono il blob dopo il click.
+      setTimeout(() => {
+        URL.revokeObjectURL(indirizzo);
+      }, 10_000);
+    },
+  });
+}

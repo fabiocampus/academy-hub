@@ -59,7 +59,11 @@ def test_configurazione_e_pubblica(client: TestClient) -> None:
     risposta = client.get(f"{PREFISSO}/configurazione")
 
     assert risposta.status_code == 200
-    assert risposta.json() == {"identita": "provvisoria", "oidc": None}
+    assert risposta.json() == {
+        "identita": "provvisoria",
+        "oidc": None,
+        "flag": {"calendario": False},
+    }
 
 
 def test_configurazione_oidc_indica_emittente_e_client() -> None:
@@ -75,6 +79,7 @@ def test_configurazione_oidc_indica_emittente_e_client() -> None:
             "emittente": "http://localhost:8080/realms/academy",
             "client_id": "academy-web",
         },
+        "flag": {"calendario": False},
     }
 
 
@@ -85,4 +90,12 @@ def test_configurazione_databricks_senza_oidc() -> None:
     assert configurazione_client(impostazioni).model_dump() == {
         "identita": "databricks",
         "oidc": None,
+        "flag": {"calendario": False},
     }
+
+
+def test_configurazione_mostra_le_flag_accese() -> None:
+    """Il frontend nasconde il pulsante del calendario se la flag è spenta (ADR-0014)."""
+    impostazioni = Impostazioni(ambiente="collaudo", identita="databricks", flag_calendario=True)
+
+    assert configurazione_client(impostazioni).flag.calendario is True

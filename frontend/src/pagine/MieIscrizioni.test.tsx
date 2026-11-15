@@ -1,9 +1,9 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { Schemi } from "../api/client";
+import { impostaToken, type Schemi } from "../api/client";
 import { API, iscrizioneLetta, miaIscrizione, pagina, problema, server } from "../test/server";
 import { mostra } from "../test/render";
 import { MieIscrizioni } from "./MieIscrizioni";
@@ -130,6 +130,104 @@ describe("Le mie iscrizioni", () => {
     expect(
       screen.getByText("Mancano 2 giorni all'inizio: si annulla solo fino a 4 giorni prima"),
     ).toBeInTheDocument();
+  });
+
+  describe("aggiungi al calendario (feature flag, ADR-0014)", () => {
+    afterEach(() => {
+      impostaToken(() => Promise.resolve(undefined));
+      vi.restoreAllMocks();
+    });
+
+    function treStati(): void {
+      conIscrizioni([
+        miaIscrizione(1, {
+          corso: { id: 1, titolo: "Sicura", durata_ore: 8 },
+          stato: "Confermata",
+        }),
+        miaIscrizione(2, {
+          corso: { id: 2, titolo: "In corso", durata_ore: 8 },
+          stato: "Approvata",
+        }),
+        miaIscrizione(3, { corso: { id: 3, titolo: "In fila", durata_ore: 8 }, stato: "InAttesa" }),
+      ]);
+    }
+
+    it("con la flag spenta non c'è il pulsante", async () => {
+      treStati();
+      mostra(<MieIscrizioni />, { flag: { calendario: false } });
+
+      expect(await screen.findByText("Sicura")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /^Aggiungi al calendario/ }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("con la flag accesa c'è solo per le iscrizioni confermate", async () => {
+      treStati();
+      mostra(<MieIscrizioni />, { flag: { calendario: true } });
+
+      expect(
+        await screen.findByRole("button", { name: "Aggiungi al calendario Sicura" }),
+      ).toBeInTheDocument();
+      expect(screen.getAllByRole("button", { name: /^Aggiungi al calendario/ })).toHaveLength(1);
+    });
+
+    it("scarica l'evento con il token dell'utente", async () => {
+      conIscrizioni([miaIscrizione(7, { stato: "Confermata" })]);
+      impostaToken(() => Promise.resolve("token-di-anna"));
+      const autorizzazioni: (string | null)[] = [];
+      server.use(
+        http.get(`${API}/iscrizioni/:id/calendario.ics`, ({ params, request }) => {
+          autorizzazioni.push(request.headers.get("Authorization"));
+          return new HttpResponse(`BEGIN:VCALENDAR\r\nUID:${String(params.id)}\r\n`, {
+            headers: { "Content-Type": "text/calendar; charset=utf-8" },
+          });
+        }),
+      );
+      const scaricati: Blob[] = [];
+      vi.spyOn(URL, "createObjectURL").mockImplementation((blob) => {
+        scaricati.push(blob as Blob);
+        return "blob:evento";
+      });
+      vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+      const nomi: string[] = [];
+      vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
+        this: HTMLAnchorElement,
+      ) {
+        nomi.push(this.download);
+      });
+      mostra(<MieIscrizioni />, { flag: { calendario: true } });
+
+      await userEvent.click(
+        await screen.findByRole("button", { name: "Aggiungi al calendario Corso 7" }),
+      );
+
+      await vi.waitFor(() => {
+        expect(nomi).toEqual(["iscrizione-7.ics"]);
+      });
+      expect(autorizzazioni).toEqual(["Bearer token-di-anna"]);
+      expect(await (scaricati[0] as Blob).text()).toContain("UID:7");
+    });
+
+    it("mostra l'errore se l'evento non si scarica", async () => {
+      conIscrizioni([miaIscrizione(7, { stato: "Confermata" })]);
+      server.use(
+        http.get(`${API}/iscrizioni/:id/calendario.ics`, () =>
+          problema(409, {
+            type: "/problemi/iscrizione-non-confermata",
+            title: "Iscrizione non confermata",
+            detail: "Solo un'iscrizione Confermata ha un evento di calendario",
+          }),
+        ),
+      );
+      mostra(<MieIscrizioni />, { flag: { calendario: true } });
+
+      await userEvent.click(
+        await screen.findByRole("button", { name: "Aggiungi al calendario Corso 7" }),
+      );
+
+      expect(await screen.findByText("Iscrizione non confermata")).toBeInTheDocument();
+    });
   });
 
   it("mostra l'errore dell'elenco e riprova", async () => {
