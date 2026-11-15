@@ -35,20 +35,32 @@ Ogni job con `environment:` (`rilascia-ambiente.yml`) crea un deployment nell'en
 - Il lead time di un rilascio legge al massimo 250 commit (limite di `compare`). Un rilascio di uno SHA più vecchio dell'ultimo (approvazioni in ordine inverso) non porta commit nuovi.
 - Il rollback di prova della fase 10 conta come un fallimento del rilascio che ha annullato.
 
+## Prova del rollback (fase 10)
+
+Il 2026-11-15, dopo il rilascio di 1c774ea (run 43717943683):
+
+1. `rollback.yml` con la run 43711400013 (run 43718710085): stesso artifact di a8f5b4f, checkout di a8f5b4f, fumo in collaudo e in prod con `/health` = a8f5b4f.
+2. `rollback.yml` con la run 43717943683 (run 43718950203): di nuovo 1c774ea in entrambi gli ambienti, fumo verde.
+
+Nessuna migrazione fra le due versioni. Tempo di ripristino misurato in prod (dal rilascio annullato al rollback riuscito, approvazione compresa): 3 minuti.
+
 ## Istantanea
 
 <!-- dora:inizio -->
-Environment `prod` di `fabiocampus/academy-hub`, deployment finiti fra il 2026-08-17 13:05 UTC e il 2026-11-15 13:05 UTC.
+Environment `prod` di `fabiocampus/academy-hub`, deployment finiti fra il 2026-08-17 13:29 UTC e il 2026-11-15 13:29 UTC.
 
 | Metrica | Valore | Base |
 | --- | --- | --- |
-| Frequenza dei rilasci | 0.2 a settimana | 2 rilasci riusciti |
-| Lead time for changes (mediana) | 7 min | 2 commit |
-| Change failure rate | 0% | 0 falliti o annullati su 2 rilasci |
-| Tempo di ripristino (mediana) | n/d | 0 ripristini, 0 rollback |
+| Frequenza dei rilasci | 0.2 a settimana | 3 rilasci riusciti |
+| Lead time for changes (mediana) | 8 min | 3 commit |
+| Change failure rate | 33% | 1 falliti o annullati su 3 rilasci |
+| Tempo di ripristino (mediana) | 3 min | 1 ripristini, 2 rollback |
 
 | Fine | Tipo | Esito | Commit della run |
 | --- | --- | --- | --- |
 | 2026-11-15 12:06 UTC | rilascio | riuscito | `a8f5b4f` |
 | 2026-11-15 12:57 UTC | rilascio | riuscito | `9d76b45` |
+| 2026-11-15 13:22 UTC | rilascio | riuscito, poi annullato | `1c774ea` |
+| 2026-11-15 13:25 UTC | rollback | riuscito | `1c774ea` |
+| 2026-11-15 13:28 UTC | rollback | riuscito | `1c774ea` |
 <!-- dora:fine -->

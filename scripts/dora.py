@@ -328,7 +328,7 @@ def main() -> int:
     client = ClientGitHub(token())
     deployment = deployment_finiti(client.leggi, client.elenco, opzioni.repo, opzioni.environment)
     # timezone.utc e non datetime.UTC: lo script gira anche col Python di sistema (3.10).
-    a = datetime.now(timezone.utc).replace(second=0, microsecond=0)  # noqa: UP017
+    a = datetime.now(timezone.utc)  # noqa: UP017 - non troncare: escluderebbe il deployment appena finito
     m = metriche(deployment, a - timedelta(days=opzioni.giorni), a)
     testo = markdown(m, deployment, opzioni.environment, opzioni.repo)
     if opzioni.aggiorna:
