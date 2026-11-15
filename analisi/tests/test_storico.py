@@ -7,8 +7,9 @@ from pyspark.errors import AnalysisException
 from pyspark.sql import DataFrame, DataFrameReader, SparkSession
 from pyspark.sql.catalog import Catalog
 
+from academy_analisi.letture import TABELLA_ASSENTE
 from academy_analisi.snapshot import COLONNA_SNAPSHOT
-from academy_analisi.storico import TABELLA_ASSENTE, leggi_scatti, prossimo_snapshot, versione
+from academy_analisi.storico import leggi_scatti, prossimo_snapshot, versione
 
 PRIMO = datetime(2026, 11, 14, 5, 0, tzinfo=UTC)
 # Con i microsecondi: la versione calcolata da Spark (unix_micros) deve coincidere.
