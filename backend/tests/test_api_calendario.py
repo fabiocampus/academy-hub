@@ -52,7 +52,7 @@ def test_titolare_scarica_l_evento(flag_accesa: TestClient, db: Engine) -> None:
     )
     assert risposta.headers["cache-control"] == "no-store"
     corpo = risposta.text
-    assert f"UID:iscrizione-{iscr}@academy-hub\r\n" in corpo
+    assert f"UID:iscrizione-{iscr}@locale.academy-hub\r\n" in corpo
     assert "SUMMARY:SQL per analisti\r\n" in corpo
     assert f"DTSTART;VALUE=DATE:{inizio:%Y%m%d}\r\n" in corpo
     # La fine è esclusa: il giorno dopo l'ultimo.

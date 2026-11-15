@@ -170,7 +170,10 @@ export function useScaricaCalendario() {
       const link = document.createElement("a");
       link.href = indirizzo;
       link.download = `iscrizione-${String(iscrizioneId)}.ics`;
+      // Nel documento: alcuni browser (Firefox vecchi, WebView) ignorano il click altrimenti.
+      document.body.append(link);
       link.click();
+      link.remove();
       // Non subito: alcuni browser leggono il blob dopo il click.
       setTimeout(() => {
         URL.revokeObjectURL(indirizzo);

@@ -18,7 +18,7 @@ from academy_hub.dominio.errori import (
     EdizioneIniziata,
     NonTrovato,
 )
-from academy_hub.dominio.ics import EventoEdizione
+from academy_hub.dominio.ics import EventoEdizione, calendario
 from academy_hub.dominio.organigramma import verifica_decisore
 from academy_hub.dominio.ruoli import Ruolo
 from academy_hub.dominio.stati import (
@@ -349,8 +349,11 @@ def iscrizioni_dell_edizione(
 # --- Calendario dell'iscrizione confermata (fase 10, feature flag, ADR-0014) ----------
 
 
-def evento_calendario(sessione: Session, attore: Attore, iscrizione_id: int) -> EventoEdizione:
-    """L'evento dell'edizione per il calendario del titolare, solo se il posto è confermato.
+def evento_calendario(sessione: Session, attore: Attore, iscrizione_id: int, ambiente: str) -> str:
+    """Il file `.ics` dell'edizione per il calendario del titolare, solo se il posto è confermato.
+
+    `ambiente` entra nell'UID dell'evento (unico fra collaudo e prod); `DTSTAMP` è l'ora
+    del database, come ogni altro istante dei servizi.
 
     Solo il titolare: è il suo calendario, l'amministrazione vede già tutto altrove.
     Edizione cancellata o iniziata non contano: una Confermata in un'edizione cancellata è
@@ -366,11 +369,13 @@ def evento_calendario(sessione: Session, attore: Attore, iscrizione_id: int) -> 
         )
     edizione = catalogo.edizione(sessione, trovata.edizione_id)
     corso = catalogo.corso(sessione, edizione.corso_id)
-    return EventoEdizione(
+    evento = EventoEdizione(
         iscrizione_id=trovata.id,
         titolo=corso.titolo,
         descrizione=corso.descrizione,
         data_inizio=edizione.data_inizio,
         data_fine=edizione.data_fine,
         versione=edizione.versione,
+        ambiente=ambiente,
     )
+    return calendario(evento, repository.adesso(sessione))

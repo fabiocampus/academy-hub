@@ -16,6 +16,7 @@ BASE = EventoEdizione(
     data_inizio=date(2026, 12, 1),
     data_fine=date(2026, 12, 2),
     versione=1,
+    ambiente="collaudo",
 )
 
 
@@ -40,7 +41,8 @@ def test_struttura_e_identita_stabile() -> None:
     assert ics.startswith("BEGIN:VCALENDAR\r\nVERSION:2.0\r\n")
     assert ics.endswith("END:VEVENT\r\nEND:VCALENDAR\r\n")
     p = _proprieta(ics)
-    assert p["UID"] == "iscrizione-42@academy-hub"
+    # L'ambiente nell'UID: gli id dei database di collaudo e prod si sovrappongono.
+    assert p["UID"] == "iscrizione-42@collaudo.academy-hub"
     assert p["DTSTAMP"] == "20261115T123005Z"  # in UTC
     assert p["SEQUENCE"] == "0"
     assert p["SUMMARY"] == "SQL avanzato"
@@ -59,6 +61,22 @@ def test_ogni_riga_finisce_con_crlf() -> None:
 
 def test_escape_del_testo() -> None:
     assert escape("a\\b;c,d\r\ne\nf") == "a\\\\b\\;c\\,d\\ne\\nf"
+
+
+def test_escape_toglie_i_caratteri_di_controllo() -> None:
+    """TEXT vieta i controlli tranne TAB (RFC 5545 §3.3.11): un titolo sporco non rompe il file."""
+    assert escape("a\x00b\x07c\td\x1fe\x7ff\x0bg") == "abc\tdefg"
+
+
+def test_uid_diverso_per_ambiente() -> None:
+    uid = {
+        a: _proprieta(calendario(_evento(ambiente=a), ADESSO))["UID"]
+        for a in ("locale", "produzione")
+    }
+    assert uid == {
+        "locale": "iscrizione-42@locale.academy-hub",
+        "produzione": "iscrizione-42@produzione.academy-hub",
+    }
 
 
 def test_piegatura_a_75_ottetti_senza_spezzare_utf8() -> None:

@@ -26,8 +26,6 @@ from academy_hub.api.schemi import (
 )
 from academy_hub.config import impostazioni
 from academy_hub.dominio.errori import FunzioneNonDisponibile
-from academy_hub.dominio.ics import calendario
-from academy_hub.repository.iscrizioni import adesso
 from academy_hub.servizi import iscrizioni
 
 router = APIRouter(prefix="/iscrizioni", tags=["iscrizioni"], responses=risposte(401))
@@ -122,9 +120,9 @@ def flag_calendario() -> None:
 def calendario_iscrizione(
     iscrizione_id: int, sessione: SessioneDb, attore: AttoreCorrente
 ) -> Response:
-    evento = iscrizioni.evento_calendario(sessione, attore, iscrizione_id)
+    evento = iscrizioni.evento_calendario(sessione, attore, iscrizione_id, impostazioni().ambiente)
     return Response(
-        content=calendario(evento, adesso(sessione)),
+        content=evento,
         media_type="text/calendar; charset=utf-8",
         headers={
             "Content-Disposition": f'attachment; filename="iscrizione-{iscrizione_id}.ics"',

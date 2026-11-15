@@ -2,10 +2,15 @@
 
 Un'edizione dura giorni interi: l'evento è "tutto il giorno" (`VALUE=DATE`), senza fuso,
 e `DTEND` è il giorno dopo l'ultimo, perché in iCalendar la fine è esclusa.
-L'`UID` dipende solo dall'iscrizione: scaricare di nuovo il file aggiorna l'evento già
-importato invece di duplicarlo (se le date dell'edizione cambiano, cresce `SEQUENCE`).
+L'`UID` dipende solo da iscrizione e ambiente: scaricare di nuovo il file aggiorna l'evento
+già importato invece di duplicarlo. L'ambiente serve perché gli id di collaudo e prod si
+sovrappongono: senza, l'evento di un ambiente sovrascriverebbe quello dell'altro.
+`SEQUENCE` segue la versione dell'edizione: cresce a ogni sua modifica, anche se non tocca
+l'evento (capienza, docente). È voluto: non scende mai, e al più il client riscrive
+un evento uguale.
 """
 
+import re
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 
@@ -22,12 +27,22 @@ class EventoEdizione:
     data_fine: date
     versione: int
     """Versione dell'edizione: diventa `SEQUENCE`, così un client sa che l'evento è cambiato."""
+    ambiente: str
+    """`ACADEMY_AMBIENTE`: entra nell'`UID`, unico anche fra collaudo e prod."""
+
+
+# Controlli vietati in TEXT (RFC 5545 §3.3.11). TAB è ammesso; CR e LF diventano `\n` sotto.
+_CONTROLLI = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
 
 def escape(valore: str) -> str:
-    """Escape di un valore TEXT (RFC 5545 §3.3.11): barra, punto e virgola, virgola, a capo."""
+    """Escape di un valore TEXT (RFC 5545 §3.3.11): barra, punto e virgola, virgola, a capo.
+
+    I caratteri di controllo (tranne TAB e gli a capo) si tolgono: il tipo li vieta.
+    """
     return (
-        valore.replace("\\", "\\\\")
+        _CONTROLLI.sub("", valore)
+        .replace("\\", "\\\\")
         .replace(";", "\\;")
         .replace(",", "\\,")
         .replace("\r\n", "\\n")
@@ -67,7 +82,7 @@ def calendario(evento: EventoEdizione, adesso: datetime) -> str:
         "CALSCALE:GREGORIAN",
         "METHOD:PUBLISH",
         "BEGIN:VEVENT",
-        f"UID:iscrizione-{evento.iscrizione_id}@academy-hub",
+        f"UID:iscrizione-{evento.iscrizione_id}@{evento.ambiente}.academy-hub",
         f"DTSTAMP:{stamp}",
         f"SEQUENCE:{max(evento.versione - 1, 0)}",
         f"DTSTART;VALUE=DATE:{_data(evento.data_inizio)}",
