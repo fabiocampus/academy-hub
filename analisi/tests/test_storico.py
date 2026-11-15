@@ -12,6 +12,17 @@ PRIMO = datetime(2026, 11, 14, 5, 0, tzinfo=UTC)
 SECONDO = datetime(2026, 11, 15, 5, 0, 0, 123456, tzinfo=UTC)
 
 
+TERZO = datetime(2026, 11, 16, 5, 0, tzinfo=UTC)
+
+
+def _scatti(spark: SparkSession, *istanti: datetime) -> DataFrame:
+    return spark.createDataFrame([(i,) for i in istanti], f"{COLONNA_SNAPSHOT} TIMESTAMP")
+
+
+def _vuota(spark: SparkSession) -> DataFrame:
+    return spark.createDataFrame([], f"id INT, nome STRING, {COLONNA_SNAPSHOT} TIMESTAMP")
+
+
 def _bronze(spark: SparkSession) -> DataFrame:
     return spark.createDataFrame(
         [(1, "Academy", PRIMO), (2, "Vendite", PRIMO), (1, "Academy Italia", SECONDO)],
@@ -26,7 +37,7 @@ def test_versione_cresce_con_l_istante() -> None:
 
 
 def test_la_prima_chiamata_restituisce_lo_snapshot_piu_vecchio(spark: SparkSession) -> None:
-    risultato = prossimo_snapshot(_bronze(spark), None)
+    risultato = prossimo_snapshot(_bronze(spark), _scatti(spark, PRIMO, SECONDO), None)
 
     assert risultato is not None
     righe, v = risultato
@@ -37,7 +48,7 @@ def test_la_prima_chiamata_restituisce_lo_snapshot_piu_vecchio(spark: SparkSessi
 
 
 def test_dopo_una_versione_arriva_la_successiva(spark: SparkSession) -> None:
-    risultato = prossimo_snapshot(_bronze(spark), versione(PRIMO))
+    risultato = prossimo_snapshot(_bronze(spark), _scatti(spark, PRIMO, SECONDO), versione(PRIMO))
 
     assert risultato is not None
     righe, v = risultato
@@ -46,10 +57,41 @@ def test_dopo_una_versione_arriva_la_successiva(spark: SparkSession) -> None:
 
 
 def test_nessuno_snapshot_nuovo(spark: SparkSession) -> None:
-    assert prossimo_snapshot(_bronze(spark), versione(SECONDO)) is None
+    assert (
+        prossimo_snapshot(_bronze(spark), _scatti(spark, PRIMO, SECONDO), versione(SECONDO)) is None
+    )
 
 
-def test_bronze_vuota(spark: SparkSession) -> None:
-    vuota = spark.createDataFrame([], f"id INT, {COLONNA_SNAPSHOT} TIMESTAMP")
+def test_nessuno_scatto(spark: SparkSession) -> None:
+    assert prossimo_snapshot(_vuota(spark), _scatti(spark), None) is None
 
-    assert prossimo_snapshot(vuota, None) is None
+
+def test_primo_scatto_di_una_tabella_vuota(spark: SparkSession) -> None:
+    # #99: in produzione corsi era vuota, la sorgente restituiva None e la pipeline falliva.
+    risultato = prossimo_snapshot(_vuota(spark), _scatti(spark, PRIMO), None)
+
+    assert risultato is not None
+    righe, v = risultato
+    assert v == versione(PRIMO)
+    assert righe.collect() == []
+    assert righe.columns == ["id", "nome"]
+
+
+def test_tabella_svuotata_da_uno_snapshot_vuoto(spark: SparkSession) -> None:
+    # Dopo SECONDO la tabella si è svuotata: lo snapshot vuoto chiude le righe aperte.
+    risultato = prossimo_snapshot(
+        _bronze(spark), _scatti(spark, PRIMO, SECONDO, TERZO), versione(SECONDO)
+    )
+
+    assert risultato is not None
+    righe, v = risultato
+    assert v == versione(TERZO)
+    assert righe.collect() == []
+
+
+def test_snapshot_precedenti_al_registro_restano_validi(spark: SparkSession) -> None:
+    # Bronze scritta prima di `scatti`: una pipeline ricreata rilegge anche quegli snapshot.
+    risultato = prossimo_snapshot(_bronze(spark), _scatti(spark, TERZO), None)
+
+    assert risultato is not None
+    assert risultato[1] == versione(PRIMO)

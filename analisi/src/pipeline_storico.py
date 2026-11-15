@@ -12,6 +12,7 @@ from collections.abc import Callable
 from pyspark import pipelines as dp
 from pyspark.sql import DataFrame, SparkSession
 
+from academy_analisi.snapshot import TABELLA_SCATTI
 from academy_analisi.storico import prossimo_snapshot
 from academy_analisi.tabelle import TABELLE, Tabella
 
@@ -21,7 +22,11 @@ Sorgente = Callable[[int | None], tuple[DataFrame, int] | None]
 def _sorgente(tabella: Tabella) -> Sorgente:
     def prossimo(ultima: int | None) -> tuple[DataFrame, int] | None:
         spark = SparkSession.active()
-        return prossimo_snapshot(spark.read.table(f"bronze.{tabella.nome}"), ultima)
+        return prossimo_snapshot(
+            spark.read.table(f"bronze.{tabella.nome}"),
+            spark.read.table(f"bronze.{TABELLA_SCATTI}"),
+            ultima,
+        )
 
     return prossimo
 

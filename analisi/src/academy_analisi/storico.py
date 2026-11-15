@@ -5,6 +5,10 @@ riceve l'ultima versione già elaborata e restituisce lo snapshot successivo, op
 None quando non ce ne sono altri. Così uno snapshot saltato (pipeline fallita) viene
 recuperato alla passata dopo, in ordine. La versione è l'istante dello scatto in
 microsecondi: intera, crescente, uguale per tutte le tabelle della stessa passata.
+
+Le versioni vengono dal registro `bronze.scatti`, non solo dalle righe della tabella: lo
+snapshot di una tabella vuota non ha righe ma va elaborato lo stesso, altrimenti la
+prima passata fallisce e una tabella svuotata non chiude mai le sue righe (#99).
 """
 
 from datetime import datetime
@@ -27,10 +31,19 @@ def versione(istante: datetime) -> int:
     return secondi * 1_000_000 + istante.microsecond
 
 
-def prossimo_snapshot(bronze: DataFrame, ultima: int | None) -> tuple[DataFrame, int] | None:
-    """Lo snapshot dopo `ultima` (il primo se None), senza la colonna dello scatto."""
+def prossimo_snapshot(
+    bronze: DataFrame, scatti: DataFrame, ultima: int | None
+) -> tuple[DataFrame, int] | None:
+    """Lo snapshot dopo `ultima` (il primo se None), senza la colonna dello scatto.
+
+    Le versioni sono quelle del registro più quelle già in bronze (snapshot scritti prima
+    del registro). Le righe restituite possono essere zero: tabella vuota a quello scatto.
+    """
     con_versione = bronze.withColumn(_VERSIONE, F.unix_micros(F.col(COLONNA_SNAPSHOT)))
-    candidate = con_versione if ultima is None else con_versione.where(F.col(_VERSIONE) > ultima)
+    versioni = scatti.select(F.unix_micros(F.col(COLONNA_SNAPSHOT)).alias(_VERSIONE)).union(
+        con_versione.select(_VERSIONE)
+    )
+    candidate = versioni if ultima is None else versioni.where(F.col(_VERSIONE) > ultima)
     prima = candidate.agg(F.min(_VERSIONE)).first()
     if prima is None or prima[0] is None:
         return None
