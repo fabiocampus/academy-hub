@@ -2,7 +2,9 @@
 
 from datetime import UTC, datetime
 
+import pytest
 from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql.catalog import Catalog
 
 from academy_analisi.snapshot import COLONNA_SNAPSHOT
 from academy_analisi.storico import leggi_scatti, prossimo_snapshot, versione
@@ -112,8 +114,15 @@ def test_bronze_prima_del_registro_poi_scatto_vuoto(spark: SparkSession) -> None
     assert prossimo_snapshot(bronze, scatti, secondo[1]) is None
 
 
-def test_registro_non_ancora_creato(spark: SparkSession) -> None:
-    scatti = leggi_scatti(spark, "default.scatti_inesistente")
+def test_registro_non_ancora_creato(spark: SparkSession, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Il catalogo vero passa da Hadoop, che sulla Java della CI non va (getSubject):
+    # qui conta solo il ramo senza tabella.
+    def nessuna(_self: Catalog, _nome: str) -> bool:
+        return False
+
+    monkeypatch.setattr(Catalog, "tableExists", nessuna)
+
+    scatti = leggi_scatti(spark, "academy_collaudo.bronze.scatti")
 
     assert scatti.columns == [COLONNA_SNAPSHOT]
     assert scatti.collect() == []
