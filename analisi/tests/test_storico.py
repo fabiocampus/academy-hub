@@ -5,13 +5,11 @@ from datetime import UTC, datetime
 from pyspark.sql import DataFrame, SparkSession
 
 from academy_analisi.snapshot import COLONNA_SNAPSHOT
-from academy_analisi.storico import prossimo_snapshot, versione
+from academy_analisi.storico import leggi_scatti, prossimo_snapshot, versione
 
 PRIMO = datetime(2026, 11, 14, 5, 0, tzinfo=UTC)
 # Con i microsecondi: la versione calcolata da Spark (unix_micros) deve coincidere.
 SECONDO = datetime(2026, 11, 15, 5, 0, 0, 123456, tzinfo=UTC)
-
-
 TERZO = datetime(2026, 11, 16, 5, 0, tzinfo=UTC)
 
 
@@ -95,3 +93,27 @@ def test_snapshot_precedenti_al_registro_restano_validi(spark: SparkSession) -> 
 
     assert risultato is not None
     assert risultato[1] == versione(PRIMO)
+
+
+def test_bronze_prima_del_registro_poi_scatto_vuoto(spark: SparkSession) -> None:
+    # Collaudo dopo il rilascio: PRIMO solo in bronze, SECONDO solo nel registro (vuota).
+    bronze = spark.createDataFrame(
+        [(1, "Corso", PRIMO)], f"id INT, nome STRING, {COLONNA_SNAPSHOT} TIMESTAMP"
+    )
+    scatti = _scatti(spark, SECONDO)
+
+    primo = prossimo_snapshot(bronze, scatti, None)
+    assert primo is not None
+    assert primo[1] == versione(PRIMO)
+    secondo = prossimo_snapshot(bronze, scatti, primo[1])
+    assert secondo is not None
+    assert secondo[1] == versione(SECONDO)
+    assert secondo[0].collect() == []
+    assert prossimo_snapshot(bronze, scatti, secondo[1]) is None
+
+
+def test_registro_non_ancora_creato(spark: SparkSession) -> None:
+    scatti = leggi_scatti(spark, "default.scatti_inesistente")
+
+    assert scatti.columns == [COLONNA_SNAPSHOT]
+    assert scatti.collect() == []

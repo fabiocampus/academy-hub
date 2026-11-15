@@ -57,8 +57,9 @@ def scatta(
 ) -> dict[str, int]:
     """Uno snapshot di ogni tabella da `sorgente` a `destinazione`; righe scritte per tabella.
 
-    `scatto`, la riga del registro, si scrive dopo tutte le tabelle: segna la passata
-    completa. Le tabelle vuote non aggiungono righe, ma la loro versione resta lì.
+    `scatto`, la riga del registro, si scrive dopo tutte le tabelle: rende visibile anche lo
+    snapshot di una tabella vuota, che non aggiunge righe. Non filtra le passate
+    interrotte: lo storico legge anche le versioni presenti solo nelle righe di bronze.
     """
     contate: dict[str, int] = {}
     for tabella in tabelle:

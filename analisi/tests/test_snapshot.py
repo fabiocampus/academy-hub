@@ -122,3 +122,21 @@ def test_il_registro_non_e_una_tabella_storicizzata() -> None:
 def test_main_rifiuta_nomi_non_validi_prima_di_spark() -> None:
     with pytest.raises(ValueError, match=r"catalogo\.schema"):
         main(["--sorgente", "academy_collaudo_oltp.academy_collaudo", "--destinazione", "x"])
+
+
+def test_tabella_fallita_niente_registro(spark: SparkSession) -> None:
+    def leggi(nome: str) -> DataFrame:
+        raise RuntimeError(f"lettura fallita: {nome}")
+
+    scritte: list[str] = []
+    with pytest.raises(RuntimeError, match="lettura fallita"):
+        scatta(
+            leggi=leggi,
+            scrivi=lambda _df, nome: scritte.append(nome),
+            tabelle=TABELLE,
+            sorgente="academy_prod_oltp.academy",
+            destinazione="academy_prod.bronze",
+            istante=ISTANTE,
+            scatto=scatto(spark, ISTANTE),
+        )
+    assert scritte == []

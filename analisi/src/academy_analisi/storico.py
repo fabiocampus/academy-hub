@@ -13,7 +13,7 @@ prima passata fallisce e una tabella svuotata non chiude mai le sue righe (#99).
 
 from datetime import datetime
 
-from pyspark.sql import DataFrame
+from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
 from academy_analisi.snapshot import COLONNA_SNAPSHOT
@@ -29,6 +29,17 @@ def versione(istante: datetime) -> int:
     """
     secondi = int(istante.timestamp())
     return secondi * 1_000_000 + istante.microsecond
+
+
+def leggi_scatti(spark: SparkSession, nome: str) -> DataFrame:
+    """Il registro delle passate; vuoto se il job non l'ha ancora creato.
+
+    La pipeline può girare da sola (avvio a mano, full refresh) prima della prima passata
+    del job dopo il rilascio: senza registro valgono solo le versioni già in bronze.
+    """
+    if spark.catalog.tableExists(nome):
+        return spark.read.table(nome)
+    return spark.createDataFrame([], f"{COLONNA_SNAPSHOT} TIMESTAMP")
 
 
 def prossimo_snapshot(
