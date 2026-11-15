@@ -4,21 +4,25 @@ Prototipo di studio: iscrizioni ai corsi di un'Academy aziendale (parte transazi
 
 ## Stato
 
-Fase 5 (API a livelli), in tre PR (issue #49): errori RFC 9457, ETag/If-Match, contratto OpenAPI versionato, corsi, edizioni e catalogo; flusso delle iscrizioni (richiesta idempotente, approvazione del responsabile diretto, conferma, annullamento, audit); promozione dalla lista d'attesa nella stessa transazione, cancellazione dell'edizione e job di sistema (ADR-0007). Convenzioni in `docs/adr/0005-convenzioni-dell-api.md`.
+Fasi 1–12 del piano chiuse, fase 13 (documentazione) in corso: la storia per fase è nelle issue epic (#49 API, #36/#56 sicurezza, #59 frontend, #68 Databricks, #75 infrastruttura, #81 rilascio, #91 analisi, #107 osservabilità) e negli ADR. Mappa del sistema in `docs/architettura.md` (C4 in Mermaid), avvio in `README.md`, regole di contribuzione in `CONTRIBUTING.md`, errori dell'agente e regole nate da essi in `docs/retrospettiva-ai.md`. Rimandati: synced table e pagina dei report nel frontend (fase 11), OpenTelemetry (fase 12).
 
-Fase 6 (identità e sicurezza, issue #36): identità da token OIDC di Keycloak in locale e da `X-Forwarded-Email` su Databricks Apps, ruoli dal database, persona trovata per email (ADR-0008). Seconda PR (issue #56): matrice di autorizzazione rotta × profilo (`backend/tests/test_autorizzazione.py`: una rotta nuova senza la sua riga fa fallire i test), pip-audit e CodeQL in CI, threat model STRIDE in `docs/threat-model.md`.
+## Strumenti dell'agente
 
-Fase 7 (frontend, issue #59), in tre PR: A) base in `frontend/` (React, Vite, Mantine, React Query, client dal contratto, login OIDC con PKCE, catalogo; ADR-0009); B) mie iscrizioni con annullamento, richiesta dal catalogo, approvazioni (issue #62), poi gestione di corsi, edizioni e iscrizioni dell'edizione per `admin_academy` (issue #64, elenchi nuovi nel contratto 1.5.0, modifiche con ETag/If-Match); C) build servita da FastAPI nello stesso processo, end-to-end con Playwright su docker compose e axe, bundle diviso per pagina (issue #66).
+- **GitHub con `gh`**, non con il server MCP di GitHub (ADR-0019): `gh issue view <n> --comments`, `gh pr view/checks`, `gh run view`, `gh api` per sub-issue e board. Su questo PC la rete verso api.github.com a volte cade: ripeti la chiamata.
+- **Skill di progetto** in `.claude/skills/`: `nuova-migrazione` (Alembic, expand/contract) e `nuova-rotta` (test, matrice di autorizzazione, contratto, client del frontend). Seguile invece di improvvisare i passi.
+- **Subagent `revisore`** (`.claude/agents/revisore.md`) prima di ogni merge. Se la sessione è partita fuori da `academy-hub/` non è caricato: usa un agente generico con quelle istruzioni.
+- **Hook** `.claude/hooks/dopo_modifica.py` dopo ogni modifica a un `.py` del backend.
 
-Fase 8 (Databricks, issue #68), in due PR: A) l'App su Lakebase (issue #69): bundle `databricks.yml` con target `collaudo` e `prod`, un progetto Lakebase con un branch per ambiente, password del database = token OAuth per connessione, schema `academy`, avvio con migrazioni e persona amministratrice (ADR-0010); B) Unity Catalog e identità dell'utente (issue #73): cataloghi `academy_collaudo`/`academy_prod` con `bronze`/`silver`/`gold` nel bundle, report `GET /api/v1/report/iscrizioni-per-corso` letto con il token dell'utente (`X-Forwarded-Access-Token`, scope `sql`) su un SQL warehouse, porta `LettoreReport` in `report.py` (ADR-0011).
+## Lezioni imparate
 
-Fase 9 (infrastruttura come codice, issue #75), in due PR: A) Terraform per GitHub in `infra/github/` (repository, ruleset, environment `infra`/`infra-plan`, label; esistenti con blocchi `import`), stato su HCP Terraform Free in execution mode locale, workflow `infra.yml` con plan nella PR, apply dopo approvazione e deriva il lunedì (issue #76, ADR-0012); B) Terraform per Databricks (issue #78): `infra/databricks/` con cataloghi (creati in SQL da `crea_catalogo.py`), schemi, grant e secret scope, usciti dal bundle con `bundle deployment unbind`; `infra/databricks-identita/` (solo dal PC) con il service principal `academy-terraform` del workflow e i suoi secret negli environment.
+Errori già fatti, da non ripetere:
 
-Fase 10 (rilascio continuo, issue #81), in due PR: A) pipeline (issue #82): `rilascio.yml` su ogni push a `main` (CI richiamata, un artifact `build/app`, collaudo, fumo, approvazione nell'environment `prod`, produzione, fumo) con il service principal `academy-rilascio` (ADR-0013); B1) feature flag per ambiente dal bundle, spenta per difetto e 404 da spenta, esposta in `/configurazione` (prima flag: evento `.ics` di un'iscrizione Confermata, `ACADEMY_FLAG_CALENDARIO`) e dati di prova sintetici del collaudo caricati all'avvio (`ACADEMY_DATI_PROVA`, vietati in produzione), ADR-0014 (issue #86); B2) rollback e metriche DORA (issue #88, ADR-0015): `rollback.yml` (`workflow_dispatch` con l'id di una run di `rilascio.yml` arrivata in prod: stesso artifact, `databricks.yml` e fumo del suo commit, collaudo poi approvazione di prod) e `scripts/dora.py` (frequenza, lead time, change failure rate, tempo di ripristino dai deployment degli environment di GitHub; metodo e istantanea in `docs/dora.md`).
-
-Fase 11 (parte analitica, issue #91), in tre PR: A) storico dei dati di Lakebase (issue #92, ADR-0016): database di Lakebase registrato in Unity Catalog (`academy_<env>_oltp`, Terraform), job `analisi` del bundle (ogni giorno: snapshot in `bronze`, poi pipeline Lakeflow `storico` con SCD di tipo 2 in `silver`), codice in `analisi/` dentro l'artifact del rilascio; B1) importazioni, controlli di qualità e gold (issue #103, ADR-0017): volume `bronze.importazioni` con i CSV di presenze e valutazioni (esempi in `data/samples/`), Auto Loader e classificazione nella pipeline `storico` (valide in silver, quarantena e stato dei file nello schema `qualita`), task `controlli` → `gold` → `registra_esito` nel job (verdetto per file fissato, gold riscritto solo se nessun file nuovo è respinto, esito in `qualita.esiti`); B2) API dei report sul gold (issue #105, contratto 1.8.0: ore per team, tasso di completamento, valutazione media; `iscrizioni-per-corso` deprecata), gate che regge il ritentativo serverless di `controlli`, row filter `gold.vede_team` su `ore_per_team` e `iscrizioni_concluse` creato dal task `gold` (ADR-0018); C) synced table, rimandata.
-
-Fase 12 (osservabilità e incidenti, issue #107), perimetro minimo senza OpenTelemetry: A) log JSON con id di correlazione `X-Request-Id` e senza dati personali (issue #108, `osservabilita.py`); B) avvisi nel bundle (email del job `analisi` e della pipeline `storico` sui fallimenti, alert SQL `academy-qualita-<target>` su `qualita.esiti`), SLI/SLO in `docs/slo.md`, runbook in `docs/runbook.md`, post-mortem in `docs/postmortem/` (issue #109). C) incidente simulato (issue #111): schema sbagliato nel task `gold`, rilevato dall'alert SQL, rollback, post-mortem `docs/postmortem/2026-11-15-schema-gold-inesistente.md`; da lì `backend/tests/test_bundle_schemi.py` (gli schemi nominati dal bundle devono esistere in Terraform) e le email sui task `gold` e `controlli`.
+- **Databricks serverless**: un `spark_python_task` gira in IPython, quindi qualsiasi `SystemExit` (anche 0) fa fallire il task (#97); nella pipeline Lakeflow `spark.catalog.tableExists` e `getCondition()` non sono ammessi (#101); un job con un task finale `ALL_DONE` finisce `SUCCESS_WITH_FAILURES` e non fa scattare `on_failure` del job: le email vanno sui task (post-mortem 2026-11-15); i task falliti vengono ritentati in automatico nella stessa run.
+- **Unity Catalog**: il proprietario di un catalogo non ha `SELECT` sulle tabelle figlie senza grant; gli schemi di Lakebase registrati in UC non si vedono dall'API dei grant finché una query SQL non li legge (`carica_schemi.py`). Uno schema nominato dal bundle deve esistere in Terraform (`test_bundle_schemi.py`).
+- **Bundle**: mai `bundle deploy` con il profilo `academy`; una cache `.databricks/` locale vince sullo stato remoto; i bind vogliono chiavi qualificate (`apps.academy_hub`); `bundle run` vuole le stesse `BUNDLE_VAR_*` del deploy.
+- **Rilascio**: un push su `main` che cambia `infra/` fa partire insieme Rilascio e apply dell'infrastruttura: il job `analisi` non va lanciato prima dell'apply. Modificare il corpo di una PR rilancia `issue-collegata`: aspetta prima del merge.
+- **Windows**: leggi e scrivi i file con `encoding="utf-8"` (e `newline="\n"`); in Git Bash `MSYS_NO_PATHCONV=1` per i percorsi del workspace; per gli script dal PC verso PostgreSQL di compose usa `127.0.0.1`, per il browser `localhost`; Spark locale su Windows non legge file (quelle prove girano solo in CI).
+- **Test**: un test deve verificare stato **e** effetto (corpo della risposta, righe nel database), non solo che il codice non esploda; le rotte dietro una flag spenta rispondono 404, quindi i test su tutte le rotte vogliono le flag accese; una dipendenza nuova si verifica sul registro (PyPI, npm) prima di aggiungerla, con la versione esatta nel lock.
 
 ## Infrastruttura
 
@@ -78,7 +82,7 @@ uv run pre-commit install    # una volta per clone: hook pre-commit (ruff, gitle
 uv run pre-commit run --all-files
 ```
 
-Dentro `analisi/` (Python 3.12, come l'ambiente serverless 4 di Databricks; i test avviano Spark in locale: serve Java 17+):
+Dentro `analisi/` (Python 3.12, come l'ambiente serverless 4 di Databricks; i test avviano Spark in locale: serve Java 17, non 24+ per Hadoop):
 
 ```bash
 uv sync                      # pyspark e gli strumenti, solo per sviluppo e test
@@ -133,6 +137,7 @@ npm run e2e                  # Playwright + axe su docker compose acceso (http:/
 2. Test prima del codice per i criteri di accettazione.
 3. Comandi verdi in locale, poi PR con `Closes #n` e l'elenco di che cosa hai eseguito.
 4. Rilettura con il subagent `revisore` (`.claude/agents/revisore.md`) prima del merge (squash).
+5. Dopo il merge: Rilascio in collaudo, fumo, approvazione di `prod` da parte dell'utente (mai approvare al suo posto).
 
 ## Regole
 
