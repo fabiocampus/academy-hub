@@ -24,6 +24,16 @@ S = StatoIscrizione
 T0 = datetime(2026, 1, 1, 9, 0, tzinfo=UTC)
 
 
+@pytest.fixture(autouse=True)
+def log_lasciati_a_pytest(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`main` configura i log in JSON e toglierebbe l'handler di caplog dal logger radice."""
+
+    def nessuna_configurazione(_livello: str) -> None:
+        return None
+
+    monkeypatch.setattr(job, "configura_log", nessuna_configurazione)
+
+
 def nuova(db: Engine, edizione_id: int, stato: StatoIscrizione, minuto: int = 0) -> int:
     chi = persona(db, f"P{stato.value}{minuto}")
     return iscrizione(
