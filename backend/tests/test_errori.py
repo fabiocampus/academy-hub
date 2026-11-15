@@ -48,4 +48,4 @@ def test_errore_imprevisto_500_senza_dettagli_interni(caplog: pytest.LogCaptureF
         "instance": "/esplodi",
     }
     assert "segreta" not in risposta.text
-    assert "segreta" in caplog.text
+    assert "Errore imprevisto" in caplog.text

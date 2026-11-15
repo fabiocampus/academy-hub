@@ -17,6 +17,7 @@ from academy_hub.db import dati_prova
 from academy_hub.db.amministratore import assicura_amministratore
 from academy_hub.db.migrazioni import aggiorna_schema
 from academy_hub.db.motore import crea_motore
+from academy_hub.osservabilita import configura_log
 
 log = logging.getLogger("academy_hub.avvio")
 
@@ -48,9 +49,7 @@ def prepara() -> None:
 
 
 def main() -> int:
-    logging.basicConfig(
-        level=impostazioni().livello_log, format="%(levelname)s %(name)s: %(message)s"
-    )
+    configura_log(impostazioni().livello_log)
     prepara()
     uvicorn.run(
         "academy_hub.main:app",
@@ -58,6 +57,10 @@ def main() -> int:
         port=porta(dict(os.environ)),
         # L'App è raggiungibile solo dal proxy di Databricks Apps (verificato, ADR-0010),
         # che non è su 127.0.0.1: senza "*" uvicorn ignorerebbe X-Forwarded-For/-Proto.
+        # Log già configurati in JSON; l'access log di uvicorn (con l'IP) è sostituito
+        # dalla riga del middleware Correlazione.
+        log_config=None,
+        access_log=False,
         proxy_headers=True,
         forwarded_allow_ips="*",
     )

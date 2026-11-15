@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 
 from academy_hub.config import impostazioni
 from academy_hub.db.motore import crea_motore
+from academy_hub.osservabilita import configura_log
 from academy_hub.servizi import iscrizioni
 
 log = logging.getLogger("academy_hub.job")
@@ -109,7 +110,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     ogni: int | None = parser.parse_args(argv).ogni
     config = impostazioni()
-    logging.basicConfig(level=config.livello_log, format="%(asctime)s %(levelname)s %(message)s")
+    configura_log(config.livello_log)
     motore = crea_motore(config, pool_pre_ping=True)
     try:
         if ogni is None:
