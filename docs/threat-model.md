@@ -52,6 +52,7 @@ Asset da proteggere: l'esito delle richieste (chi va al corso), i posti delle ed
 | D18 | Feature flag spente per difetto, controllate dall'API (404 prima dell'identità, il frontend nasconde solo); accensione in prod con una PR; evento `.ics` solo al titolare di un'iscrizione Confermata, `Cache-Control: no-store`; dati di prova sintetici (`@academy.example`) rifiutati dalla configurazione in `produzione` | `config.py`, `api/rotte/iscrizioni.py`, `db/dati_prova.py`, `databricks.yml`, ADR-0014 |
 | D19 | Rollback solo a una run di `rilascio.yml` su `main` già riuscita in prod, con lo stesso artifact (nessuna build nuova) e la sua verifica dello SHA in `RILASCIO`; stesso workflow riusabile, stessi environment, approvazione di prod e concurrency del rilascio; `GITHUB_TOKEN` con `actions: read` solo per leggere run e artifact | `.github/workflows/rollback.yml`, `rilascia-ambiente.yml`, ADR-0015 |
 | D20 | Dati analitici (bronze, silver) letti solo da `academy-rilascio` (proprietario delle tabelle; il proprietario del catalogo li legge solo dandosi un grant, che Terraform segnala come deriva); gli utenti leggono solo gold; Lakebase in Unity Catalog in sola lettura (il job non scrive mai sull'App); colonne copiate elencate una per una (nessun `SELECT *`), con un test che le lega al modello; grant del service principal del rilascio limitati agli schemi che scrive, in Terraform | `analisi/`, `infra/databricks/analisi.tf`, ADR-0016 |
+| D21 | File importati trattati solo come dati: letti come testo, convertiti con `try_cast`/`try_to_date`, mai eseguiti né interpretati; regole di qualità con quarantena, file respinti da regole bloccanti o oltre il 10% di scarti, verdetto fissato per file; gold solo da file accettati; volume scrivibile da tutti solo in collaudo, in produzione solo dal proprietario del catalogo | `analisi/src/academy_analisi/qualita.py`, `gate.py`, `infra/databricks/qualita.tf`, ADR-0017 |
 
 ## Minacce
 
@@ -81,6 +82,8 @@ Stato: **mitigata** (una difesa la copre), **accettata** (rischio residuo consap
 | Superare la capienza con conferme simultanee | conferma, annullamento, job | D8 | mitigata |
 | Riscrivere o cancellare la storia | tutti | D7 | mitigata per l'app; un superutente del database può spegnere i trigger |
 | Modifica di corso o edizione sopra quella di un altro | — | D9 | mitigata |
+| CSV di presenze o valutazioni falsi per gonfiare ore di formazione o voti | importazioni | D21: in produzione carica solo il proprietario del catalogo; le righe devono corrispondere a persone ed edizioni vere, nei giorni dell'edizione | accettata: chi può caricare è fidato; il file resta nel volume e il verdetto dice quando è arrivato |
+| Un file sbagliato che sporca i report | importazioni | D21: regole bloccanti e soglia del 10% respingono il file, il gold usa solo i file accettati | mitigata |
 | Organigramma cambiato per farsi approvare da un complice | approvazione | nessuna rotta modifica team o responsabili: si cambiano solo nel database | accettata finché non c'è un'API dell'organigramma |
 
 ### R · Repudiation
@@ -108,6 +111,7 @@ Stato: **mitigata** (una difesa la copre), **accettata** (rischio residuo consap
 | Access token rubato dal browser con uno script iniettato (XSS): con l'HTML sulla stessa origine dell'API uno script vale una sessione intera | tutti | React fa l'escape del testo, nessun HTML grezzo; D14 (CSP: niente script inline o di altre origini, dati mandati solo all'app o all'emittente); token in `sessionStorage`, non in `localStorage`; durata breve del token di Keycloak | mitigata; resta `style-src 'unsafe-inline'` per gli stili di Mantine (iniezione di CSS, non di script) |
 | URL dell'App, host o id del workspace nei log pubblici dei workflow di rilascio | rilascio | D17: secret mascherati da GitHub; URL, host senza schema e id del workspace mascherati con `::add-mask::` prima del deploy, che si ferma se l'URL non si può leggere | mitigata; il workspace non è un segreto forte (senza credenziali non si entra), ma non serve renderlo pubblico |
 | Dati personali (`persone.email`, ruoli, team) copiati fuori dall'App e letti da chi vede i report | analisi | D20: bronze e silver senza grant agli utenti; colonne esplicite, una nuova non arriva da sola | mitigata; l'oblio va fatto anche in bronze e silver (ADR-0016) |
+| Formula o script in un commento di valutazione (`=HYPERLINK(...)`) che si esegue quando qualcuno apre i dati | importazioni | D21: il commento resta testo; nel frontend React fa l'escape | mitigata nell'App; chi esporta la quarantena in un foglio di calcolo deve aprirla come testo |
 | File del server letti dal fallback della SPA (`../`, percorsi assoluti, collegamenti) | — | D14: percorso risolto e accettato solo dentro la build; test con un file sentinella accanto alla build | mitigata |
 
 ### D · Denial of service
@@ -118,6 +122,8 @@ Stato: **mitigata** (una difesa la copre), **accettata** (rischio residuo consap
 | Lock tenuti a lungo su un'edizione per bloccare le conferme | conferma, annullamento | transazioni brevi; il titolare dell'annullamento è controllato prima dei lock | mitigata in parte: un utente qualunque che tenta una decisione blocca per un attimo la riga dell'iscrizione |
 | Percorsi con caratteri nulli che fanno sollevare un errore al file system (500 e righe di log a volontà, senza login) | — | D14: 404 prima di toccare il file system, con test | mitigata |
 | Keycloak irraggiungibile | tutti | cache del JWKS 5 minuti, poi 503 `identita-non-disponibile` | accettata |
+| Un file respinto che ferma i report di tutti | importazioni | D21: il verdetto è fissato, quindi blocca solo la passata in cui arriva; l'esito lo registra con il motivo | accettata: un giorno di report fermo; le notifiche arrivano nella PR B2 |
+| File enorme caricato nel volume | importazioni | — | accettata: carica solo chi è fidato (in collaudo il workspace ha un utente) |
 | Un'edizione che fa fallire il job ferma le altre | job | una transazione per edizione, errori isolati, uscita 1 (ADR-0007) | mitigata |
 
 ### E · Elevation of privilege

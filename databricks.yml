@@ -129,16 +129,23 @@ resources:
       schema: silver
       serverless: true
       channel: CURRENT
-      # In sys.path: pipeline_storico.py importa il pacchetto academy_analisi accanto.
+      # In sys.path: i file della pipeline importano il pacchetto academy_analisi accanto.
       root_path: ./build/app/analisi
       libraries:
         - file:
             path: ./build/app/analisi/pipeline_storico.py
+        # Importazioni dei CSV dal volume e controlli di qualità (ADR-0017).
+        - file:
+            path: ./build/app/analisi/pipeline_importazioni.py
+      configuration:
+        academy.importazioni: /Volumes/${var.catalogo}/bronze/importazioni
 
   jobs:
     analisi:
       name: academy-analisi-${bundle.target}
-      description: Snapshot giornaliero di Lakebase in bronze, poi storico SCD 2 in silver
+      description: >-
+        Snapshot giornaliero di Lakebase in bronze, storico SCD 2 e importazioni in silver,
+        gate di qualità, gold dei report ed esito in qualita.esiti
       max_concurrent_runs: 1
       schedule:
         quartz_cron_expression: "0 0 5 * * ?"
@@ -163,6 +170,49 @@ resources:
             - task_key: snapshot
           pipeline_task:
             pipeline_id: ${resources.pipelines.storico.id}
+        # Gate di qualità (ADR-0017): fissa il verdetto dei file importati nuovi e fallisce
+        # se uno è respinto, così il gold non si aggiorna.
+        - task_key: controlli
+          depends_on:
+            - task_key: storico
+          environment_key: analisi
+          spark_python_task:
+            python_file: ./build/app/analisi/controlli_qualita.py
+            parameters:
+              - --qualita
+              - ${var.catalogo}.qualita
+              - --run-id
+              - "{{job.run_id}}"
+        - task_key: gold
+          depends_on:
+            - task_key: controlli
+          environment_key: analisi
+          spark_python_task:
+            python_file: ./build/app/analisi/aggiorna_gold.py
+            parameters:
+              - --silver
+              - ${var.catalogo}.silver
+              - --qualita
+              - ${var.catalogo}.qualita
+              - --gold
+              - ${var.catalogo}.gold
+        # Gira sempre, anche dopo un errore: registra com'è andata la passata.
+        - task_key: registra_esito
+          depends_on:
+            - task_key: gold
+          run_if: ALL_DONE
+          environment_key: analisi
+          spark_python_task:
+            python_file: ./build/app/analisi/registra_esito.py
+            parameters:
+              - --qualita
+              - ${var.catalogo}.qualita
+              - --run-id
+              - "{{job.run_id}}"
+              - --controlli
+              - "{{tasks.controlli.result_state}}"
+              - --gold
+              - "{{tasks.gold.result_state}}"
 
 targets:
   collaudo:

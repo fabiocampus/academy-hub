@@ -26,6 +26,8 @@ locals {
     bronze = "Dati grezzi, come arrivano dalle sorgenti"
     silver = "Dati puliti e validati"
     gold   = "Aggregati per i report"
+    # ADR-0017: quarantena, stato dei file importati, verdetti del gate, esiti del job.
+    qualita = "Controlli di qualità delle importazioni"
   }
 
   # "collaudo/gold" => { catalogo, schema, commento }
@@ -87,6 +89,12 @@ resource "databricks_grants" "gold" {
   grant {
     principal  = "account users"
     privileges = ["USE_SCHEMA", "SELECT"]
+  }
+
+  # Il task `gold` del job analisi riscrive le tabelle dei report (ADR-0017).
+  grant {
+    principal  = data.databricks_service_principal.rilascio.application_id
+    privileges = ["USE_SCHEMA", "CREATE_TABLE"]
   }
 }
 

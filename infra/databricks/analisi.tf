@@ -78,6 +78,16 @@ resource "databricks_grants" "bronze" {
     principal  = data.databricks_service_principal.rilascio.application_id
     privileges = ["USE_SCHEMA", "CREATE_TABLE"]
   }
+
+  # Per arrivare al volume delle importazioni (qualita.tf), dove in collaudo tutti
+  # possono caricare file. Solo l'accesso allo schema: le tabelle non le leggono.
+  dynamic "grant" {
+    for_each = contains(var.importazioni_aperte, each.key) ? [1] : []
+    content {
+      principal  = "account users"
+      privileges = ["USE_SCHEMA"]
+    }
+  }
 }
 
 resource "databricks_grants" "silver" {

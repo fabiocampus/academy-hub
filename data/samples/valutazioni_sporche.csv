@@ -1,0 +1,9 @@
+edizione_id,email,voto,commento
+101,ada.rossi@academy.example,5,Chiaro e pratico
+101,bruno.verdi@academy.example,7,Voto oltre la scala
+101,dario.gallo@academy.example,abc,Voto non numerico
+102,carla.neri@academy.example,4,Prima versione
+102,carla.neri@academy.example,2,Seconda versione
+999,dario.gallo@academy.example,4,Edizione che non esiste
+101,zeno.ignoto@academy.example,3,Persona sconosciuta
+101,dario.gallo@academy.example,4,"=HYPERLINK(""https://x.example"",""clic"")"

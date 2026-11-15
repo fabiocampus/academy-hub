@@ -6,6 +6,7 @@ dal file con importlib. Rete, git e orologio sono sostituiti con monkeypatch.
 
 import importlib.util
 import json
+import re
 import types
 import urllib.error
 import urllib.request
@@ -118,11 +119,14 @@ def test_copia_analisi_porta_job_pipeline_e_pacchetto(
 
 
 def test_copia_analisi_del_repository(prepara: types.ModuleType, tmp_path: Path) -> None:
-    # I file che databricks.yml nomina devono esserci davvero.
+    # I file che databricks.yml nomina (pipeline e task del job) devono esserci davvero.
     prepara.copia_analisi(prepara.ANALISI, tmp_path)
+    bundle = (prepara.RADICE / "databricks.yml").read_text(encoding="utf-8")
+    nominati = set(re.findall(r"\./build/app/(analisi/[\w/]+\.py)", bundle))
 
-    for file in ("snapshot_bronze.py", "pipeline_storico.py", "academy_analisi/storico.py"):
-        assert (tmp_path / "analisi" / file).is_file()
+    assert len(nominati) >= 6
+    for file in [*sorted(nominati), "analisi/academy_analisi/storico.py"]:
+        assert (tmp_path / file).is_file(), file
 
 
 # --- fumo_rilascio.attendi_health -------------------------------------------------
