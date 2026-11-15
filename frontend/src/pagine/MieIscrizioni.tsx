@@ -3,7 +3,8 @@ import { Button, Group, Modal, Stack, Table, Text, Title } from "@mantine/core";
 import { useState } from "react";
 
 import type { Schemi } from "../api/client";
-import { useAnnullaIscrizione, useMieIscrizioni } from "../api/query";
+import { useFlag } from "../api/flag";
+import { useAnnullaIscrizione, useMieIscrizioni, useScaricaCalendario } from "../api/query";
 import { avvisaErrore, avvisaSuccesso } from "../componenti/avvisi";
 import { formattaPeriodo } from "../componenti/formato";
 import { Paginazione } from "../componenti/Paginazione";
@@ -19,6 +20,8 @@ export function MieIscrizioni() {
   const iscrizioni = useMieIscrizioni({ limite: PER_PAGINA, offset: (pagina - 1) * PER_PAGINA });
   const annullamento = useAnnullaIscrizione();
   const [daAnnullare, setDaAnnullare] = useState<Voce | null>(null);
+  const flag = useFlag();
+  const calendario = useScaricaCalendario();
 
   function annulla(voce: Voce): void {
     annullamento.mutate(voce.id, {
@@ -71,18 +74,36 @@ export function MieIscrizioni() {
                       </Group>
                     </Table.Td>
                     <Table.Td>
-                      {STATI_ANNULLABILI.has(voce.stato) ? (
-                        <Button
-                          size="xs"
-                          variant="light"
-                          color="red"
-                          aria-label={`Annulla l'iscrizione a ${voce.corso.titolo}`}
-                          onClick={() => {
-                            setDaAnnullare(voce);
-                          }}
-                        >
-                          Annulla
-                        </Button>
+                      {STATI_ANNULLABILI.has(voce.stato) ||
+                      (flag.calendario && voce.stato === "Confermata") ? (
+                        <Group gap="xs" wrap="nowrap">
+                          {flag.calendario && voce.stato === "Confermata" && (
+                            <Button
+                              size="xs"
+                              variant="light"
+                              aria-label={`Aggiungi al calendario ${voce.corso.titolo}`}
+                              loading={calendario.isPending && calendario.variables === voce.id}
+                              onClick={() => {
+                                calendario.mutate(voce.id, { onError: avvisaErrore });
+                              }}
+                            >
+                              Calendario
+                            </Button>
+                          )}
+                          {STATI_ANNULLABILI.has(voce.stato) && (
+                            <Button
+                              size="xs"
+                              variant="light"
+                              color="red"
+                              aria-label={`Annulla l'iscrizione a ${voce.corso.titolo}`}
+                              onClick={() => {
+                                setDaAnnullare(voce);
+                              }}
+                            >
+                              Annulla
+                            </Button>
+                          )}
+                        </Group>
                       ) : (
                         "—"
                       )}

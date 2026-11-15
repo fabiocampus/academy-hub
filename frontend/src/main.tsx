@@ -12,6 +12,7 @@ import { BrowserRouter } from "react-router";
 import { Accesso } from "./accesso/Accesso";
 import { riprova } from "./api/client";
 import { leggiConfigurazione } from "./api/configurazione";
+import { ContestoFlag } from "./api/flag";
 import { App } from "./App";
 import { messaggio } from "./componenti/Stati";
 import { tema, variabiliCss } from "./tema";
@@ -42,13 +43,15 @@ function mostra(contenuto: ReactNode): void {
 leggiConfigurazione().then(
   (configurazione) => {
     mostra(
-      <Accesso configurazione={configurazione}>
-        <QueryClientProvider client={queryClient}>
-          <BrowserRouter>
-            <App />
-          </BrowserRouter>
-        </QueryClientProvider>
-      </Accesso>,
+      <ContestoFlag.Provider value={configurazione.flag}>
+        <Accesso configurazione={configurazione}>
+          <QueryClientProvider client={queryClient}>
+            <BrowserRouter>
+              <App />
+            </BrowserRouter>
+          </QueryClientProvider>
+        </Accesso>
+      </ContestoFlag.Provider>,
     );
   },
   (errore: unknown) => {

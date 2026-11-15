@@ -49,6 +49,7 @@ Asset da proteggere: l'esito delle richieste (chi va al corso), i posti delle ed
 | D14 | HTML dell'app con `Content-Security-Policy` (script solo dalla stessa origine, nessun `object`, `base-uri` e `form-action` limitati, `frame-ancestors 'none'`, rete solo verso l'app e l'emittente OIDC), `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`; file serviti solo da dentro la build, `/api` mai coperto dal fallback | `academy_hub/frontend.py`, ADR-0009 §14 |
 | D16 | Infrastruttura nel codice: ruleset, environment e permessi cambiano solo con una PR e un apply approvato nell'environment `infra` (policy sul ramo `main` per nome); token GitHub di sola lettura per il plan, quello che scrive solo nell'environment approvato; stato su HCP (cifrato, con lock), mai nel repository; deriva cercata ogni settimana | `infra/`, `.github/workflows/infra.yml`, ADR-0012 |
 | D17 | Rilascio continuo solo da `main`: environment `collaudo` e `prod` limitati al ramo `main`, `prod` con approvatore e senza bypass degli admin; credenziali del service principal `academy-rilascio` solo nei secret degli environment (mai nel repository, mai sulla riga di comando); URL dell'App, host e id del workspace mascherati nei log pubblici prima del deploy; secret OAuth che ruota dopo 335 giorni (#80); `bundle deploy` senza `--auto-approve` | `.github/workflows/rilascio.yml`, `rilascia-ambiente.yml`, `infra/databricks-identita/`, ADR-0013 |
+| D18 | Feature flag spente per difetto, controllate dall'API (404 prima dell'identità, il frontend nasconde solo); accensione in prod con una PR; evento `.ics` solo al titolare di un'iscrizione Confermata, `Cache-Control: no-store`; dati di prova sintetici (`@academy.example`) rifiutati dalla configurazione in `produzione` | `config.py`, `api/rotte/iscrizioni.py`, `db/dati_prova.py`, `databricks.yml`, ADR-0014 |
 
 ## Minacce
 
@@ -96,6 +97,8 @@ Stato: **mitigata** (una difesa la copre), **accettata** (rischio residuo consap
 | Scoprire che un'iscrizione esiste: per un id altrui la risposta è 403, non 404, e gli id sono sequenziali | lettura, decisioni, annullamento | — | accettata: rivela solo l'esistenza di un numero, non chi né dove |
 | Elenco delle richieste altrui | US-07 | la query applica la stessa regola del decisore, verificata da un test | mitigata |
 | Dettagli interni negli errori | tutti | D10 | mitigata |
+| Evento di calendario di un'iscrizione altrui (titolo del corso, date) | calendario | D18, D4: solo il titolare, come la lettura dell'iscrizione | mitigata |
+| Funzione non pronta usata in produzione chiamando l'API a mano | calendario | D18: da spenta la rotta risponde 404 anche ai client che la conoscono | mitigata |
 | Report letti con i permessi dell'App invece che con quelli dell'utente | report | D15: il service principal non ha grant su Unity Catalog, la query usa il token dell'utente (`letto_come` lo mostra) | mitigata; il rifiuto per un altro utente è provato solo nei test (Free Edition ha un utente) |
 | Token dell'utente (`X-Forwarded-Access-Token`) nei log o riusato dall'App | report | D15: mai registrato, usato solo per la query fissa del report, in memoria per la richiesta | mitigata |
 | Segreti nel repository pubblico | — | D12 (gitleaks in pre-commit e in CI, push protection), solo dati sintetici | mitigata |
@@ -126,6 +129,7 @@ Stato: **mitigata** (una difesa la copre), **accettata** (rischio residuo consap
 | Codice vulnerabile o workflow iniettabile | — | D12 (CodeQL `security-extended`, permessi minimi nei workflow) | mitigata in parte |
 | Ruleset o environment allentati a mano dalla UI, o con un workflow modificato in una PR che legge i secret dell'infrastruttura | — | D16; il plan delle PR ha un token GitHub di sola lettura, le PR da fork non hanno secret; un ramo diverso da `main` non entra nell'environment `infra` | mitigata in parte: il token di HCP in `infra-plan` è un token utente e può scrivere lo stato (accettata: solo il proprietario apre rami); il proprietario resta amministratore e può cambiare tutto dalla UI (lo rileva il plan del lunedì) |
 | Workflow su `main` compromesso (merge di una PR malevola o di un'azione di terze parti alterata) che usa le credenziali di `academy-rilascio`: il service principal è admin del workspace | rilascio | D17, D12 (azioni fissate per SHA), D5 e ruleset (ogni modifica passa da PR con CI verde); prod esige l'approvazione | accettata: admin necessario per App e Lakebase su Free Edition, dati sintetici, un solo sviluppatore (ADR-0013); con un account vero federation OIDC e un workspace per ambiente |
+| Dati di prova sintetici caricati in produzione (persone e iscrizioni finte nei report veri) | avvio | D18: `ACADEMY_DATI_PROVA` vietata con `ACADEMY_AMBIENTE=produzione`, l'App non parte; variabile del bundle spenta nel target `prod` | mitigata |
 
 ## Rischi accettati e limiti del piano gratuito
 

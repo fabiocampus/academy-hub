@@ -272,11 +272,18 @@ class ConfigurazioneOidc(BaseModel):
     client_id: str = Field(description="Client pubblico del frontend (authorization code + PKCE)")
 
 
+class FlagFunzioni(BaseModel):
+    """Feature flag dell'ambiente (ADR-0014): il frontend mostra solo le funzioni accese."""
+
+    calendario: bool = Field(description="Download dell'evento .ics delle iscrizioni Confermate")
+
+
 class ConfigurazioneClient(BaseModel):
     """Come si accede: con `oidc` il frontend fa il login; con `databricks` lo fa la piattaforma."""
 
     identita: Literal["oidc", "databricks", "provvisoria"]
     oidc: ConfigurazioneOidc | None
+    flag: FlagFunzioni
 
 
 class RigaReportIscrizioni(BaseModel):

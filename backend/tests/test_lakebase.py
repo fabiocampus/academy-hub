@@ -127,6 +127,32 @@ def test_avvio_prepara_due_volte(
 
 
 @pytest.mark.integrazione
+def test_avvio_carica_dati_prova_se_accesi(
+    nuovo_database: Callable[[str], str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Collaudo (ACADEMY_DATI_PROVA=true): dati sintetici al primo avvio, non duplicati."""
+    url = nuovo_database("academy_avvio_prova")
+    monkeypatch.setenv("ACADEMY_DATABASE_URL", url)
+    monkeypatch.setenv("ACADEMY_DATABASE_SCHEMA", "academy_prova")
+    monkeypatch.setenv("ACADEMY_ADMIN_EMAIL", "admin@example.com")
+    monkeypatch.setenv("ACADEMY_DATI_PROVA", "true")
+
+    prepara()
+    motore = crea_motore(impostazioni())
+    try:
+        with Session(motore) as sessione:
+            prima = len(sessione.scalars(select(Persona)).all())
+        prepara()
+        with Session(motore) as sessione:
+            email = sessione.scalars(select(Persona.email)).all()
+    finally:
+        motore.dispose()
+    assert len(email) == prima > 1
+    assert "admin@example.com" in email
+    assert sum(e.endswith("@academy.example") for e in email) == prima - 1
+
+
+@pytest.mark.integrazione
 def test_migrazioni_nello_schema_dedicato(
     nuovo_database: Callable[[str], str], monkeypatch: pytest.MonkeyPatch
 ) -> None:

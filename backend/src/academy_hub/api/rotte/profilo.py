@@ -8,6 +8,7 @@ from academy_hub.api.errori import risposte
 from academy_hub.api.schemi import (
     ConfigurazioneClient,
     ConfigurazioneOidc,
+    FlagFunzioni,
     PersonaInBreve,
     Profilo,
 )
@@ -35,7 +36,9 @@ def configurazione_client(imp: Impostazioni) -> ConfigurazioneClient:
     oidc = None
     if imp.identita == "oidc":
         oidc = ConfigurazioneOidc(emittente=imp.oidc_emittente, client_id=imp.oidc_client_web)
-    return ConfigurazioneClient(identita=imp.identita, oidc=oidc)
+    return ConfigurazioneClient(
+        identita=imp.identita, oidc=oidc, flag=FlagFunzioni(calendario=imp.flag_calendario)
+    )
 
 
 @router.get("/configurazione", operation_id="configurazione")

@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { impostaAlNonAutenticato, impostaToken } from "../api/client";
+import { FLAG_SPENTE } from "../api/flag";
 import { useProfilo } from "../api/query";
 import { tema, variabiliCss } from "../tema";
 import { API, profiloDipendente, server } from "../test/server";
@@ -70,7 +71,7 @@ describe("Accesso", () => {
     salvaUtente("token-di-anna", 300);
     const autorizzazioni = registraAutorizzazioni();
 
-    mostraAccesso({ identita: "oidc", oidc: OIDC }, <ChiSono />);
+    mostraAccesso({ flag: FLAG_SPENTE, identita: "oidc", oidc: OIDC }, <ChiSono />);
 
     expect(await screen.findByText(profiloDipendente.nome)).toBeInTheDocument();
     expect(autorizzazioni).toEqual(["Bearer token-di-anna"]);
@@ -80,7 +81,7 @@ describe("Accesso", () => {
     salvaUtente("token-scaduto", -60);
     const autorizzazioni = registraAutorizzazioni();
 
-    mostraAccesso({ identita: "oidc", oidc: OIDC }, <ChiSono />);
+    mostraAccesso({ flag: FLAG_SPENTE, identita: "oidc", oidc: OIDC }, <ChiSono />);
 
     expect(await screen.findByRole("button", { name: "Accedi" })).toBeInTheDocument();
     expect(autorizzazioni).toEqual([]);
@@ -97,27 +98,27 @@ describe("Accesso", () => {
       ),
     );
 
-    mostraAccesso({ identita: "oidc", oidc: OIDC }, <ChiSono />);
+    mostraAccesso({ flag: FLAG_SPENTE, identita: "oidc", oidc: OIDC }, <ChiSono />);
 
     expect(await screen.findByRole("button", { name: "Accedi" })).toBeInTheDocument();
     expect(window.sessionStorage.length).toBe(0);
   });
 
   it("con OIDC e senza sessione chiede di accedere", async () => {
-    mostraAccesso({ identita: "oidc", oidc: OIDC });
+    mostraAccesso({ flag: FLAG_SPENTE, identita: "oidc", oidc: OIDC });
 
     expect(await screen.findByRole("button", { name: "Accedi" })).toBeInTheDocument();
     expect(screen.queryByText("Area riservata")).not.toBeInTheDocument();
   });
 
   it("su Databricks entra subito: il login l'ha fatto la piattaforma", () => {
-    mostraAccesso({ identita: "databricks", oidc: null });
+    mostraAccesso({ flag: FLAG_SPENTE, identita: "databricks", oidc: null });
 
     expect(screen.getByText("Area riservata")).toBeInTheDocument();
   });
 
   it("con l'identità provvisoria del backend non entra", () => {
-    mostraAccesso({ identita: "provvisoria", oidc: null });
+    mostraAccesso({ flag: FLAG_SPENTE, identita: "provvisoria", oidc: null });
 
     expect(screen.getByText("Accesso non configurato")).toBeInTheDocument();
     expect(screen.queryByText("Area riservata")).not.toBeInTheDocument();
@@ -136,7 +137,7 @@ describe("Accesso", () => {
   it("cliccando «Accedi» ricorda la pagina aperta", async () => {
     window.history.replaceState({}, "", "/approvazioni?pagina=2");
     const accedi = vi.spyOn(UserManager.prototype, "signinRedirect").mockResolvedValue();
-    mostraAccesso({ identita: "oidc", oidc: OIDC });
+    mostraAccesso({ flag: FLAG_SPENTE, identita: "oidc", oidc: OIDC });
 
     await userEvent.click(await screen.findByRole("button", { name: "Accedi" }));
 

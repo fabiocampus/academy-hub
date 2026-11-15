@@ -43,6 +43,13 @@ class ReportNonDisponibile(ErroreDominio):
     titolo = "Report non disponibile"
 
 
+class FunzioneNonDisponibile(ErroreDominio):
+    """Feature flag spenta in questo ambiente (ADR-0014): la rotta risponde come se non ci fosse."""
+
+    tipo = "funzione-non-disponibile"
+    titolo = "Funzione non disponibile in questo ambiente"
+
+
 class NonTrovato(ErroreDominio, LookupError):
     tipo = "non-trovato"
     titolo = "Risorsa inesistente"

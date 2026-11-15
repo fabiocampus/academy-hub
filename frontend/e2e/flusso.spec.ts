@@ -2,6 +2,8 @@
  * Criterio della fase 7: richiesta → approvazione → conferma da browser, con tre utenti
  * veri di Keycloak (US-04, US-06, US-08).
  */
+import { readFile } from "node:fs/promises";
+
 import { expect, test } from "@playwright/test";
 
 import { entra, preparaEdizione } from "./sessione";
@@ -36,4 +38,15 @@ test("richiesta, approvazione del responsabile e conferma dell'admin", async ({
   // Il dipendente la vede Confermata.
   await dipendente.reload();
   await expect(riga).toContainText("Confermata");
+
+  // Feature flag accesa in compose (ADR-0014): l'evento si scarica con il token OIDC.
+  const [scaricato] = await Promise.all([
+    dipendente.waitForEvent("download"),
+    riga.getByRole("button", { name: `Aggiungi al calendario ${titolo}` }).click(),
+  ]);
+  expect(scaricato.suggestedFilename()).toMatch(/^iscrizione-\d+\.ics$/);
+  const percorso = await scaricato.path();
+  const evento = await readFile(percorso, "utf-8");
+  expect(evento).toContain("BEGIN:VEVENT");
+  expect(evento.replace(/\r\n /g, "")).toContain(`SUMMARY:${titolo}`);
 });
