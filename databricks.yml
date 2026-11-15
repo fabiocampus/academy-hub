@@ -139,6 +139,39 @@ resources:
             path: ./build/app/analisi/pipeline_importazioni.py
       configuration:
         academy.importazioni: /Volumes/${var.catalogo}/bronze/importazioni
+      # Avvisi (fase 12, docs/runbook.md): email all'admin quando un aggiornamento fallisce.
+      notifications:
+        - email_recipients:
+            - ${var.admin_email}
+          alerts:
+            - on-update-failure
+            - on-update-fatal-failure
+
+  # Alert SQL (fase 12, docs/runbook.md): ogni mattina dopo il job, email all'admin se
+  # nelle ultime 24 ore c'è un esito bloccato o in errore in qualita.esiti (ADR-0017).
+  alerts:
+    qualita:
+      display_name: academy-qualita-${bundle.target}
+      warehouse_id: ${var.warehouse_id}
+      query_text: >-
+        SELECT count(*) AS falliti FROM ${var.catalogo}.qualita.esiti
+        WHERE esito IN ('bloccato', 'errore')
+        AND registrato_il > current_timestamp() - INTERVAL 24 HOURS
+      evaluation:
+        source:
+          name: falliti
+        comparison_operator: GREATER_THAN
+        threshold:
+          value:
+            double_value: 0
+        empty_result_state: OK
+        notification:
+          notify_on_ok: true
+          subscriptions:
+            - user_email: ${var.admin_email}
+      schedule:
+        quartz_cron_schedule: "0 0 6 * * ?"
+        timezone_id: Europe/Rome
 
   jobs:
     analisi:
@@ -147,6 +180,10 @@ resources:
         Snapshot giornaliero di Lakebase in bronze, storico SCD 2 e importazioni in silver,
         gate di qualità, gold dei report ed esito in qualita.esiti
       max_concurrent_runs: 1
+      # Avviso (fase 12, docs/runbook.md): email all'admin a ogni run fallita.
+      email_notifications:
+        on_failure:
+          - ${var.admin_email}
       schedule:
         quartz_cron_expression: "0 0 5 * * ?"
         timezone_id: Europe/Rome
