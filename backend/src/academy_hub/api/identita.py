@@ -137,9 +137,9 @@ class Oidc:
                 errore
             )
         except jwt.PyJWTError as errore:
-            # Il motivo esatto (pubblico, emittente, kid attesi) resta nel log, non nella
-            # risposta.
-            log.info("Token rifiutato: %s", errore)
+            # Nel log la classe del motivo (InvalidAudienceError, ExpiredSignatureError...),
+            # senza messaggio come ogni eccezione (fase 12); nella risposta niente.
+            log.info("Token rifiutato: %s", type(errore).__name__)
             raise NonAutenticato("Token non valido") from errore
         if dati.get("email_verified") is not True:
             raise NonAutenticato("L'email del token non è verificata dal provider")

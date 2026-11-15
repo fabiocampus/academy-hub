@@ -46,10 +46,26 @@ class FormatoJson(logging.Formatter):
         if isinstance(campi, dict):
             riga.update(campi)  # pyright: ignore[reportUnknownArgumentType]
         if record.exc_info and record.exc_info[0] is not None:
-            classe, _, tb = record.exc_info
+            classe, errore, tb = record.exc_info
             riga["eccezione"] = classe.__qualname__
             riga["stack"] = "".join(traceback.format_tb(tb))
+            cause = _cause(errore)
+            if cause:
+                riga["cause"] = cause
         return json.dumps(riga, ensure_ascii=False, default=str)
+
+
+def _cause(errore: BaseException | None) -> list[str]:
+    """Classi della catena __cause__/__context__ (un IntegrityError dietro un errore di
+    dominio), senza messaggi."""
+    classi: list[str] = []
+    visti: set[int] = set()
+    corrente = errore.__cause__ or errore.__context__ if errore is not None else None
+    while corrente is not None and id(corrente) not in visti and len(classi) < 10:
+        visti.add(id(corrente))
+        classi.append(type(corrente).__qualname__)
+        corrente = corrente.__cause__ or corrente.__context__
+    return classi
 
 
 def configura_log(livello: str = "INFO") -> None:

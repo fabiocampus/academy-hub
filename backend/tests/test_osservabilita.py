@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from academy_hub.main import crea_app
-from academy_hub.osservabilita import FormatoJson, id_richiesta, nuovo_id
+from academy_hub.osservabilita import FormatoJson, configura_log, id_richiesta, nuovo_id
 
 # Composta a runtime: lo stack riporta le righe del sorgente, non i valori.
 EMAIL = "mario" + ".rossi@example.org"
@@ -117,3 +117,37 @@ def test_formato_json_campi_ed_eccezione_senza_messaggio() -> None:
     assert riga["eccezione"] == "ValueError"
     assert "test_formato_json" in riga["stack"]
     assert "mario.rossi" not in json.dumps(riga)
+
+
+def test_formato_json_catena_delle_cause_senza_messaggi() -> None:
+    try:
+        try:
+            raise KeyError(EMAIL)
+        except KeyError as interno:
+            raise RuntimeError("dominio") from interno
+    except RuntimeError:
+        record = logging.getLogger("prova").makeRecord(
+            "prova", logging.ERROR, __file__, 1, "x", (), exc_info=sys.exc_info()
+        )
+
+    riga = json.loads(FormatoJson().format(record))
+
+    assert riga["cause"] == ["KeyError"]
+    assert "mario.rossi" not in json.dumps(riga)
+
+
+def test_configura_log_spegne_access_log_e_usa_json() -> None:
+    radice = logging.getLogger()
+    prima = radice.handlers[:], radice.level
+    try:
+        configura_log("INFO")
+        configura_log("INFO")
+
+        assert len(radice.handlers) == 1
+        assert isinstance(radice.handlers[0].formatter, FormatoJson)
+        accesso = logging.getLogger("uvicorn.access")
+        assert accesso.handlers == []
+        assert accesso.propagate is False
+    finally:
+        radice.handlers[:] = prima[0]
+        radice.setLevel(prima[1])
