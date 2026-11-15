@@ -24,6 +24,9 @@ from academy_analisi.snapshot import nome_tabella
 INIZIO, FINE = "__START_AT", "__END_AT"
 STATI_CONCLUDIBILI = ("Confermata", "Completata")
 SOGLIA_COMPLETAMENTO = 75
+# Row filter delle tabelle per team (ADR-0018): funzione nello schema gold.
+FILTRO_TEAM = "vede_team"
+FILTRATE_PER_TEAM = ("iscrizioni_concluse", "ore_per_team")
 
 
 def correnti(storico: DataFrame) -> DataFrame:
@@ -233,9 +236,48 @@ def lettore(spark: SparkSession, qualita: str) -> Callable[[str], DataFrame]:
     return leggi
 
 
-def sovrascrivi(righe: DataFrame, nome: str) -> None:
-    """Riscrive la tabella Delta (schema compreso): il gold si ricalcola per intero."""
-    righe.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(nome)
+def sql_filtro_team(silver: str, gold: str) -> str:
+    """La funzione del row filter: vede un team chi ne è responsabile (oggi, nello storico),
+    l'amministratore Academy e gli amministratori del workspace (ADR-0018).
+
+    Si valuta con i diritti di chi l'ha creata (il service principal del job): chi legge il
+    gold non ha bisogno di leggere silver. Persona riconosciuta dall'email, come l'App.
+    """
+    persone, team = nome_tabella(silver, "persone"), nome_tabella(silver, "team")
+    # Nomi validati da nome_tabella; nessun valore del client nel testo.
+    return (
+        f"CREATE OR REPLACE FUNCTION {nome_tabella(gold, FILTRO_TEAM)}(team_id BIGINT) "  # noqa: S608
+        "RETURNS BOOLEAN "
+        "COMMENT 'Row filter per team (ADR-0018): responsabile del team, admin_academy, admins' "
+        "RETURN is_account_group_member('admins') OR is_member('admins') "
+        f"OR team_id IN (SELECT t.id FROM {team} t JOIN {persone} p "
+        f"ON t.responsabile_id = p.id WHERE t.{FINE} IS NULL AND p.{FINE} IS NULL "
+        "AND lower(p.email) = lower(current_user())) "
+        f"OR EXISTS (SELECT 1 FROM {persone} p WHERE p.{FINE} IS NULL "
+        "AND lower(p.email) = lower(current_user()) "
+        "AND array_contains(p.ruoli, 'admin_academy'))"
+    )
+
+
+def sql_sovrascrivi(nome: str, vista: str, filtro: str | None) -> str:
+    """Riscrive la tabella dalla vista; con il filtro già attaccato, mai un istante senza."""
+    con_filtro = f" WITH ROW FILTER {filtro} ON (team_id)" if filtro else ""
+    # Nomi costruiti da questo modulo con schemi validati, mai input esterno.
+    return f"CREATE OR REPLACE TABLE {nome}{con_filtro} AS SELECT * FROM {vista}"  # noqa: S608
+
+
+def sovrascrittore(spark: SparkSession, silver: str, gold: str) -> Callable[[DataFrame, str], None]:
+    """Riscrive le tabelle gold (schema compreso); quelle per team con il row filter."""
+    filtro = nome_tabella(gold, FILTRO_TEAM)
+    spark.sql(sql_filtro_team(silver, gold))
+
+    def scrivi(righe: DataFrame, nome: str) -> None:
+        vista = f"_gold_{nome.rsplit('.', 1)[1]}"
+        righe.createOrReplaceTempView(vista)
+        per_team = nome.rsplit(".", 1)[1] in FILTRATE_PER_TEAM
+        spark.sql(sql_sovrascrivi(nome, vista, filtro if per_team else None))
+
+    return scrivi
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -253,7 +295,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     spark = SparkSession.builder.getOrCreate()
     tabelle = aggiorna(
         leggi=lettore(spark, a.qualita),
-        scrivi=sovrascrivi,
+        scrivi=sovrascrittore(spark, a.silver, a.gold),
         silver=a.silver,
         qualita=a.qualita,
         gold=a.gold,

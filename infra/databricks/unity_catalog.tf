@@ -91,10 +91,11 @@ resource "databricks_grants" "gold" {
     privileges = ["USE_SCHEMA", "SELECT"]
   }
 
-  # Il task `gold` del job analisi riscrive le tabelle dei report (ADR-0017).
+  # Il task `gold` del job analisi riscrive le tabelle dei report (ADR-0017) e la
+  # funzione del row filter per team (ADR-0018).
   grant {
     principal  = data.databricks_service_principal.rilascio.application_id
-    privileges = ["USE_SCHEMA", "CREATE_TABLE"]
+    privileges = ["USE_SCHEMA", "CREATE_TABLE", "CREATE_FUNCTION"]
   }
 }
 

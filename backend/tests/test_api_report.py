@@ -12,10 +12,14 @@ from academy_hub.api import PREFISSO
 from academy_hub.api.identita import Databricks
 from academy_hub.main import crea_app
 from academy_hub.report import (
+    ORE_PER_TEAM,
+    Gold,
+    ReportGold,
     ReportIscrizioniPerCorso,
     ReportNonAutorizzato,
     ReportNonDisponibile,
     RigaIscrizioniPerCorso,
+    T,
 )
 
 from .api import R
@@ -32,12 +36,24 @@ class LettoreFinto:
     def __init__(self, esito: ReportIscrizioniPerCorso | Exception = REPORT) -> None:
         self.esito = esito
         self.token: list[str | None] = []
+        self.letti: list[object] = []
 
     def iscrizioni_per_corso(self, token_utente: str | None) -> ReportIscrizioniPerCorso:
         self.token.append(token_utente)
         if isinstance(self.esito, Exception):
             raise self.esito
         return self.esito
+
+    def gold(self, report: Gold[T], token_utente: str | None) -> ReportGold[T]:
+        self.token.append(token_utente)
+        self.letti.append(report)
+        if isinstance(self.esito, Exception):
+            raise self.esito
+        return ReportGold(letto_come="anna@esempio.test", righe=[report.riga(r) for r in RIGHE])
+
+
+# Righe come le dà la Statement Execution API (testo), senza `letto_come`.
+RIGHE: list[list[str | None]] = [["7", "Dati", "16", "2"]]
 
 
 @pytest.fixture
@@ -113,3 +129,26 @@ def test_errori_del_lettore_come_problemi(
     assert risposta.status_code == stato
     assert risposta.headers["content-type"] == "application/problem+json"
     assert risposta.json()["type"] == f"/problemi/{tipo}"
+
+
+@pytest.mark.integrazione
+def test_ore_per_team_dal_gold(client: TestClient, lettore: LettoreFinto) -> None:
+    risposta = client.get(f"{PREFISSO}/report/ore-per-team", headers=ANNA)
+
+    assert risposta.status_code == 200
+    assert risposta.json() == {
+        "letto_come": "anna@esempio.test",
+        "righe": [{"team_id": 7, "team": "Dati", "ore_formazione": 16, "iscrizioni_completate": 2}],
+    }
+    assert lettore.letti == [ORE_PER_TEAM]
+    assert lettore.token == ["token-di-anna"]
+    assert risposta.headers["cache-control"] == "no-store"
+
+
+@pytest.mark.integrazione
+def test_report_gold_errore_come_problema(client: TestClient, lettore: LettoreFinto) -> None:
+    lettore.esito = ReportNonDisponibile("warehouse spento")
+
+    risposta = client.get(f"{PREFISSO}/report/valutazione-media", headers=ANNA)
+
+    assert risposta.status_code == 503

@@ -16,10 +16,16 @@ from academy_hub.dominio.errori import (
     ReportNonDisponibile,
 )
 from academy_hub.report import (
+    ORE_PER_TEAM,
+    TASSO_COMPLETAMENTO,
+    VALUTAZIONE_MEDIA,
     NessunReport,
     ReportDatabricks,
     ReportIscrizioniPerCorso,
     RigaIscrizioniPerCorso,
+    RigaOrePerTeam,
+    RigaTassoCompletamento,
+    RigaValutazioneMedia,
     invio_http,
     lettore_report,
     sessione_senza_cookie,
@@ -345,3 +351,49 @@ def test_lettore_dalla_configurazione() -> None:
 def test_report_configurato_a_meta_e_un_errore() -> None:
     with pytest.raises(ValueError, match="report"):
         Impostazioni(ambiente="locale", report_warehouse_id="0123456789abcdef")
+
+
+def test_gold_ore_per_team() -> None:
+    trasporto = Trasporto(
+        200, _riuscita([["anna@esempio.test", "7", None, "16", "2"]], ORE_PER_TEAM.colonne)
+    )
+
+    report = _lettore(trasporto).gold(ORE_PER_TEAM, "token-di-anna")
+
+    assert report.letto_come == "anna@esempio.test"
+    assert report.righe == [RigaOrePerTeam(7, None, 16, 2)]
+    token, richiesta = trasporto.chiamate[0]
+    assert (token, richiesta["schema"]) == ("token-di-anna", "gold")
+    assert "FROM ore_per_team" in richiesta["statement"]
+
+
+def test_gold_tasso_e_valutazione_decimali() -> None:
+    tasso = Trasporto(
+        200,
+        _riuscita([["a@esempio.test", "1", "SQL", "4", "3", "0.75"]], TASSO_COMPLETAMENTO.colonne),
+    )
+    voto = Trasporto(
+        200, _riuscita([["a@esempio.test", "1", "SQL", "3", "4.33"]], VALUTAZIONE_MEDIA.colonne)
+    )
+
+    assert _lettore(tasso).gold(TASSO_COMPLETAMENTO, "t").righe == [
+        RigaTassoCompletamento(1, "SQL", 4, 3, 0.75)
+    ]
+    assert _lettore(voto).gold(VALUTAZIONE_MEDIA, "t").righe == [
+        RigaValutazioneMedia(1, "SQL", 3, 4.33)
+    ]
+
+
+def test_gold_vuoto_colonne_inattese_e_valori_non_validi() -> None:
+    vuoto = _lettore(Trasporto(200, _riuscita([], ORE_PER_TEAM.colonne)))
+    assert vuoto.gold(ORE_PER_TEAM, "t").righe == []
+    with pytest.raises(ReportNonDisponibile, match="colonne"):
+        _lettore(Trasporto(200, _riuscita([], COLONNE))).gold(ORE_PER_TEAM, "t")
+    with pytest.raises(ReportNonDisponibile, match="Valori"):
+        _lettore(
+            Trasporto(200, _riuscita([["a", "x", "Dati", "1", "1"]], ORE_PER_TEAM.colonne))
+        ).gold(ORE_PER_TEAM, "t")
+    with pytest.raises(ReportNonDisponibile, match="token"):
+        vuoto.gold(ORE_PER_TEAM, None)
+    with pytest.raises(ReportNonDisponibile):
+        NessunReport().gold(ORE_PER_TEAM, "t")

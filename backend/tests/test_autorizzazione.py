@@ -44,7 +44,7 @@ from academy_hub.db.modelli import Edizione, Persona
 from academy_hub.dominio.ruoli import Ruolo
 from academy_hub.dominio.stati import StatoIscrizione
 from academy_hub.main import crea_app
-from academy_hub.report import ReportIscrizioniPerCorso
+from academy_hub.report import Gold, ReportGold, ReportIscrizioniPerCorso, T
 
 from .dati import crea_edizione, crea_iscrizione, crea_persona, crea_team
 from .oidc import ProviderFinto
@@ -216,6 +216,15 @@ MATRICE: dict[tuple[str, str], Riga] = {
         lambda m: Chiamata("GET", "/report/iscrizioni-per-corso"),
         TUTTI,
     ),
+    ("GET", "/report/ore-per-team"): (lambda m: Chiamata("GET", "/report/ore-per-team"), TUTTI),
+    ("GET", "/report/tasso-completamento"): (
+        lambda m: Chiamata("GET", "/report/tasso-completamento"),
+        TUTTI,
+    ),
+    ("GET", "/report/valutazione-media"): (
+        lambda m: Chiamata("GET", "/report/valutazione-media"),
+        TUTTI,
+    ),
     # Pubblica: il frontend la legge prima del login.
     ("GET", "/configurazione"): (
         lambda m: Chiamata("GET", "/configurazione"),
@@ -280,6 +289,9 @@ def client(
     class Lettore:
         def iscrizioni_per_corso(self, token_utente: str | None) -> ReportIscrizioniPerCorso:
             return report
+
+        def gold(self, report: Gold[T], token_utente: str | None) -> ReportGold[T]:
+            return ReportGold(letto_come=None, righe=[])
 
     try:
         with TestClient(crea_app(motore=db, identita=provider.oidc(), report=Lettore())) as client:
