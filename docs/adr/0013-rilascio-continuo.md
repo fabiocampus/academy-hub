@@ -29,4 +29,4 @@ Vincoli:
 - Il merge di una PR porta la build in collaudo da solo, e in produzione dopo un clic sull'approvazione. La CI gira anche su `main`, prima del rilascio.
 - Un secret in più da rinnovare dal PC, insieme a quello di `academy-terraform` (#80).
 - Il service principal admin può fare tutto nel workspace: rischio accettato, come per `academy-terraform` (dati sintetici, un solo sviluppatore). Con un account vero: federation OIDC al posto del secret, e due workspace con un service principal ciascuno.
-- Da questa fase il rollback (rilascio di un artifact precedente) e la feature flag del calendario sono nella seconda PR; le metriche DORA si calcolano dai deployment che gli environment registrano.
+- Da questa fase il rollback (rilascio di un artifact precedente) e la feature flag del calendario sono nella seconda PR; le metriche DORA si calcolano dai deployment che gli environment registrano (ADR-0014, ADR-0015).
