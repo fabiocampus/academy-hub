@@ -45,7 +45,9 @@ variables:
       di collaudo non può usare: ogni target non-prod ha quindi uno schema suo.
     default: academy
   catalogo:
-    description: Catalogo Unity Catalog del target (ADR-0011).
+    description: >-
+      Catalogo Unity Catalog del target (ADR-0011). Cataloghi, schemi e grant li
+      gestisce Terraform in infra/databricks (ADR-0012); il bundle passa solo il nome all'App.
   warehouse_id:
     description: >-
       SQL warehouse con cui l'App legge i report, con l'identità dell'utente. Cercato per
@@ -54,33 +56,6 @@ variables:
       warehouse: Serverless Starter Warehouse
 
 resources:
-  # Parte analitica (ADR-0011): un catalogo per ambiente con i livelli medallion. Leggere
-  # gold è concesso agli utenti; il service principal dell'App non ha grant: i report li
-  # legge con il token dell'utente, così decidono i suoi permessi.
-  catalogs:
-    academy:
-      name: ${var.catalogo}
-      comment: Academy Hub, parte analitica (dati sintetici)
-      grants:
-        - principal: account users
-          privileges: [USE_CATALOG]
-  schemas:
-    bronze:
-      catalog_name: ${resources.catalogs.academy.name}
-      name: bronze
-      comment: Dati grezzi, come arrivano dalle sorgenti
-    silver:
-      catalog_name: ${resources.catalogs.academy.name}
-      name: silver
-      comment: Dati puliti e validati
-    gold:
-      catalog_name: ${resources.catalogs.academy.name}
-      name: gold
-      comment: Aggregati per i report
-      grants:
-        - principal: account users
-          privileges: [USE_SCHEMA, SELECT]
-
   apps:
     academy_hub:
       name: academy-hub-${bundle.target}
@@ -110,8 +85,9 @@ resources:
             value: ${var.admin_email}
           - name: ACADEMY_REPORT_WAREHOUSE_ID
             value_from: warehouse
+          # Il catalogo lo gestisce Terraform (infra/databricks, ADR-0012).
           - name: ACADEMY_REPORT_CATALOGO
-            value: ${resources.catalogs.academy.name}
+            value: ${var.catalogo}
       # La risorsa postgres dell'App sta nei target: il branch è un riferimento
       # all'endpoint del target, così il bundle crea prima Lakebase e poi l'App.
 
@@ -161,21 +137,6 @@ targets:
       branch_lakebase: production
       catalogo: academy_prod
     resources:
-      # In prod né il catalogo né i suoi schemi (con le tabelle) si cancellano dal bundle.
-      catalogs:
-        academy:
-          lifecycle:
-            prevent_destroy: true
-      schemas:
-        bronze:
-          lifecycle:
-            prevent_destroy: true
-        silver:
-          lifecycle:
-            prevent_destroy: true
-        gold:
-          lifecycle:
-            prevent_destroy: true
       postgres_projects:
         academy_hub:
           project_id: ${var.progetto_lakebase}

@@ -5,8 +5,10 @@ Terraform per la piattaforma, il bundle (`databricks.yml`) per le risorse del pr
 | Cartella | Provider | Workspace HCP | Che cosa |
 |---|---|---|---|
 | `github/` | `integrations/github` | `academy-github` | repository, ruleset `main protetto`, environment `infra` e `infra-plan`, label |
+| `databricks/` | `databricks/databricks` | `academy-databricks` | cataloghi `academy_collaudo`/`academy_prod` (in SQL, `crea_catalogo.py`), schemi `bronze`/`silver`/`gold`, grant, secret scope `academy-hub` |
+| `databricks-identita/` | `databricks`, `github`, `time` | `academy-databricks-identita` | service principal `academy-terraform` (admin del workspace, `CREATE CATALOG`), il suo secret OAuth e i secret `DATABRICKS_*` negli environment. **Solo dal PC**, niente workflow |
 
-Lo stato è su HCP Terraform Free (organizzazione `academy-hub-studio`, execution mode locale). Il workflow `.github/workflows/infra.yml` fa il plan nelle PR, l'apply su `main` dopo l'approvazione nell'environment `infra` e un plan di deriva ogni lunedì.
+Lo stato è su HCP Terraform Free (organizzazione `academy-hub-studio`, execution mode locale). Il workflow `.github/workflows/infra.yml` fa il plan nelle PR, l'apply su `main` dopo l'approvazione nell'environment `infra` e un plan di deriva ogni lunedì, per `github/` e `databricks/`.
 
 ## Dal PC
 
@@ -15,7 +17,14 @@ terraform login                      # una volta: token di HCP Terraform
 cd infra/github
 terraform init
 GITHUB_TOKEN=$(gh auth token) terraform plan
+
+cd ../databricks                     # e ../databricks-identita
+DATABRICKS_CONFIG_PROFILE=academy GITHUB_TOKEN=$(gh auth token) terraform plan
 ```
+
+Su Windows il provider databricks cerca la CLI per l'autenticazione del profilo: se non la trova, `DATABRICKS_CLI_PATH` con il percorso di `databricks.exe`. Per creare un catalogo servono anche `python` (non l'alias dello Store) e `databricks` nel PATH: `crea_catalogo.py` gira con `cmd /C`.
+
+`databricks-identita/` si applica solo dal PC: il secret di un service principal si legge con un'API di account, e su Free Edition admin dell'account è solo il proprietario. Lì va rifatto un `apply` quando il plan propone di sostituire il secret (dopo 335 giorni; scade dopo un anno).
 
 ## Prima volta (bootstrap)
 
@@ -37,4 +46,10 @@ GITHUB_TOKEN=$(gh auth token) terraform plan
    gh secret set GH_TERRAFORM_SCRITTURA --env infra
    ```
 
-Da lì ogni modifica passa da una PR.
+5. Databricks (fase 9, PR B), dal PC con il profilo `academy`:
+   1. `databricks-identita/`: `apply` (service principal, grant `CREATE CATALOG`, secret e secret `DATABRICKS_*` negli environment);
+   2. `databricks/`: `apply` (cataloghi, schemi, grant, secret scope). Su un workspace dove esistono già, senza stato, prima `terraform import` di schemi (`<catalogo>.<schema>`) e grant (`catalog/<catalogo>`, `schema/<catalogo>.gold`).
+
+   Se cataloghi e schemi stanno ancora nel bundle, prima `databricks bundle deployment unbind <chiave> -t <target>` per `academy`, `bronze`, `silver`, `gold`, con il `databricks.yml` che li contiene: un `bundle deploy` che non li trova più nel file li cancellerebbe.
+
+Da lì ogni modifica passa da una PR (tranne `databricks-identita/`).
