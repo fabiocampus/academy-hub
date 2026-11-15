@@ -17,7 +17,8 @@ from collections.abc import Callable, Sequence
 from pyspark.sql import Column, DataFrame, SparkSession, Window
 from pyspark.sql import functions as F
 
-from academy_analisi.gate import VERDETTI
+from academy_analisi.gate import SCHEMA_VERDETTI, VERDETTI
+from academy_analisi.letture import leggi_o_vuota
 from academy_analisi.snapshot import nome_tabella
 
 INIZIO, FINE = "__START_AT", "__END_AT"
@@ -216,6 +217,22 @@ def aggiorna(
     return tabelle
 
 
+def lettore(spark: SparkSession, qualita: str) -> Callable[[str], DataFrame]:
+    """Legge le tabelle per `aggiorna`; i verdetti possono mancare (nessun CSV ancora).
+
+    `gate.controlla` crea `qualita.verdetti` solo al primo file: senza, il gold vale per
+    lo storico e nessuna presenza o valutazione.
+    """
+    verdetti = nome_tabella(qualita, VERDETTI)
+
+    def leggi(nome: str) -> DataFrame:
+        if nome == verdetti:
+            return leggi_o_vuota(spark, nome, SCHEMA_VERDETTI)
+        return spark.read.table(nome)
+
+    return leggi
+
+
 def sovrascrivi(righe: DataFrame, nome: str) -> None:
     """Riscrive la tabella Delta (schema compreso): il gold si ricalcola per intero."""
     righe.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(nome)
@@ -235,7 +252,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     spark = SparkSession.builder.getOrCreate()
     tabelle = aggiorna(
-        leggi=spark.read.table,
+        leggi=lettore(spark, a.qualita),
         scrivi=sovrascrivi,
         silver=a.silver,
         qualita=a.qualita,

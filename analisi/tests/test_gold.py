@@ -3,6 +3,7 @@
 from datetime import UTC, date, datetime
 
 import pytest
+from pyspark.errors import AnalysisException
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
@@ -11,6 +12,7 @@ from academy_analisi.gold import (
     correnti,
     da_file_accettati,
     iscrizioni_concluse,
+    lettore,
     ore_per_team,
     tasso_completamento,
     valutazione_media,
@@ -321,6 +323,15 @@ def test_aggiorna_esclude_i_file_respinti(
     }
     assert (concluse[1000].giorni_presenti, concluse[1000].completata) == (2, False)
     assert scritte["academy_collaudo.gold.ore_per_team"].collect() == []
+
+
+def test_lettore_senza_verdetti_da_vuoti(spark: SparkSession) -> None:
+    # Prima del primo CSV `qualita.verdetti` non esiste: il gold non deve fallire.
+    leggi = lettore(spark, "spark_catalog.qualita_assente")
+
+    assert leggi("spark_catalog.qualita_assente.verdetti").collect() == []
+    with pytest.raises(AnalysisException):
+        _ = leggi("spark_catalog.qualita_assente.altra").schema
 
 
 def test_soglia_fuori_scala(

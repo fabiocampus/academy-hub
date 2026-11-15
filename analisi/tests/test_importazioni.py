@@ -35,7 +35,9 @@ def _scrivi(cartella: Path, nome: str, testo: str) -> Path:
 
 @su_file
 def test_righe_come_testo_con_file_e_istante(spark: SparkSession, tmp_path: Path) -> None:
-    _scrivi(tmp_path, "a.csv", "edizione_id,email,giorno\n7,anna@academy.example,2026-01-02\n")
+    file = _scrivi(
+        tmp_path, "a.csv", "edizione_id,email,giorno\n7,anna@academy.example,2026-01-02\n"
+    )
 
     righe = _leggi(spark, tmp_path).collect()
 
@@ -46,7 +48,8 @@ def test_righe_come_testo_con_file_e_istante(spark: SparkSession, tmp_path: Path
         "2026-01-02",
     )
     assert righe[0][COLONNA_FILE].endswith("/a.csv")
-    assert righe[0][COLONNA_CARICATA] is not None
+    # L'istante è la modifica del file, stabile anche rileggendolo (full refresh).
+    assert abs(righe[0][COLONNA_CARICATA].timestamp() - file.stat().st_mtime) < 1
 
 
 @su_file

@@ -58,11 +58,15 @@ def cartella(radice: str, tipo: str) -> str:
 
 
 def con_provenienza(righe: DataFrame) -> DataFrame:
-    """Le righe con il file di origine (`_metadata.file_path`) e l'istante di caricamento."""
+    """Le righe con il file di origine (`_metadata.file_path`) e l'istante di caricamento.
+
+    L'istante è la data di modifica del file, non quella della lettura: resta uguale anche
+    dopo un full refresh, così "la prima valutazione caricata" non cambia.
+    """
     return righe.select(
         "*",
         F.col("_metadata.file_path").alias(COLONNA_FILE),
-        F.current_timestamp().alias(COLONNA_CARICATA),
+        F.col("_metadata.file_modification_time").alias(COLONNA_CARICATA),
     )
 
 
