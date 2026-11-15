@@ -4,9 +4,9 @@ Il progetto (fasi 1–13, 2026-11-13 → 2026-11-15) è stato scritto quasi tutt
 
 ## Che cosa ha fatto bene
 
-- **Volume con disciplina.** API a livelli, frontend, parte analitica, Terraform e pipeline di rilascio in tre giorni, ogni modifica da una PR collegata a una issue e con CI verde (oltre 600 test pytest, un centinaio di Vitest, end-to-end con Playwright e axe).
+- **Volume con disciplina.** API a livelli, frontend, parte analitica, Terraform e pipeline di rilascio in tre giorni, ogni modifica da una PR collegata a una issue e con CI verde (oltre 800 test pytest, test Vitest del frontend, end-to-end con Playwright e axe).
 - **Test dove contano.** Concorrenza sull'ultimo posto con transazioni vere (ADR-0004), matrice rotta × profilo che fallisce se una rotta non ha la sua riga, contratto OpenAPI con impronta per versione.
-- **Misurare invece di supporre.** `EXPLAIN ANALYZE` su dati sintetici: la query delle richieste da decidere (US-07) riscritta da 150 a 15 ms (#54). Terraform introdotto con 28 `import` e piano a zero modifiche (#77); deriva provata aggiungendo un grant a mano (#79); rollback provato andando indietro e avanti in collaudo e produzione (#89).
+- **Misurare invece di supporre.** `EXPLAIN ANALYZE` su dati sintetici: la query delle richieste da decidere (US-07) riscritta da 100-185 a 10-18 ms per query (#54). Terraform introdotto con 27 `import` e nessuna modifica alle risorse esistenti (#77); deriva provata aggiungendo un grant a mano (#79); rollback provato andando indietro e avanti in collaudo e produzione (#89).
 - **Gli end-to-end hanno trovato bug veri** che i test unitari non vedevano: callback di `mutate()` perse allo smontaggio del componente e contrasto insufficiente del tema Mantine (#67).
 - **Incidente gestito con metodo**: alert, rollback, correzione, post-mortem con azioni (#114, #115).
 
@@ -23,10 +23,10 @@ Codice che sembrava giusto, passava i test locali e falliva nel sistema vero:
 | `spark.catalog.tableExists` | Non ammesso da py4j nella pipeline serverless (#101) | job di collaudo |
 | Tabella che può non esistere | `gold` leggeva `qualita.verdetti` prima che qualcuno la creasse (#104) | revisore |
 | Secret del workflow riutilizzabile | Il workflow chiamato riceveva secret vuoti: mancava `secrets: inherit` (#84) | primo rilascio |
-| Identità provvisoria | Con `ACADEMY_AMBIENTE` predefinito a `locale` l'header di test `X-Persona-Id` passava anche fuori dal locale (#58) | rilettura della sicurezza |
+| Identità provvisoria | Con `ACADEMY_AMBIENTE` predefinito a `locale` l'header di test `X-Persona-Id` poteva passare in un deploy senza `ACADEMY_AMBIENTE` (#58) | threat model (#57) |
 | Orologio dell'App | Momenti di approvazione presi dall'orologio dell'App e non da quello del database; controllo del titolare dopo i lock (#51) | revisore |
 | Un errore ferma tutto | Il job di sistema si fermava alla prima edizione in errore invece di isolarla (#52) | revisore |
-| `on_failure` del job | Con un task finale `ALL_DONE` il job finisce `SUCCESS_WITH_FAILURES` e l'email del job non parte (#114) | incidente simulato |
+| `on_failure` del job | Con un task finale `ALL_DONE` il job finisce `SUCCESS_WITH_FAILURES` e l'email del job non parte (#111, #115) | incidente simulato |
 
 Il filo comune: **l'agente conosce l'API documentata, non il comportamento della piattaforma gratuita** (Databricks serverless, Free Edition). Quei casi si scoprono solo eseguendo nel sistema vero.
 

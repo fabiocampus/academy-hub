@@ -29,9 +29,9 @@ Le procedure passo per passo stanno in `.claude/skills/` (le usa l'agente, valgo
 ## Controlli prima della PR
 
 ```bash
-cd backend  && uv run ruff check && uv run ruff format --check && uv run pyright && uv run pytest
-cd frontend && npm run lint && npm run formato && npm run tipi && npm test
-cd analisi  && uv run ruff check && uv run pyright && uv run pytest   # se tocchi analisi/
+(cd backend  && uv run ruff check && uv run ruff format --check && uv run pyright && uv run pytest)
+(cd frontend && npm run lint && npm run formato && npm run tipi && npm test)
+(cd analisi  && uv run ruff check && uv run pyright && uv run pytest)   # se tocchi analisi/
 ```
 
 Gli end-to-end (`npm run e2e` in `frontend/`, con docker compose acceso) girano comunque in CI.

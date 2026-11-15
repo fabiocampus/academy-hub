@@ -8,7 +8,7 @@ Chi usa il sistema e con che cosa parla.
 
 ```mermaid
 flowchart LR
-    dip["Dipendente<br/>chiede l'iscrizione"]
+    dip["Dipendente, dirigente, docente<br/>chiede l'iscrizione"]
     resp["Responsabile<br/>decide le richieste del team"]
     adm["Amministratore Academy<br/>corsi, edizioni, posti, presenze"]
     hub["Academy Hub<br/>iscrizioni, approvazioni,<br/>report controllati"]
@@ -36,7 +36,8 @@ flowchart TB
         api["Backend<br/>FastAPI, SQLAlchemy<br/><i>backend/</i>"]
     end
     db[("Database transazionale<br/>Lakebase / PostgreSQL 17<br/>schema academy")]
-    idp["Proxy Databricks Apps<br/>X-Forwarded-Email<br/>(locale: Keycloak OIDC)"]
+    idp["Proxy Databricks Apps<br/>X-Forwarded-Email (solo cloud)"]
+    kc["Keycloak<br/>OIDC con PKCE (solo locale)"]
     subgraph uc["Unity Catalog: academy_{env}"]
         oltp[("academy_{env}_oltp<br/>Lakebase registrato")]
         bronze[("bronze<br/>snapshot, volume importazioni")]
@@ -49,6 +50,8 @@ flowchart TB
     alert["Alert SQL<br/>academy-qualita-{env}"]
 
     browser -- "HTTPS /api/v1, JSON" --> idp --> api
+    browser -. "locale: login, poi Bearer" .-> kc
+    api -. "locale: JWKS" .-> kc
     api -- "SQL, token OAuth come password" --> db
     api -- "report con il token dell'utente (OBO)" --> wh --> gold
     db -.-> oltp
@@ -96,7 +99,7 @@ Regole: niente logica nelle rotte, niente SQL fuori dai repository, un solo punt
 
 ```mermaid
 flowchart LR
-    pr["Pull request<br/>Closes #n"] --> ci["CI: check obbligatori del ruleset<br/>lint, tipi, test, analisi, frontend,<br/>immagine+Trivy, compose, e2e,<br/>CodeQL, pip-audit, gitleaks"]
+    pr["Pull request<br/>Closes #n"] --> ci["CI: check obbligatori del ruleset<br/>lint, tipi, test, analisi, frontend,<br/>immagine+Trivy, compose, e2e,<br/>CodeQL, dipendenze (pip-audit),<br/>gitleaks, issue-collegata"]
     ci --> main["main<br/>(squash)"]
     main --> build["build/app<br/>un artifact"]
     build --> coll["collaudo<br/>bundle deploy + fumo"]

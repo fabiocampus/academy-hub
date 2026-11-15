@@ -19,8 +19,9 @@ Lo schema cambia solo con una migrazione (`docs/database.md`). Le migrazioni gir
 
 1. Test prima: un test in `tests/test_vincoli.py` (vincolo) o nel test del servizio che userà lo schema nuovo; deve fallire.
 2. Modifica `src/academy_hub/db/modelli.py`.
-3. Database locale acceso (`docker compose up -d --wait db migrazioni` dalla radice), poi:
+3. Database locale acceso (`docker compose up -d --wait db migrazioni` dalla radice), poi (`127.0.0.1`: `localhost` su Windows si può bloccare su IPv6):
    ```bash
+   export ACADEMY_DATABASE_URL=postgresql+psycopg://academy:academy@127.0.0.1:5432/academy
    uv run alembic revision --autogenerate --rev-id <NNNN> -m "<descrizione_breve>"
    ```
    `<NNNN>` = numero dell'ultima migrazione in `src/academy_hub/db/schema/versions/` + 1, a quattro cifre: gli id sono sequenziali, non esadecimali casuali. Il file prende il nome `AAAAMMGG_NNNN_descrizione.py`.

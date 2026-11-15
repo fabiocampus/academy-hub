@@ -22,7 +22,7 @@ Come stanno insieme: [docs/architettura.md](docs/architettura.md) (diagrammi C4)
 Serve solo **Docker** (Docker Desktop o equivalente, con Compose v2). Dalla radice del repository:
 
 ```bash
-docker compose up -d --build --wait   # database, migrazioni, dati demo, Keycloak, backend con il frontend, job
+docker compose up -d --build --wait   # database, migrazioni, dati demo, Keycloak, backend con il frontend, job, Grafana/OTLP
 ```
 
 La prima volta scarica le immagini e compila: qualche minuto. Poi:
@@ -46,9 +46,9 @@ Per fermare: `docker compose down` (`-v` cancella anche i dati). Il file `.env` 
 Strumenti: [uv](https://docs.astral.sh/uv/) (Python), Node 24 con npm, Docker per i test d'integrazione. In alternativa c'è il dev container (`.devcontainer/`).
 
 ```bash
-cd backend && uv sync && uv run pytest        # test (quelli `integrazione` avviano PostgreSQL con Testcontainers)
-cd frontend && npm ci && npm test             # Vitest; npm run dev per il server di sviluppo su :5173
-cd analisi && uv sync && uv run pytest        # trasformazioni su Spark locale (serve Java 17+)
+(cd backend && uv sync && uv run pytest)      # test (quelli `integrazione` avviano PostgreSQL con Testcontainers)
+(cd frontend && npm ci && npm test)           # Vitest; npm run dev per il server di sviluppo su :5173
+(cd analisi && uv sync && uv run pytest)      # trasformazioni su Spark locale (serve Java 17: non 24+, Hadoop)
 ```
 
 Tutti i comandi, la struttura del codice e le regole sono in [CLAUDE.md](CLAUDE.md) (scritto per l'agente, utile a chiunque). Come proporre una modifica: [CONTRIBUTING.md](CONTRIBUTING.md).

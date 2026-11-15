@@ -82,7 +82,7 @@ uv run pre-commit install    # una volta per clone: hook pre-commit (ruff, gitle
 uv run pre-commit run --all-files
 ```
 
-Dentro `analisi/` (Python 3.12, come l'ambiente serverless 4 di Databricks; i test avviano Spark in locale: serve Java 17+):
+Dentro `analisi/` (Python 3.12, come l'ambiente serverless 4 di Databricks; i test avviano Spark in locale: serve Java 17, non 24+ per Hadoop):
 
 ```bash
 uv sync                      # pyspark e gli strumenti, solo per sviluppo e test
