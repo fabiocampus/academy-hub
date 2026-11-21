@@ -1,5 +1,5 @@
 /** US-05, US-10: le mie iscrizioni, con annullamento confermato da una finestra. */
-import { Button, Group, Modal, Stack, Table, Text, Title } from "@mantine/core";
+import { Button, Group, Modal, Stack, Table, Text } from "@mantine/core";
 import { useState } from "react";
 
 import type { Schemi } from "../api/client";
@@ -7,6 +7,7 @@ import { useFlag } from "../api/flag";
 import { useAnnullaIscrizione, useMieIscrizioni, useScaricaCalendario } from "../api/query";
 import { avvisaErrore, avvisaSuccesso } from "../componenti/avvisi";
 import { formattaPeriodo } from "../componenti/formato";
+import { IntestazionePagina } from "../componenti/IntestazionePagina";
 import { Paginazione } from "../componenti/Paginazione";
 import { Caricamento, Errore, Vuoto } from "../componenti/Stati";
 import { STATI_ANNULLABILI, StatoIscrizione } from "../componenti/StatoIscrizione";
@@ -37,7 +38,10 @@ export function MieIscrizioni() {
 
   return (
     <Stack>
-      <Title order={1}>Le mie iscrizioni</Title>
+      <IntestazionePagina
+        titolo="Le mie iscrizioni"
+        descrizione="Le richieste che hai fatto, a che punto sono e quelle che puoi ancora annullare."
+      />
       {iscrizioni.isPending && <Caricamento etichetta="Caricamento delle iscrizioni" />}
       {iscrizioni.isError && (
         <Errore errore={iscrizioni.error} riprova={() => void iscrizioni.refetch()} />

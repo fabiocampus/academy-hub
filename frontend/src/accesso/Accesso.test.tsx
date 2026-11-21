@@ -5,14 +5,22 @@ import { http, HttpResponse } from "msw";
 import userEvent from "@testing-library/user-event";
 import { User, UserManager } from "oidc-client-ts";
 import type { ReactNode } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { impostaAlNonAutenticato, impostaToken } from "../api/client";
 import { FLAG_SPENTE } from "../api/flag";
 import { useProfilo } from "../api/query";
 import { tema, variabiliCss } from "../tema";
 import { API, profiloDipendente, server } from "../test/server";
-import { Accesso, creaGestoreOidc, dopoIlLogin, percorsoDiRitorno } from "./Accesso";
+import {
+  Accesso,
+  CHIAVE_RITORNO,
+  PAGINA_PUBBLICA,
+  creaGestoreOidc,
+  dopoIlLogin,
+  percorsoDiRitorno,
+} from "./Accesso";
+import { navigazione } from "./navigazione";
 
 const OIDC = { emittente: "http://localhost:8080/realms/academy", client_id: "academy-web" };
 
@@ -62,9 +70,15 @@ function registraAutorizzazioni(): string[] {
 }
 
 describe("Accesso", () => {
+  let sostituisci: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    sostituisci = vi.spyOn(navigazione, "sostituisci").mockImplementation(() => undefined);
+  });
   afterEach(() => {
     impostaToken(() => Promise.resolve(undefined));
     impostaAlNonAutenticato(() => undefined);
+    window.history.replaceState({}, "", "/");
+    window.sessionStorage.clear();
   });
 
   it("con una sessione valida entra e manda il token del gestore all'API", async () => {
@@ -77,13 +91,15 @@ describe("Accesso", () => {
     expect(autorizzazioni).toEqual(["Bearer token-di-anna"]);
   });
 
-  it("con un token scaduto chiede di nuovo l'accesso e non lo manda", async () => {
+  it("con un token scaduto torna alla pagina pubblica e non lo manda", async () => {
     salvaUtente("token-scaduto", -60);
     const autorizzazioni = registraAutorizzazioni();
 
     mostraAccesso({ flag: FLAG_SPENTE, identita: "oidc", oidc: OIDC }, <ChiSono />);
 
-    expect(await screen.findByRole("button", { name: "Accedi" })).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(sostituisci).toHaveBeenCalledWith(PAGINA_PUBBLICA);
+    });
     expect(autorizzazioni).toEqual([]);
   });
 
@@ -100,14 +116,25 @@ describe("Accesso", () => {
 
     mostraAccesso({ flag: FLAG_SPENTE, identita: "oidc", oidc: OIDC }, <ChiSono />);
 
-    expect(await screen.findByRole("button", { name: "Accedi" })).toBeInTheDocument();
-    expect(window.sessionStorage.length).toBe(0);
+    await vi.waitFor(() => {
+      expect(sostituisci).toHaveBeenCalledWith(PAGINA_PUBBLICA);
+    });
+    expect(window.sessionStorage.getItem(`oidc.user:${OIDC.emittente}:${OIDC.client_id}`)).toBe(
+      null,
+    );
   });
 
-  it("con OIDC e senza sessione chiede di accedere", async () => {
+  it("senza sessione va alla pagina pubblica e ricorda la pagina aperta", async () => {
+    window.history.replaceState({}, "", "/approvazioni?pagina=2");
+    const accedi = vi.spyOn(UserManager.prototype, "signinRedirect").mockResolvedValue();
+
     mostraAccesso({ flag: FLAG_SPENTE, identita: "oidc", oidc: OIDC });
 
-    expect(await screen.findByRole("button", { name: "Accedi" })).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(sostituisci).toHaveBeenCalledWith(PAGINA_PUBBLICA);
+    });
+    expect(window.sessionStorage.getItem(CHIAVE_RITORNO)).toBe("/approvazioni?pagina=2");
+    expect(accedi).not.toHaveBeenCalled();
     expect(screen.queryByText("Area riservata")).not.toBeInTheDocument();
   });
 
@@ -134,17 +161,43 @@ describe("Accesso", () => {
     expect(gestore.settings.disablePKCE).toBe(false);
   });
 
-  it("cliccando «Accedi» ricorda la pagina aperta", async () => {
-    window.history.replaceState({}, "", "/approvazioni?pagina=2");
+  it("con ?accedi=1 dalla pagina pubblica parte il login verso la pagina ricordata", async () => {
+    window.sessionStorage.setItem(CHIAVE_RITORNO, "/approvazioni?pagina=2");
+    window.history.replaceState({}, "", "/?accedi=1");
     const accedi = vi.spyOn(UserManager.prototype, "signinRedirect").mockResolvedValue();
+
     mostraAccesso({ flag: FLAG_SPENTE, identita: "oidc", oidc: OIDC });
 
-    await userEvent.click(await screen.findByRole("button", { name: "Accedi" }));
+    await vi.waitFor(() => {
+      expect(accedi).toHaveBeenCalledWith(
+        expect.objectContaining({ state: { ritorno: "/approvazioni?pagina=2" } }),
+      );
+    });
+    expect(window.sessionStorage.getItem(CHIAVE_RITORNO)).toBe(null);
+    expect(sostituisci).not.toHaveBeenCalled();
+  });
 
-    expect(accedi).toHaveBeenCalledWith(
-      expect.objectContaining({ state: { ritorno: "/approvazioni?pagina=2" } }),
-    );
-    window.history.replaceState({}, "", "/");
+  it("con ?accedi=1 e nessuna pagina ricordata torna alla radice", async () => {
+    window.history.replaceState({}, "", "/?accedi=1");
+    const accedi = vi.spyOn(UserManager.prototype, "signinRedirect").mockResolvedValue();
+
+    mostraAccesso({ flag: FLAG_SPENTE, identita: "oidc", oidc: OIDC });
+
+    await vi.waitFor(() => {
+      expect(accedi).toHaveBeenCalledWith(expect.objectContaining({ state: { ritorno: "/" } }));
+    });
+  });
+
+  it("se il ritorno da Keycloak fallisce mostra l'errore e fa riprovare", async () => {
+    window.history.replaceState({}, "", "/?error=access_denied&state=sconosciuto");
+    const accedi = vi.spyOn(UserManager.prototype, "signinRedirect").mockResolvedValue();
+
+    mostraAccesso({ flag: FLAG_SPENTE, identita: "oidc", oidc: OIDC });
+
+    expect(await screen.findByText("Accesso non riuscito")).toBeInTheDocument();
+    expect(sostituisci).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Riprova ad accedere" }));
+    expect(accedi).toHaveBeenCalledWith(expect.objectContaining({ state: { ritorno: "/" } }));
   });
 });
 

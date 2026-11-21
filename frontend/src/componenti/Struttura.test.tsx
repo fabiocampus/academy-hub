@@ -99,6 +99,52 @@ describe("Struttura", () => {
     expect(screen.queryByText("Contenuto")).not.toBeInTheDocument();
   });
 
+  it("segna la voce della pagina corrente con aria-current (US-20)", async () => {
+    mostra(conPagina());
+
+    expect(await screen.findByRole("link", { name: "Catalogo" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(screen.getByRole("link", { name: "Le mie iscrizioni" })).not.toHaveAttribute(
+      "aria-current",
+    );
+  });
+
+  it("il primo link della pagina porta al contenuto (US-20)", async () => {
+    mostra(conPagina());
+    await screen.findByText("Contenuto");
+
+    const salta = screen.getByRole("link", { name: "Vai al contenuto" });
+    expect(salta).toHaveAttribute("href", "#contenuto");
+    expect(screen.getAllByRole("link")[0]).toBe(salta);
+    expect(screen.getByRole("main")).toHaveAttribute("id", "contenuto");
+  });
+
+  it("il pulsante del menu dice se il menu è aperto e Esc lo chiude (US-20)", async () => {
+    mostra(conPagina());
+    await screen.findByText("Contenuto");
+
+    const pulsante = screen.getByRole("button", { name: "Apri il menu" });
+    expect(pulsante).toHaveAttribute("aria-expanded", "false");
+    expect(pulsante).toHaveAttribute("aria-controls", "menu-principale");
+
+    await userEvent.click(pulsante);
+    expect(screen.getByRole("button", { name: "Chiudi il menu" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    expect(screen.getByRole("navigation", { name: "Menu principale" })).toHaveAttribute(
+      "data-aperto",
+    );
+
+    await userEvent.keyboard("{Escape}");
+    expect(screen.getByRole("button", { name: "Apri il menu" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+  });
+
   it("mostra le voci del menu in base al profilo", async () => {
     server.use(http.get(`${API}/io`, () => HttpResponse.json(profiloResponsabile)));
     mostra(conPagina());

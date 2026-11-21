@@ -1,5 +1,5 @@
 /** US-03: catalogo delle edizioni, filtrabile per titolo e paginato; US-04: richiesta. */
-import { Button, Stack, Table, Text, TextInput, Title } from "@mantine/core";
+import { Button, Stack, Table, Text, TextInput } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
 import { useRef, useState } from "react";
 
@@ -7,6 +7,7 @@ import type { Schemi } from "../api/client";
 import { useCatalogo, useProfilo, useRichiediIscrizione } from "../api/query";
 import { avvisaErrore, avvisaSuccesso } from "../componenti/avvisi";
 import { formattaPeriodo } from "../componenti/formato";
+import { IntestazionePagina } from "../componenti/IntestazionePagina";
 import { Paginazione } from "../componenti/Paginazione";
 import { Caricamento, Errore, Vuoto } from "../componenti/Stati";
 import { STATI_ANNULLABILI, StatoIscrizione } from "../componenti/StatoIscrizione";
@@ -105,7 +106,10 @@ export function Catalogo() {
 
   return (
     <Stack>
-      <Title order={1}>Catalogo</Title>
+      <IntestazionePagina
+        titolo="Catalogo"
+        descrizione="Le edizioni in programma, con i posti liberi e la lista d'attesa: chiedi un posto, decide il tuo responsabile."
+      />
       <TextInput
         label="Cerca per titolo"
         type="search"

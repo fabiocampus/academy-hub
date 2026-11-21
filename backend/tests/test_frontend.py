@@ -17,6 +17,7 @@ from academy_hub.main import crea_app
 
 INDICE = "<!doctype html><title>Academy Hub</title>"
 SEGRETO = "non deve uscire"
+BENVENUTO = "<!doctype html><title>Benvenuto</title>"
 
 
 @pytest.fixture
@@ -28,6 +29,9 @@ def build(tmp_path: Path) -> Path:
     (dist / "index.html").write_text(INDICE, encoding="utf-8")
     (dist / "assets" / "index-abc123.js").write_text("console.log(1)", encoding="utf-8")
     (dist / "favicon.svg").write_text("<svg/>", encoding="utf-8")
+    (dist / "benvenuto.html").write_text(BENVENUTO, encoding="utf-8")
+    (dist / "vetrina").mkdir()
+    (dist / "vetrina" / "avvio.js").write_text("void 0", encoding="utf-8")
     return dist
 
 
@@ -60,6 +64,28 @@ def test_index_con_intestazioni_di_sicurezza(client: TestClient) -> None:
     assert "connect-src 'self' http://localhost:8080" in csp
     assert intestazioni["X-Content-Type-Options"] == "nosniff"
     assert intestazioni["Referrer-Policy"] == "no-referrer"
+
+
+def test_pagina_pubblica_con_le_intestazioni_di_index(client: TestClient) -> None:
+    """La pagina pubblica statica (benvenuto.html) è HTML come index: stessa CSP, niente cache."""
+    risposta = client.get("/benvenuto.html")
+    indice = client.get("/").headers
+
+    assert risposta.status_code == 200
+    assert risposta.text == BENVENUTO
+    for nome in ("Content-Security-Policy", "Referrer-Policy", "X-Content-Type-Options"):
+        assert risposta.headers[nome] == indice[nome]
+    assert risposta.headers["Cache-Control"] == "no-cache"
+
+
+def test_file_della_vetrina_senza_csp(client: TestClient) -> None:
+    """Gli script e gli stili della vetrina sono file normali: niente CSP, nosniff sì."""
+    risposta = client.get("/vetrina/avvio.js")
+
+    assert risposta.status_code == 200
+    assert risposta.text == "void 0"
+    assert "Content-Security-Policy" not in risposta.headers
+    assert risposta.headers["X-Content-Type-Options"] == "nosniff"
 
 
 def test_head_sulle_rotte_del_client(client: TestClient) -> None:

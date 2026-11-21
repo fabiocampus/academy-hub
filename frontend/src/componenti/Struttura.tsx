@@ -1,8 +1,8 @@
-/** Intestazione, menu e area principale; il menu dipende dal profilo (ruoli). */
-import { AppShell, Burger, Button, Group, NavLink, Text } from "@mantine/core";
+/** Intestazione fissa, menu e area principale; il menu dipende dal profilo (ruoli). */
+import { Burger, Button } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
-import { Suspense } from "react";
-import { NavLink as Collegamento, Outlet, useLocation } from "react-router";
+import { Suspense, useEffect } from "react";
+import { Link, NavLink, Outlet, useLocation } from "react-router";
 
 import { useSessione } from "../accesso/contesto";
 import type { Schemi } from "../api/client";
@@ -35,61 +35,89 @@ export function vociMenu(profilo: Schemi["Profilo"]): VoceMenu[] {
   return voci;
 }
 
+/** Il marchio della pagina pubblica (un anello), nel colore d'azione. */
+function Marchio() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        fill="currentColor"
+        fillRule="evenodd"
+        d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 5.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z"
+      />
+    </svg>
+  );
+}
+
 export function Struttura() {
   const profilo = useProfilo();
   const { pathname } = useLocation();
   const { esci } = useSessione();
   const [aperto, { toggle, close }] = useDisclosure();
 
+  // Il pannello a tutto schermo del telefono si chiude con Esc.
+  useEffect(() => {
+    if (!aperto) return;
+    const suEsc = (evento: KeyboardEvent) => {
+      if (evento.key === "Escape") close();
+    };
+    document.addEventListener("keydown", suEsc);
+    return () => {
+      document.removeEventListener("keydown", suEsc);
+    };
+  }, [aperto, close]);
+
   return (
-    <AppShell
-      header={{ height: 56 }}
-      navbar={{ width: 220, breakpoint: "sm", collapsed: { mobile: !aperto } }}
-      padding="md"
-    >
-      <AppShell.Header>
-        <Group h="100%" px="md" justify="space-between" wrap="nowrap">
-          <Group gap="sm" wrap="nowrap">
-            <Burger
-              opened={aperto}
-              onClick={toggle}
-              hiddenFrom="sm"
-              size="sm"
-              aria-label={aperto ? "Chiudi il menu" : "Apri il menu"}
-              aria-expanded={aperto}
-            />
-            <Text fw={700} size="lg">
-              Academy Hub
-            </Text>
-          </Group>
-          <Group gap="sm" wrap="nowrap">
+    <>
+      <a className="salta" href="#contenuto">
+        Vai al contenuto
+      </a>
+      <header className="testata">
+        <div className="testata__barra">
+          <Link className="marchio" to="/" onClick={close}>
+            <Marchio />
+            Academy Hub
+          </Link>
+          <nav
+            id="menu-principale"
+            className="menu"
+            aria-label="Menu principale"
+            data-aperto={aperto || undefined}
+          >
+            {profilo.data !== undefined &&
+              vociMenu(profilo.data).map((voce) => (
+                <NavLink
+                  key={voce.percorso}
+                  className="menu__voce"
+                  to={voce.percorso}
+                  end={voce.percorso !== "/gestione"}
+                  onClick={close}
+                >
+                  {voce.etichetta}
+                </NavLink>
+              ))}
+          </nav>
+          <div className="testata__destra">
             {profilo.data !== undefined && (
-              <Text size="sm" visibleFrom="xs">
-                {profilo.data.nome}
-              </Text>
+              <span className="testata__persona">{profilo.data.nome}</span>
             )}
             {esci !== undefined && (
-              <Button variant="subtle" size="xs" onClick={esci}>
+              <Button variant="default" size="sm" onClick={esci}>
                 Esci
               </Button>
             )}
-          </Group>
-        </Group>
-      </AppShell.Header>
-      <AppShell.Navbar p="xs" aria-label="Menu principale">
-        {profilo.data !== undefined &&
-          vociMenu(profilo.data).map((voce) => (
-            <NavLink
-              key={voce.percorso}
-              component={Collegamento}
-              to={voce.percorso}
-              end={voce.percorso !== "/gestione"}
-              label={voce.etichetta}
-              onClick={close}
+            <Burger
+              className="testata__menu"
+              opened={aperto}
+              onClick={toggle}
+              size="sm"
+              aria-label={aperto ? "Chiudi il menu" : "Apri il menu"}
+              aria-expanded={aperto}
+              aria-controls="menu-principale"
             />
-          ))}
-      </AppShell.Navbar>
-      <AppShell.Main>
+          </div>
+        </div>
+      </header>
+      <main id="contenuto" className="contenuto" tabIndex={-1}>
         {profilo.isPending && <Caricamento etichetta="Caricamento del profilo" />}
         {profilo.isError && (
           <Errore errore={profilo.error} riprova={() => void profilo.refetch()} />
@@ -103,7 +131,7 @@ export function Struttura() {
             </Suspense>
           </ConfinePagina>
         )}
-      </AppShell.Main>
-    </AppShell>
+      </main>
+    </>
   );
 }

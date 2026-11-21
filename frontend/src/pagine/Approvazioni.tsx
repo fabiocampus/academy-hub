@@ -2,7 +2,7 @@
  * US-06, US-07: le richieste che spettano a me (responsabile diretto, o admin Academy per
  * chi non ha un responsabile sopra), da approvare o rifiutare con un motivo.
  */
-import { Button, Group, Modal, Stack, Table, Text, Textarea, Title } from "@mantine/core";
+import { Button, Group, Modal, Stack, Table, Text, Textarea } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { useState } from "react";
 
@@ -10,6 +10,7 @@ import { erroriDeiCampi, type Schemi } from "../api/client";
 import { useApprova, useRichiesteDaApprovare, useRifiuta } from "../api/query";
 import { avvisaErrore, avvisaSuccesso } from "../componenti/avvisi";
 import { formattaData, formattaIstante } from "../componenti/formato";
+import { IntestazionePagina } from "../componenti/IntestazionePagina";
 import { Paginazione } from "../componenti/Paginazione";
 import { Caricamento, Errore, Vuoto } from "../componenti/Stati";
 
@@ -29,7 +30,10 @@ export function Approvazioni() {
 
   return (
     <Stack>
-      <Title order={1}>Approvazioni</Title>
+      <IntestazionePagina
+        titolo="Approvazioni"
+        descrizione="Le richieste d'iscrizione che aspettano la tua decisione, dalla più vecchia."
+      />
       {richieste.isPending && <Caricamento etichetta="Caricamento delle richieste" />}
       {richieste.isError && (
         <Errore errore={richieste.error} riprova={() => void richieste.refetch()} />

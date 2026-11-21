@@ -24,6 +24,8 @@ node_modules/
 frontend/dist/
 playwright-report/
 test-results/
+# Stato del gate della taste-skill (screenshot, profilo del browser)
+frontend/.taste-skill/
 
 # Terraform
 .terraform/

@@ -18,9 +18,12 @@ async function senzaViolazioni(pagina: Page, titolo: string): Promise<void> {
   expect(esito.violations, `violazioni axe su «${titolo}»`).toEqual([]);
 }
 
-test("pagina di accesso", async ({ page }) => {
+test("pagina pubblica, dove arriva chi non ha una sessione", async ({ page }) => {
+  // Senza animazioni d'ingresso axe non misura il contrasto a metà dissolvenza.
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
-  await senzaViolazioni(page, "Academy Hub");
+  await expect(page).toHaveURL(/\/benvenuto\.html$/);
+  await senzaViolazioni(page, "Iscrizioni ai corsi dell'Academy aziendale");
 });
 
 test("pagine di ogni profilo", async ({ browser, request }) => {

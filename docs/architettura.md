@@ -31,7 +31,7 @@ Un'App su Databricks Apps (backend FastAPI che serve anche il frontend), un data
 
 ```mermaid
 flowchart TB
-    browser["Frontend<br/>React, Vite, Mantine<br/><i>frontend/</i>"]
+    browser["Frontend<br/>React, Vite, Mantine<br/>+ pagina pubblica statica<br/><i>frontend/</i>"]
     subgraph app["Databricks App (o backend di compose)"]
         api["Backend<br/>FastAPI, SQLAlchemy<br/><i>backend/</i>"]
     end
@@ -62,6 +62,7 @@ flowchart TB
     alert -- legge --> qual
 ```
 
+- Frontend: l'App React per chi ha una sessione; chi non ce l'ha (login OIDC) arriva a `/benvenuto.html`, una pagina statica costruita con la taste-skill (ADR-0020).
 - Identità: ADR-0008. App e Lakebase: ADR-0010. Report con l'identità dell'utente: ADR-0011, ADR-0018.
 - Parte analitica: ADR-0016 (storico), ADR-0017 (importazioni, qualità, gold).
 - Ambienti: `collaudo` e `prod`, ognuno con la sua App, il suo branch di Lakebase e il suo catalogo.

@@ -1,7 +1,7 @@
 /** Gestione Academy (issue #64): chi è iscritto a un'edizione; conferma delle Approvate (US-08). */
-import { Anchor, Button, SegmentedControl, Stack, Table, Text, Title } from "@mantine/core";
+import { Button, SegmentedControl, Stack, Table, Text } from "@mantine/core";
 import { useState } from "react";
-import { Link, useParams } from "react-router";
+import { useParams } from "react-router";
 
 import type { Schemi } from "../../api/client";
 import {
@@ -12,6 +12,7 @@ import {
 } from "../../api/gestione";
 import { avvisaErrore, avvisaSuccesso } from "../../componenti/avvisi";
 import { formattaIstante, formattaPeriodo, idDaPercorso } from "../../componenti/formato";
+import { IntestazionePagina } from "../../componenti/IntestazionePagina";
 import { Paginazione } from "../../componenti/Paginazione";
 import { Caricamento, Errore, Vuoto } from "../../componenti/Stati";
 import { StatoIscrizione } from "../../componenti/StatoIscrizione";
@@ -32,10 +33,10 @@ export function IscrizioniEdizione() {
 function PaginaNonTrovata() {
   return (
     <Stack>
-      <Anchor component={Link} to="/gestione" size="sm">
-        ← Tutti i corsi
-      </Anchor>
-      <Title order={1}>Iscrizioni dell&apos;edizione</Title>
+      <IntestazionePagina
+        titolo="Iscrizioni dell'edizione"
+        ritorno={{ a: "/gestione", etichetta: "Tutti i corsi" }}
+      />
       <Vuoto>Pagina non trovata.</Vuoto>
     </Stack>
   );
@@ -54,12 +55,10 @@ function Iscrizioni({ edizioneId }: { edizioneId: number }) {
   return (
     <Stack>
       {!edizione.isSuccess && (
-        <>
-          <Anchor component={Link} to="/gestione" size="sm">
-            ← Tutti i corsi
-          </Anchor>
-          <Title order={1}>Iscrizioni dell&apos;edizione</Title>
-        </>
+        <IntestazionePagina
+          titolo="Iscrizioni dell'edizione"
+          ritorno={{ a: "/gestione", etichetta: "Tutti i corsi" }}
+        />
       )}
       {edizione.isPending && <Caricamento etichetta="Caricamento dell'edizione" />}
       {edizione.isError && (
@@ -146,19 +145,20 @@ function Intestazione({ edizione }: { edizione: Schemi["EdizioneLetta"] }) {
   const corso = useCorso(edizione.corso_id);
   const titolo = corso.data?.dati.titolo ?? "Edizione";
   return (
-    <>
-      <Anchor component={Link} to={`/gestione/corsi/${String(edizione.corso_id)}`} size="sm">
-        ← Edizioni del corso
-      </Anchor>
-      <Stack gap={0}>
-        <Title order={1}>{titolo}</Title>
-        <Text c="dimmed" size="sm">
+    <IntestazionePagina
+      titolo={titolo}
+      descrizione={
+        <>
           {formattaPeriodo(edizione.data_inizio, edizione.data_fine)} · {edizione.posti_confermati}/
           {edizione.capienza} posti confermati
           {edizione.cancellata_il !== null && " · edizione cancellata"}
-        </Text>
-      </Stack>
-    </>
+        </>
+      }
+      ritorno={{
+        a: `/gestione/corsi/${String(edizione.corso_id)}`,
+        etichetta: "Edizioni del corso",
+      }}
+    />
   );
 }
 

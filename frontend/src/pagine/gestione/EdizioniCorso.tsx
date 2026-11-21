@@ -8,6 +8,7 @@ import { useCancellaEdizione, useCorso, useDocenti, useEdizioniDelCorso } from "
 import { avvisaErrore, avvisaSuccesso } from "../../componenti/avvisi";
 import { Conferma } from "../../componenti/Conferma";
 import { formattaPeriodo, idDaPercorso, oggiARoma } from "../../componenti/formato";
+import { IntestazionePagina } from "../../componenti/IntestazionePagina";
 import { Paginazione } from "../../componenti/Paginazione";
 import { Caricamento, Errore, Vuoto } from "../../componenti/Stati";
 import { ModificaEdizione, NuovaEdizione } from "./FormEdizione";
@@ -48,10 +49,10 @@ export function EdizioniCorso() {
   if (corsoId === null) {
     return (
       <Stack>
-        <Anchor component={Link} to="/gestione" size="sm">
-          ← Tutti i corsi
-        </Anchor>
-        <Title order={1}>Edizioni del corso</Title>
+        <IntestazionePagina
+          titolo="Edizioni del corso"
+          ritorno={{ a: "/gestione", etichetta: "Tutti i corsi" }}
+        />
         <Vuoto>Pagina non trovata.</Vuoto>
       </Stack>
     );
@@ -76,31 +77,36 @@ function Edizioni({ corsoId }: { corsoId: number }) {
 
   return (
     <Stack>
-      <Anchor component={Link} to="/gestione" size="sm">
-        ← Tutti i corsi
-      </Anchor>
-      {!corso.isSuccess && <Title order={1}>Edizioni del corso</Title>}
+      {!corso.isSuccess && (
+        <IntestazionePagina
+          titolo="Edizioni del corso"
+          ritorno={{ a: "/gestione", etichetta: "Tutti i corsi" }}
+        />
+      )}
       {corso.isPending && <Caricamento etichetta="Caricamento del corso" />}
       {corso.isError && <Errore errore={corso.error} riprova={() => void corso.refetch()} />}
       {corso.isSuccess && (
         <>
-          <Group justify="space-between" align="flex-end">
-            <Stack gap={0}>
-              <Title order={1}>{corso.data.dati.titolo}</Title>
-              <Text c="dimmed" size="sm">
+          <IntestazionePagina
+            titolo={corso.data.dati.titolo}
+            descrizione={
+              <>
                 {corso.data.dati.durata_ore} ore{archiviato && " · corso archiviato"}
-              </Text>
-            </Stack>
-            {!archiviato && (
-              <Button
-                onClick={() => {
-                  setNuova(true);
-                }}
-              >
-                Nuova edizione
-              </Button>
-            )}
-          </Group>
+              </>
+            }
+            ritorno={{ a: "/gestione", etichetta: "Tutti i corsi" }}
+            azione={
+              !archiviato && (
+                <Button
+                  onClick={() => {
+                    setNuova(true);
+                  }}
+                >
+                  Nuova edizione
+                </Button>
+              )
+            }
+          />
           <Title order={2} size="h3">
             Edizioni
           </Title>

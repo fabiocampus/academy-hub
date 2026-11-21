@@ -2,15 +2,20 @@
  * Come si entra (ADR-0008): con `oidc` il login è nostro (authorization code + PKCE sul
  * client pubblico di Keycloak); con `databricks` lo ha già fatto la piattaforma e il
  * proxy aggiunge l'identità a ogni richiesta, quindi non c'è niente da fare.
+ *
+ * Con `oidc` chi arriva senza sessione va alla pagina pubblica statica
+ * (`public/benvenuto.html`, ADR-0020); il suo «Accedi» torna qui con `?accedi=1`, che
+ * fa partire il login verso la pagina aperta all'inizio.
  */
 import { Alert, Button, Center, Loader, Stack, Text, Title } from "@mantine/core";
 import { UserManager, WebStorageStateStore, type User } from "oidc-client-ts";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { AuthProvider, useAuth } from "react-oidc-context";
 
 import { impostaAlNonAutenticato, impostaToken } from "../api/client";
 import type { Configurazione } from "../api/configurazione";
 import { ContestoSessione } from "./contesto";
+import { navigazione } from "./navigazione";
 
 type Oidc = NonNullable<Configurazione["oidc"]>;
 
@@ -39,7 +44,14 @@ export function collegaAlClient(gestore: UserManager): void {
   impostaAlNonAutenticato(() => void gestore.removeUser());
 }
 
-/** Dove tornare dopo il login: la pagina aperta quando si è cliccato «Accedi». */
+/** La pagina pubblica per chi non ha una sessione (servita come file statico). */
+export const PAGINA_PUBBLICA = "/benvenuto.html";
+/** Dove la pagina aperta senza sessione aspetta il login (sessionStorage, solo un percorso). */
+export const CHIAVE_RITORNO = "academy.ritorno";
+/** Il parametro con cui la pagina pubblica chiede di far partire il login. */
+const PARAMETRO_ACCEDI = "accedi";
+
+/** Dove tornare dopo il login: la pagina aperta quando si è arrivati senza sessione. */
 interface StatoLogin {
   ritorno: string;
 }
@@ -115,10 +127,35 @@ function AccessoOidc({ oidc, children }: { oidc: Oidc; children: ReactNode }) {
   );
 }
 
+/** Il ritorno salvato prima di andare alla pagina pubblica, letto una volta sola. */
+function prendiRitorno(): StatoLogin {
+  const salvato = window.sessionStorage.getItem(CHIAVE_RITORNO);
+  window.sessionStorage.removeItem(CHIAVE_RITORNO);
+  // Ripassa dal controllo dell'origine: sessionStorage è scrivibile da qualunque script.
+  return { ritorno: percorsoDiRitorno({ ritorno: salvato }) };
+}
+
 function ConLogin({ children }: { children: ReactNode }) {
   const auth = useAuth();
+  const inAttesa = auth.isLoading || auth.activeNavigator !== undefined;
+  const senzaSessione = !inAttesa && !auth.isAuthenticated && auth.error === undefined;
+  // react-oidc-context dà funzioni già legate e stabili: destrutturarla tiene l'effetto fermo.
+  // eslint-disable-next-line @typescript-eslint/unbound-method
+  const { signinRedirect } = auth;
 
-  if (auth.isLoading || auth.activeNavigator !== undefined) {
+  useEffect(() => {
+    if (!senzaSessione) {
+      return;
+    }
+    if (new URLSearchParams(window.location.search).get(PARAMETRO_ACCEDI) === "1") {
+      void signinRedirect({ state: prendiRitorno() });
+      return;
+    }
+    window.sessionStorage.setItem(CHIAVE_RITORNO, statoLogin(window.location).ritorno);
+    navigazione.sostituisci(PAGINA_PUBBLICA);
+  }, [senzaSessione, signinRedirect]);
+
+  if (inAttesa || senzaSessione) {
     return (
       <Center h="100vh" role="status" aria-label="Accesso in corso">
         <Loader />
@@ -128,16 +165,17 @@ function ConLogin({ children }: { children: ReactNode }) {
   if (!auth.isAuthenticated) {
     return (
       <Center h="100vh">
-        <Stack align="center" maw={420} p="md">
-          <Title order={1}>Academy Hub</Title>
-          <Text>Iscrizioni ai corsi dell&apos;Academy.</Text>
-          {auth.error !== undefined && (
-            <Alert color="red" title="Accesso non riuscito" w="100%">
-              {auth.error.message}
-            </Alert>
-          )}
-          <Button onClick={() => void auth.signinRedirect({ state: statoLogin(window.location) })}>
-            Accedi
+        <Stack align="flex-start" maw={480} p="md" gap="md">
+          <Title order={1}>Accesso non riuscito</Title>
+          <Text c="dimmed">
+            Il login con l&apos;account aziendale non è andato a buon fine. Riprova; se succede
+            ancora, scrivi all&apos;amministratore Academy.
+          </Text>
+          <Alert color="red" w="100%">
+            {auth.error?.message}
+          </Alert>
+          <Button onClick={() => void auth.signinRedirect({ state: { ritorno: "/" } })}>
+            Riprova ad accedere
           </Button>
         </Stack>
       </Center>
