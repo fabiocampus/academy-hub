@@ -147,7 +147,11 @@ function ConLogin({ children }: { children: ReactNode }) {
     if (!senzaSessione) {
       return;
     }
-    if (new URLSearchParams(window.location.search).get(PARAMETRO_ACCEDI) === "1") {
+    const indirizzo = new URL(window.location.href);
+    if (indirizzo.searchParams.get(PARAMETRO_ACCEDI) === "1") {
+      // Tolto dalla cronologia: con «Indietro» da Keycloak non si riparte verso il login.
+      indirizzo.searchParams.delete(PARAMETRO_ACCEDI);
+      window.history.replaceState(window.history.state, "", indirizzo);
       void signinRedirect({ state: prendiRitorno() });
       return;
     }

@@ -57,6 +57,11 @@ describe("Edizioni del corso", () => {
     pagina7();
 
     expect(await screen.findByRole("heading", { name: "SQL" })).toBeInTheDocument();
+    // Il ritorno porta a tutti i corsi (US-24).
+    expect(screen.getByRole("link", { name: "← Tutti i corsi" })).toHaveAttribute(
+      "href",
+      "/gestione",
+    );
     const righe = await screen.findAllByRole("row");
     expect(righe).toHaveLength(4);
     const prima = within(righe[1] as HTMLElement);

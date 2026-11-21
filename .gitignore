@@ -25,7 +25,9 @@ frontend/dist/
 playwright-report/
 test-results/
 # Stato del gate della taste-skill (screenshot, profilo del browser)
-frontend/.taste-skill/
+frontend/.taste-skill/*
+# ...tranne i falsi positivi accettati, con il motivo (ADR-0020)
+!frontend/.taste-skill/waivers.json
 
 # Terraform
 .terraform/

@@ -142,6 +142,8 @@ describe("Accesso", () => {
     mostraAccesso({ flag: FLAG_SPENTE, identita: "databricks", oidc: null });
 
     expect(screen.getByText("Area riservata")).toBeInTheDocument();
+    // Nessuna pagina pubblica: il proxy dell'App ha già fatto entrare (US-19).
+    expect(sostituisci).not.toHaveBeenCalled();
   });
 
   it("con l'identità provvisoria del backend non entra", () => {
@@ -175,6 +177,20 @@ describe("Accesso", () => {
     });
     expect(window.sessionStorage.getItem(CHIAVE_RITORNO)).toBe(null);
     expect(sostituisci).not.toHaveBeenCalled();
+    // Tornando indietro da Keycloak non si riparte verso il login.
+    expect(window.location.search).toBe("");
+  });
+
+  it("con ?accedi=1 un ritorno manomesso verso un altro sito diventa la radice", async () => {
+    window.sessionStorage.setItem(CHIAVE_RITORNO, "//esterno.example/trappola");
+    window.history.replaceState({}, "", "/?accedi=1");
+    const accedi = vi.spyOn(UserManager.prototype, "signinRedirect").mockResolvedValue();
+
+    mostraAccesso({ flag: FLAG_SPENTE, identita: "oidc", oidc: OIDC });
+
+    await vi.waitFor(() => {
+      expect(accedi).toHaveBeenCalledWith(expect.objectContaining({ state: { ritorno: "/" } }));
+    });
   });
 
   it("con ?accedi=1 e nessuna pagina ricordata torna alla radice", async () => {
