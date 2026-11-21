@@ -35,20 +35,20 @@ SELECT * FROM <catalogo>.qualita.esiti ORDER BY registrato_il DESC LIMIT 5;
 
 ### Fumo con `/health` 502 dopo «App started successfully»
 
-L'App parte ma il processo muore subito (`databricks apps get <app> -p academy`: `app_status.state` = `CRASHED`). Leggi i log:
+L'App parte ma il processo muore subito (`databricks apps get academy-hub-<target> -p academy`, `<target>` = `collaudo` o `prod`: `app_status.state` = `CRASHED`). Leggi i log:
 
 ```bash
-databricks apps logs <app> -p academy --tail-lines 120
+databricks apps logs academy-hub-<target> -p academy --tail-lines 120
 ```
 
 Se l'errore è `The endpoint has been disabled. Enable it using the API and retry.`, l'endpoint Lakebase del branch è disabilitato (successo il 2026-11-21 a collaudo e production insieme, dopo un giorno senza uso; il bundle non lo fa). Non è colpa del rilascio: niente rollback.
 
 ```bash
-databricks postgres list-endpoints projects/academy-hub/branches/<branch> -p academy -o json   # status.disabled
+databricks postgres list-endpoints projects/academy-hub/branches/<branch> -p academy -o json   # cerca status.disabled: true
 databricks postgres update-endpoint projects/academy-hub/branches/<branch>/endpoints/primary spec.disabled --json '{"spec":{"disabled":false}}' -p academy
 ```
 
-`<branch>` è `collaudo` o `production`; controlla sempre tutti e due, l'App di prod usa lo stesso progetto. Poi rilancia il job fallito: `gh run rerun <run_id> --failed`.
+`<branch>` è `collaudo` o `production`: possono essere disabilitati insieme, quindi controllali e riabilitali tutti e due prima di rilanciare. Poi rilancia il job fallito: `gh run rerun <run_id> --failed`.
 
 ## 3. Rollback (ADR-0015)
 
