@@ -15,7 +15,7 @@ terraform {
   required_providers {
     databricks = {
       source  = "databricks/databricks"
-      version = "~> 1.140.0"
+      version = "~> 1.144.0"
     }
     github = {
       source  = "integrations/github"
