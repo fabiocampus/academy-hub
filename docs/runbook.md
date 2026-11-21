@@ -45,7 +45,7 @@ Se l'errore è `The endpoint has been disabled. Enable it using the API and retr
 
 ```bash
 databricks postgres list-endpoints projects/academy-hub/branches/<branch> -p academy -o json   # status.disabled
-databricks postgres update-endpoint projects/academy-hub/branches/<branch>/endpoints/primary   spec.disabled --json '{"spec":{"disabled":false}}' -p academy
+databricks postgres update-endpoint projects/academy-hub/branches/<branch>/endpoints/primary spec.disabled --json '{"spec":{"disabled":false}}' -p academy
 ```
 
 `<branch>` è `collaudo` o `production`; controlla sempre tutti e due, l'App di prod usa lo stesso progetto. Poi rilancia il job fallito: `gh run rerun <run_id> --failed`.
