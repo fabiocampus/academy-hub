@@ -2,7 +2,9 @@
 
 Databricks Apps esegue un solo processo: FastAPI serve l'API sotto `/api`, la build
 di Vite (`frontend/dist`) e, per ogni altra GET, `index.html`, che lascia la rotta al
-router del client. Le rotte qui restano fuori dal contratto OpenAPI.
+router del client. Ogni file `.html` della build (anche la pagina pubblica
+`benvenuto.html`) esce con le intestazioni di `index.html`. Le rotte qui restano fuori
+dal contratto OpenAPI.
 """
 
 from pathlib import Path
@@ -109,5 +111,9 @@ def monta_frontend(app: FastAPI, cartella: Path, origini_esterne: list[str]) -> 
             raise HTTPException(404)
         file = (radice / percorso).resolve()
         if file != indice and file.is_relative_to(radice) and file.is_file():
+            # Un altro HTML (la pagina pubblica benvenuto.html) è una pagina come index:
+            # stessa CSP e niente cache, perché anche lui punta a file che cambiano.
+            if file.suffix == ".html":
+                return FileResponse(file, headers=intestazioni_indice)
             return FileResponse(file, headers={"X-Content-Type-Options": "nosniff"})
         return FileResponse(indice, headers=intestazioni_indice)

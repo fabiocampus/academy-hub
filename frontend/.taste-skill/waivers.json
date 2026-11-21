@@ -1,0 +1,7 @@
+[
+  {
+    "check": "button-styles",
+    "target": "(one screen)",
+    "reason": "i '7 mar', '10 mar', '12 mar' sono le date degli eventi nel frammento calendar del kit (un mock, non bottoni): il loop ne evidenzia una alla volta"
+  }
+]

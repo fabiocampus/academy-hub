@@ -31,7 +31,9 @@ export async function entra(browser: Browser, utente: Utente, percorso = "/"): P
   aperti.push(contesto);
   const pagina = await contesto.newPage();
   await pagina.goto(percorso);
-  await pagina.getByRole("button", { name: "Accedi" }).click();
+  // Senza sessione l'App manda alla pagina pubblica, che ricorda `percorso` per il ritorno.
+  await expect(pagina).toHaveURL(/\/benvenuto\.html$/);
+  await pagina.getByRole("link", { name: "Accedi con l'account aziendale" }).first().click();
   await pagina.getByLabel("Username or email").fill(utente);
   await pagina.getByLabel("Password", { exact: true }).fill(utente);
   await pagina.getByRole("button", { name: "Sign In" }).click();

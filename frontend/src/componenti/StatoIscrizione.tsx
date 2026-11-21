@@ -5,7 +5,7 @@ import type { Schemi } from "../api/client";
 export type Stato = Schemi["StatoIscrizione"];
 
 const COLORE: Record<Stato, string> = {
-  Richiesta: "blue",
+  Richiesta: "blu",
   Approvata: "teal",
   InAttesa: "yellow",
   Confermata: "green",

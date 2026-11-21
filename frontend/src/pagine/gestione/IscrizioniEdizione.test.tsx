@@ -69,6 +69,11 @@ describe("Iscrizioni dell'edizione", () => {
       await screen.findByRole("heading", { name: "SQL" }, { timeout: 3000 }),
     ).toBeInTheDocument();
     expect(screen.getByText("2 iscrizioni")).toBeInTheDocument();
+    // Il ritorno porta alle edizioni del corso (US-24).
+    expect(screen.getByRole("link", { name: "← Edizioni del corso" })).toHaveAttribute(
+      "href",
+      "/gestione/corsi/7",
+    );
     const righe = await screen.findAllByRole("row");
     expect(righe).toHaveLength(3);
     const bruno = within(righe[2] as HTMLElement);

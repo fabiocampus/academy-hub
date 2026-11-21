@@ -8,6 +8,13 @@ import { mostra } from "../test/render";
 import { Catalogo, PER_PAGINA } from "./Catalogo";
 
 describe("Catalogo", () => {
+  it("ha un'intestazione che dice cosa contiene (US-21)", async () => {
+    mostra(<Catalogo />);
+
+    expect(await screen.findByRole("heading", { level: 1, name: "Catalogo" })).toBeInTheDocument();
+    expect(screen.getByText(/Le edizioni in programma, con i posti liberi/)).toBeInTheDocument();
+  });
+
   it("mostra le edizioni con posti liberi e la mia iscrizione", async () => {
     server.use(
       http.get(`${API}/catalogo`, () =>

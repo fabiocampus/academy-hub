@@ -4,3 +4,7 @@ package-lock.json
 src/api/schema.d.ts
 playwright-report
 test-results
+# Pagina pubblica e kit della taste-skill: formattati e verificati dal suo gate (ADR-0020).
+public/benvenuto.html
+public/vetrina
+.taste-skill

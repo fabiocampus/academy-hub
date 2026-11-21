@@ -12,6 +12,9 @@ export default defineConfig(
       "postcss.config.cjs",
       "playwright-report",
       "test-results",
+      // Kit della taste-skill copiato com'è (MIT) e stato del suo gate (ADR-0020).
+      "public/vetrina",
+      ".taste-skill",
     ],
   },
   js.configs.recommended,

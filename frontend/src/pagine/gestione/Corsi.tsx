@@ -1,16 +1,5 @@
 /** Gestione Academy (issue #64): i corsi, archiviati compresi; creazione, modifica, archiviazione. */
-import {
-  Anchor,
-  Badge,
-  Button,
-  Group,
-  Modal,
-  Stack,
-  Table,
-  Text,
-  TextInput,
-  Title,
-} from "@mantine/core";
+import { Anchor, Badge, Button, Group, Modal, Stack, Table, Text, TextInput } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
 import { useState } from "react";
 import { Link } from "react-router";
@@ -18,6 +7,7 @@ import { Link } from "react-router";
 import type { Schemi } from "../../api/client";
 import { useArchiviaCorso, useCorsi, useCorso } from "../../api/gestione";
 import { avvisaSuccesso } from "../../componenti/avvisi";
+import { IntestazionePagina } from "../../componenti/IntestazionePagina";
 import { Conferma } from "../../componenti/Conferma";
 import { Paginazione } from "../../componenti/Paginazione";
 import { Caricamento, Errore, Vuoto } from "../../componenti/Stati";
@@ -43,16 +33,19 @@ export function Corsi() {
 
   return (
     <Stack>
-      <Group justify="space-between" align="flex-end">
-        <Title order={1}>Gestione corsi</Title>
-        <Button
-          onClick={() => {
-            setNuovo(true);
-          }}
-        >
-          Nuovo corso
-        </Button>
-      </Group>
+      <IntestazionePagina
+        titolo="Gestione corsi"
+        descrizione="Tutti i corsi dell'Academy, archiviati compresi: apri un corso per le sue edizioni."
+        azione={
+          <Button
+            onClick={() => {
+              setNuovo(true);
+            }}
+          >
+            Nuovo corso
+          </Button>
+        }
+      />
       <TextInput
         label="Cerca per titolo"
         type="search"
